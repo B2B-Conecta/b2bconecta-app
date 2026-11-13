@@ -162,12 +162,14 @@ abstract final class AliadoDocType {
     final slot = photoSlotIndex(type);
     final core = switch (base) {
       fotoTienda => 'Fotografías del local',
-      registroMercantil => 'Registro mercantil / cámara',
+      registroMercantil => 'Registro Mercantil',
       cedulaPropietario => 'Cédula del propietario',
       cedulaRepresentante => 'Cédula del representante legal',
-      referenciaBancaria1 => 'Referencia bancaria (1)',
-      referenciaBancaria2 => 'Referencia bancaria (2)',
-      referenciaComercial => 'Referencia comercial / carta crédito',
+      referenciaBancaria1 => 'Referencia Bancaria 1',
+      referenciaBancaria2 => 'Referencia Bancaria 2',
+      referenciaComercial => 'Registro Comercial / Carta de Crédito',
+      'registro_comercial_carta_credito' =>
+          'Registro Comercial / Carta de Crédito',
       actaConstitutiva => 'Acta constitutiva / estatutos (histórico)',
       _ => base,
     };

@@ -14,6 +14,7 @@ import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 import 'package:motolink_pro_app/features/orders/shared/stock_insufficient_exception.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_suspendidos_morosidad_exception.dart';
 import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
+import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_message_attachment.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_message_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -185,6 +186,7 @@ class OrdersService {
     flete_pago_aprobado_at,
     created_at,
     updated_at,
+    aliado_entrepreneur_badge,
     aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at ),
     importer_carrier:importer_carriers!transaction_requests_importer_carrier_id_fkey ( company_name, contact_phone, flete_pago_modo, accepted_pago_metodos, pago_metodo_instrucciones ),
     importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at, accepted_pago_metodos, pago_metodo_instrucciones, pago_solo_divisas )
@@ -332,17 +334,46 @@ class OrdersService {
         .toList();
   }
 
-  /// Conteo ligero de pedidos operativos activos (badge del rail admin).
+  /// Pedidos operativos activos para badge/rail admin.
+  ///
+  /// Cuenta **1 por pedido/carrito** (`checkout_group_id`), no por línea de
+  /// `transaction_requests` — misma regla que la bandeja «En curso».
   static Future<int> countActiveTransactionRequestsForAdmin() async {
-    final res = await SupabaseAccess.client
+    final response = await SupabaseAccess.client
         .from('transaction_requests')
-        .select('id')
+        .select('id, checkout_group_id')
         .inFilter(
           'status',
           TransactionRequestStatus.motoconectaAdminOperationalActive,
-        )
-        .count(CountOption.exact);
-    return (res as PostgrestResponse<dynamic>).count;
+        );
+    final list = response as List<dynamic>;
+    return countDistinctCheckoutOrders(
+      list.map((raw) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        return (
+          id: m['id']?.toString() ?? '',
+          checkoutGroupId: m['checkout_group_id']?.toString(),
+        );
+      }),
+    );
+  }
+
+  /// Pedidos (carritos) con al menos una línea `pendiente` — «Por confirmar».
+  static Future<int> countPendingConfirmationOrdersForAdmin() async {
+    final response = await SupabaseAccess.client
+        .from('transaction_requests')
+        .select('id, checkout_group_id')
+        .eq('status', TransactionRequestStatus.pendiente);
+    final list = response as List<dynamic>;
+    return countDistinctCheckoutOrders(
+      list.map((raw) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        return (
+          id: m['id']?.toString() ?? '',
+          checkoutGroupId: m['checkout_group_id']?.toString(),
+        );
+      }),
+    );
   }
 
   /// Pedidos cerrados: entregados o rechazados (admin).

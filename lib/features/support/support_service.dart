@@ -88,6 +88,15 @@ class SupportService {
     return (response as List<dynamic>).length;
   }
 
+  /// Reclamos abiertos / en revisión para badge del rail admin.
+  static Future<int> countOpenSupportTicketsForAdmin() async {
+    final response = await SupabaseAccess.client
+        .from('support_tickets')
+        .select('id')
+        .inFilter('status', SupportTicketStatus.openStatuses);
+    return (response as List<dynamic>).length;
+  }
+
   static Future<String> createSupportTicket({
     required String subject,
     required String category,

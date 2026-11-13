@@ -6,9 +6,11 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/accounts_table_skeleton.dart';
+import 'package:motolink_pro_app/features/admin/admin_entrepreneur_badge.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
 import 'package:motolink_pro_app/features/admin/owner_account_rules.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_retailer.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 enum UsersTableSortColumn { user, role, status, joined }
@@ -34,6 +36,9 @@ class UsersDataTable extends StatefulWidget {
     this.onReactivate,
     this.onHardDelete,
     this.onBulkDeactivate,
+    this.entrepreneursOnly = false,
+    this.onEntrepreneursOnlyChanged,
+    this.entrepreneurStatusFilter,
   });
 
   final List<ProfileModel> profiles;
@@ -54,6 +59,13 @@ class UsersDataTable extends StatefulWidget {
   /// Purga total (Super Admin / propietario).
   final ValueChanged<ProfileModel>? onHardDelete;
   final Future<void> Function(List<ProfileModel> selected)? onBulkDeactivate;
+
+  /// Chip «Solo Emprendedores» (control externo o interno).
+  final bool entrepreneursOnly;
+  final ValueChanged<bool>? onEntrepreneursOnlyChanged;
+
+  /// Filtro por `entrepreneur_status` (bandejas del dashboard).
+  final String? entrepreneurStatusFilter;
 
   /// Filas de demostración (sector mayorista VE) cuando no hay datos.
   static List<ProfileModel> sampleRows({DateTime? now}) {
@@ -138,15 +150,33 @@ class _UsersDataTableState extends State<UsersDataTable> {
   bool _sortAsc = false;
   int _pageIndex = 0;
   late int _pageSize;
+  late bool _entrepreneursOnly;
 
   @override
   void initState() {
     super.initState();
+    _entrepreneursOnly = widget.entrepreneursOnly;
     _pageSize = widget.pageSize.clamp(1, 50);
     if (!listPageSizeOptions.contains(_pageSize)) {
       _pageSize = listPageSizeOptions.first;
     }
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
+  }
+
+  @override
+  void didUpdateWidget(covariant UsersDataTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entrepreneursOnly != widget.entrepreneursOnly) {
+      _entrepreneursOnly = widget.entrepreneursOnly;
+      _pageIndex = 0;
+    }
+    if (oldWidget.entrepreneurStatusFilter != widget.entrepreneurStatusFilter) {
+      _pageIndex = 0;
+      if (widget.entrepreneurStatusFilter != null &&
+          widget.entrepreneurStatusFilter!.trim().isNotEmpty) {
+        _entrepreneursOnly = true;
+      }
+    }
   }
 
   @override
@@ -170,7 +200,17 @@ class _UsersDataTableState extends State<UsersDataTable> {
 
   List<ProfileModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
+    final statusFilter = widget.entrepreneurStatusFilter?.trim().toLowerCase();
     final list = _source.where((p) {
+      if (_entrepreneursOnly && !p.isEntrepreneurRetailer) return false;
+      if (statusFilter != null && statusFilter.isNotEmpty) {
+        final st = p.entrepreneurStatus?.trim().toLowerCase();
+        if (statusFilter == EntrepreneurStatus.pendingWarningPeriod) {
+          if (!EntrepreneurStatus.isFirstPurchaseWarning(st)) return false;
+        } else if (st != statusFilter) {
+          return false;
+        }
+      }
       if (q.isEmpty) return true;
       final name = (p.businessName ?? '').toLowerCase();
       final email = (p.email ?? '').toLowerCase();
@@ -286,7 +326,7 @@ class _UsersDataTableState extends State<UsersDataTable> {
         bg: dark ? AdminUsersChrome.zebra : const Color(0xFFF8FAFC),
         fg: dark ? AdminUsersChrome.muted : const Color(0xFF475569),
       ),
-      'Taller comprador',
+      'Tienda minorista',
     );
   }
 
@@ -358,6 +398,15 @@ class _UsersDataTableState extends State<UsersDataTable> {
             resultCount: filtered.length,
             usingSamples: _usingSamples,
             selectedCount: _selected.length,
+            entrepreneursOnly: _entrepreneursOnly,
+            entrepreneurStatusFilter: widget.entrepreneurStatusFilter,
+            onEntrepreneursOnlyChanged: (v) {
+              setState(() {
+                _entrepreneursOnly = v;
+                _pageIndex = 0;
+              });
+              widget.onEntrepreneursOnlyChanged?.call(v);
+            },
             onCreate: widget.onCreate,
             onBulkDeactivate:
                 _selected.isEmpty ? null : () => _bulkDeactivate(),
@@ -414,9 +463,17 @@ class _UsersDataTableState extends State<UsersDataTable> {
                       _AccountsEmptyState(
                         onClear: () {
                           _searchCtrl.clear();
-                          setState(() => _pageIndex = 0);
+                          setState(() {
+                            _entrepreneursOnly = false;
+                            _pageIndex = 0;
+                          });
+                          widget.onEntrepreneursOnlyChanged?.call(false);
                         },
-                        showClear: hasQuery || _selected.isNotEmpty,
+                        showClear: hasQuery ||
+                            _selected.isNotEmpty ||
+                            _entrepreneursOnly ||
+                            (widget.entrepreneurStatusFilter?.isNotEmpty ??
+                                false),
                       )
                     else
                       for (var i = 0; i < page.length; i++)
@@ -503,6 +560,9 @@ class _Toolbar extends StatelessWidget {
     required this.resultCount,
     required this.usingSamples,
     required this.selectedCount,
+    required this.entrepreneursOnly,
+    required this.onEntrepreneursOnlyChanged,
+    this.entrepreneurStatusFilter,
     this.onCreate,
     this.onBulkDeactivate,
     this.onRefresh,
@@ -512,6 +572,9 @@ class _Toolbar extends StatelessWidget {
   final int resultCount;
   final bool usingSamples;
   final int selectedCount;
+  final bool entrepreneursOnly;
+  final ValueChanged<bool> onEntrepreneursOnlyChanged;
+  final String? entrepreneurStatusFilter;
   final VoidCallback? onCreate;
   final VoidCallback? onBulkDeactivate;
   final Future<void> Function()? onRefresh;
@@ -522,6 +585,14 @@ class _Toolbar extends StatelessWidget {
       builder: (context, constraints) {
         final theme = B2BThemeExtension.of(context);
         final narrow = constraints.maxWidth < 640;
+        final statusHint = switch (entrepreneurStatusFilter?.trim()) {
+          EntrepreneurStatus.pendingWarningPeriod ||
+          EntrepreneurStatus.pendingFirstPurchaseAlert =>
+            'Cuenta regresiva 3 d',
+          EntrepreneurStatus.expiredLocked => 'Bloqueados',
+          EntrepreneurStatus.reactivationRequested => 'Reactivación',
+          _ => null,
+        };
         final search = TextField(
           controller: searchCtrl,
           decoration: InputDecoration(
@@ -556,19 +627,49 @@ class _Toolbar extends StatelessWidget {
           ),
         );
 
+        final entrepreneursChip = FilterChip(
+          selected: entrepreneursOnly,
+          label: Text(
+            statusHint == null
+                ? 'Solo Emprendedores'
+                : 'Emprendedores · $statusHint',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          avatar: LucideIcon(
+            LucideGlyph.sparkles,
+            size: 14,
+            color: entrepreneursOnly ? theme.warningFg : theme.textSecondary,
+          ),
+          selectedColor: theme.warningBg,
+          checkmarkColor: theme.warningFg,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: entrepreneursOnly ? theme.warningFg : theme.textSecondary,
+          ),
+          side: BorderSide(
+            color: entrepreneursOnly
+                ? theme.warningFg.withOpacity(0.35)
+                : theme.borderSubtle,
+          ),
+          onSelected: onEntrepreneursOnlyChanged,
+        );
+
         final actions = Wrap(
           spacing: 8,
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
+            entrepreneursChip,
             Text(
               usingSamples
                   ? '$resultCount ejemplo${resultCount == 1 ? '' : 's'}'
                   : '$resultCount resultado${resultCount == 1 ? '' : 's'}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF64748B),
+                color: theme.textSecondary,
               ),
             ),
             if (selectedCount > 0)
@@ -1047,12 +1148,14 @@ class _UserRowState extends State<_UserRow> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         badge(roleLabel, roleStyle.bg, roleStyle.fg),
+                        if (widget.profile.isEntrepreneurRetailer)
+                          const AdminEntrepreneurBadge(compact: true),
                         status,
                         Text(
                           widget.joinDate,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF64748B),
+                            color: B2BThemeExtension.of(context).textSecondary,
                           ),
                         ),
                       ],
@@ -1085,7 +1188,16 @@ class _UserRowState extends State<_UserRow> {
               flex: 2,
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: badge(roleLabel, roleStyle.bg, roleStyle.fg),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    badge(roleLabel, roleStyle.bg, roleStyle.fg),
+                    if (widget.profile.isEntrepreneurRetailer)
+                      const AdminEntrepreneurBadge(compact: true),
+                  ],
+                ),
               ),
             ),
             Expanded(

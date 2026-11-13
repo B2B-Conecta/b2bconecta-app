@@ -75,6 +75,7 @@ class AdminCheckoutGroupMasterHeader extends StatelessWidget {
             logoStoragePath: r.aliadoLogoStoragePath,
             kycStatus: r.aliadoKycStatus,
             catalogVerifiedAt: r.aliadoCatalogVerifiedAt,
+            showEntrepreneurBadge: r.aliadoEntrepreneurBadge,
           ),
         ),
         const SizedBox(height: kOrderCardSectionGap),

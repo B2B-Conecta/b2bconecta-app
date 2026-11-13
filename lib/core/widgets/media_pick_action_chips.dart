@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/app/theme/theme_controller.dart';
 
 /// Acciones de captura/selección de medios.
@@ -81,17 +82,34 @@ class MediaPickActionChips extends StatelessWidget {
       );
     }
 
+    final theme = B2BThemeExtension.of(context);
     final button = OutlinedButton.icon(
       onPressed: pick,
-      icon: const Icon(Icons.attach_file, size: 18),
-      label: Text(buttonLabel),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: active ? AppColors.brandLink : AppColors.textMuted,
-        side: BorderSide(
-          color: active ? AppColors.brandLink : AppColors.borderSubtle,
+      icon: Icon(
+        compact ? Icons.upload_outlined : Icons.attach_file,
+        size: compact ? 16 : 18,
+      ),
+      label: Text(
+        buttonLabel,
+        style: TextStyle(
+          fontSize: compact ? 12.5 : 14,
+          fontWeight: FontWeight.w700,
         ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: active ? theme.brand : theme.textMuted,
+        side: BorderSide(
+          color: active ? theme.brand : theme.borderSubtle,
+        ),
+        backgroundColor: theme.surfaceCard,
         visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
-        minimumSize: Size(compact ? 0 : double.infinity, compact ? 32 : 44),
+        minimumSize: Size(compact ? 0 : double.infinity, compact ? 34 : 44),
+        padding: compact
+            ? const EdgeInsets.symmetric(horizontal: 10)
+            : null,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
       ),
     );
     if (compact) return button;

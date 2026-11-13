@@ -3,6 +3,7 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/admin_collapsible_section.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_seals.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_status_highlight_widgets.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_badge_chip.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_counterparty_profile_section.dart';
 
 /// Aliado en ficha admin: datos esenciales; detalle fiscal bajo demanda.
@@ -20,6 +21,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
     this.logoStoragePath,
     this.kycStatus,
     this.catalogVerifiedAt,
+    this.showEntrepreneurBadge = false,
   });
 
   final String profileId;
@@ -33,6 +35,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
   final String? logoStoragePath;
   final String? kycStatus;
   final DateTime? catalogVerifiedAt;
+  final bool showEntrepreneurBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +45,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
         name: businessName,
         kycStatus: kycStatus,
         catalogVerified: catalogVerifiedAt != null,
+        showEntrepreneurBadge: showEntrepreneurBadge,
       ),
       subtitle: _subtitleWidget(),
       child: TransactionRequestCounterpartyProfileSection(
@@ -57,6 +61,7 @@ class AdminCompactAliadoCard extends StatelessWidget {
         logoStoragePath: logoStoragePath,
         kycStatus: kycStatus,
         catalogVerifiedAt: catalogVerifiedAt,
+        showEntrepreneurBadge: showEntrepreneurBadge,
         loadApprovedDocuments: true,
       ),
     );
@@ -168,12 +173,14 @@ class _CompactPartyHeader extends StatelessWidget {
     required this.name,
     this.kycStatus,
     this.catalogVerified = false,
+    this.showEntrepreneurBadge = false,
   });
 
   final String label;
   final String? name;
   final String? kycStatus;
   final bool catalogVerified;
+  final bool showEntrepreneurBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +203,8 @@ class _CompactPartyHeader extends StatelessWidget {
             fontSize: 13,
           ),
         ),
-        if (catalogVerified ||
+        if (showEntrepreneurBadge ||
+            catalogVerified ||
             (kycStatus != null && kycStatus!.trim().isNotEmpty)) ...[
           const SizedBox(height: 4),
           Wrap(
@@ -204,6 +212,8 @@ class _CompactPartyHeader extends StatelessWidget {
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              if (showEntrepreneurBadge)
+                const EntrepreneurBadgeChip(compact: true),
               if (catalogVerified)
                 const ImporterCatalogSealChip(
                   kind: ImporterCatalogSealKind.verified,

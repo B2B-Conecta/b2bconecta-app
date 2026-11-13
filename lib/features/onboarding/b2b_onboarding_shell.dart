@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 
 /// Layout onboarding / registro B2B: panel de marca en escritorio + formulario centrado.
@@ -12,58 +13,35 @@ class B2bOnboardingShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= AppBreakpoints.authDesktop;
 
         if (!isDesktop) {
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: AppBreakpoints.formMaxWidth,
-                  ),
-                  child: child,
-                ),
-              ),
-            ),
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Expanded(flex: 5, child: _B2bOnboardingBrandingPanel()),
-            Expanded(
-              flex: 5,
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 28,
-                  ),
+          return ColoredBox(
+            color: theme.background,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
                       maxWidth: AppBreakpoints.formMaxWidth,
                     ),
                     child: Material(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.surfaceTinted
-                          : AppColors.white,
+                      color: theme.surfaceCard,
                       elevation: 0,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       clipBehavior: Clip.antiAlias,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.borderSubtle),
-                          boxShadow: AppDecorations.cardShadow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.borderSubtle),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
                           child: child,
                         ),
                       ),
@@ -72,7 +50,56 @@ class B2bOnboardingShell extends StatelessWidget {
                 ),
               ),
             ),
-          ],
+          );
+        }
+
+        return ColoredBox(
+          color: theme.background,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Expanded(flex: 5, child: _B2bOnboardingBrandingPanel()),
+              Expanded(
+                flex: 5,
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 28,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: AppBreakpoints.formMaxWidth,
+                      ),
+                      child: Material(
+                        color: theme.surfaceCard,
+                        elevation: 0,
+                        borderRadius: BorderRadius.circular(20),
+                        clipBehavior: Clip.antiAlias,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: theme.borderSubtle),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.textPrimary.withOpacity(0.06),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+                            child: child,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -84,15 +111,17 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final onBrand = theme.surfaceCard;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.black,
-            AppColors.brandBlue,
-            AppColors.brandAccent,
+            theme.brand,
+            Color.lerp(theme.brand, theme.textPrimary, 0.35)!,
+            theme.brand,
           ],
         ),
       ),
@@ -103,15 +132,14 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Un solo logo de plataforma en el panel; el formulario no lo repite.
               const MotoLinkProLogo(height: 64, forceWhite: true),
               const SizedBox(height: 28),
-              const Text(
+              Text(
                 'Complete su perfil B2B',
                 style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.white,
+                  color: onBrand,
                   height: 1.15,
                   letterSpacing: -0.5,
                 ),
@@ -119,27 +147,37 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Registre su negocio, verifique documentos y acceda al catálogo, '
-                'pedidos y operaciones.',
+                'pedidos y operaciones. Los emprendedores pueden empezar hoy y '
+                'completar el expediente en 8 semanas.',
                 style: TextStyle(
                   fontSize: 15.5,
                   height: 1.5,
-                  color: AppColors.white.withOpacity(0.88),
+                  color: onBrand.withOpacity(0.9),
                 ),
               ),
               const SizedBox(height: 32),
-              const _BrandingBullet(
-                icon: Icons.storefront_outlined,
-                label: 'Datos fiscales y ubicación del taller',
+              _BrandingBullet(
+                glyph: LucideGlyph.store,
+                label: 'Datos fiscales y ubicación del negocio',
+                color: onBrand,
               ),
               const SizedBox(height: 12),
-              const _BrandingBullet(
-                icon: Icons.folder_shared_outlined,
+              _BrandingBullet(
+                glyph: LucideGlyph.sparkles,
+                label: 'Opción Minorista-Emprendedor con acceso inmediato',
+                color: onBrand,
+              ),
+              const SizedBox(height: 12),
+              _BrandingBullet(
+                glyph: LucideGlyph.shieldCheck,
                 label: 'Verificación documental segura',
+                color: onBrand,
               ),
               const SizedBox(height: 12),
-              const _BrandingBullet(
-                icon: Icons.dashboard_outlined,
-                label: 'Acceso al panel cuando se apruebe su cuenta',
+              _BrandingBullet(
+                glyph: LucideGlyph.layoutDashboard,
+                label: 'Acceso al panel según su modalidad',
+                color: onBrand,
               ),
             ],
           ),
@@ -150,17 +188,22 @@ class _B2bOnboardingBrandingPanel extends StatelessWidget {
 }
 
 class _BrandingBullet extends StatelessWidget {
-  const _BrandingBullet({required this.icon, required this.label});
+  const _BrandingBullet({
+    required this.glyph,
+    required this.label,
+    required this.color,
+  });
 
-  final IconData icon;
+  final LucideGlyph glyph;
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 22, color: Colors.white.withOpacity(0.92)),
+        LucideIcon(glyph, size: 20, color: color.withOpacity(0.95)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -168,7 +211,7 @@ class _BrandingBullet extends StatelessWidget {
             style: TextStyle(
               fontSize: 14.5,
               height: 1.4,
-              color: Colors.white.withOpacity(0.9),
+              color: color.withOpacity(0.92),
               fontWeight: FontWeight.w600,
             ),
           ),

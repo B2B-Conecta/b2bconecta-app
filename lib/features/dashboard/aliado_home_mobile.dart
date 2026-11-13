@@ -638,6 +638,14 @@ extension on _AliadoHomeDashboardState {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   _mobileHeader(),
+                  if (EntrepreneurFirstPurchaseWarningBanner.maybe(
+                          widget.profile)
+                      case final warningBanner?)
+                    _block(warningBanner, top: 12)
+                  else if (EntrepreneurRailStatusCard.homeBanner(
+                          widget.profile)
+                      case final entrepreneurBanner?)
+                    _block(entrepreneurBanner, top: 12),
                   if (snapshot.connectionState != ConnectionState.done &&
                       data == null)
                     const SliverFillRemaining(

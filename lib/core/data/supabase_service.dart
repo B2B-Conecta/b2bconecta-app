@@ -705,6 +705,32 @@ class SupabaseService {
   static Future<void> acceptTerms({required String version}) =>
       ProfileService.acceptTerms(version: version);
 
+  static Future<ProfileModel> completeEntrepreneurRegistration({
+    required String phone,
+    required String rif,
+    required String cedula,
+    required String direccion,
+    String? businessName,
+    String? termsVersion,
+  }) =>
+      ProfileService.completeEntrepreneurRegistration(
+        phone: phone,
+        rif: rif,
+        cedula: cedula,
+        direccion: direccion,
+        businessName: businessName,
+        termsVersion: termsVersion,
+      );
+
+  static Future<void> markEntrepreneurWelcomeSeen() =>
+      ProfileService.markEntrepreneurWelcomeSeen();
+
+  static Future<String?> syncMyEntrepreneurExpiry() =>
+      ProfileService.syncMyEntrepreneurExpiry();
+
+  static Future<String> requestEntrepreneurReactivation() =>
+      ProfileService.requestEntrepreneurReactivation();
+
   static Future<List<ProfileDocumentModel>> fetchMyProfileDocuments() =>
       KycService.fetchMyProfileDocuments();
 
@@ -1200,6 +1226,18 @@ class SupabaseService {
 
   static Future<List<ProfileModel>> ownerListProfiles() =>
       AdminService.ownerListProfiles();
+
+  static Future<List<ProfileModel>> adminListEntrepreneurAlerts() =>
+      AdminService.adminListEntrepreneurAlerts();
+
+  static Future<void> adminExtendEntrepreneurKyc({
+    required String aliadoId,
+    int extraDays = 14,
+  }) =>
+      AdminService.adminExtendEntrepreneurKyc(
+        aliadoId: aliadoId,
+        extraDays: extraDays,
+      );
 
   static Future<List<ProfileModel>> ownerListProfilesWithDossier() =>
       AdminService.ownerListProfilesWithDossier();

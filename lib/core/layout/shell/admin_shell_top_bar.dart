@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'shell_destination.dart';
@@ -35,6 +36,10 @@ class AdminShellTopBar extends StatefulWidget implements PreferredSizeWidget {
     this.showThemeToggle = true,
     this.showUserAvatar = false,
     this.onBreadcrumbBack,
+    this.showGlobalSearch = true,
+    this.onMessagesTap,
+    this.unreadMessages = 0,
+    this.trailingActions = const [],
   });
 
   final List<AdminShellBreadcrumb> breadcrumbs;
@@ -55,6 +60,12 @@ class AdminShellTopBar extends StatefulWidget implements PreferredSizeWidget {
 
   /// Retroceso contextual en subvistas profundas (Registro Incompleto, detalle…).
   final VoidCallback? onBreadcrumbBack;
+
+  /// Búsqueda global (admin). Los paneles B2B pueden ocultarla.
+  final bool showGlobalSearch;
+  final VoidCallback? onMessagesTap;
+  final int unreadMessages;
+  final List<Widget> trailingActions;
 
   static const double height = 64;
   static const double mobileMenuBreakpoint = AppBreakpoints.mobileMenu;
@@ -81,31 +92,13 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
     final theme = B2BThemeExtension.of(context);
     final showMenu = widget.onOpenDrawer != null &&
         width < AdminShellTopBar.mobileMenuBreakpoint;
-    final showSearch = width >= 560;
+    final showSearch = widget.showGlobalSearch && width >= 560;
     final barBg = theme.surfaceCard;
     final barBorder = theme.borderStrong;
     final iconColor = theme.textPrimary;
     final mutedIcon = theme.textSecondary;
 
-    return Shortcuts(
-      shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.keyK, meta: true):
-            _FocusAdminSearchIntent(),
-        SingleActivator(LogicalKeyboardKey.keyK, control: true):
-            _FocusAdminSearchIntent(),
-      },
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          _FocusAdminSearchIntent: CallbackAction<_FocusAdminSearchIntent>(
-            onInvoke: (_) {
-              _openGlobalSearch();
-              return null;
-            },
-          ),
-        },
-        child: Focus(
-          autofocus: true,
-          child: Material(
+    Widget bar = Material(
             color: barBg,
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -144,29 +137,37 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
                           onBack: widget.onBreadcrumbBack,
                         ),
                       ),
-                      if (showSearch) ...[
-                        const SizedBox(width: 12),
-                        _GlobalSearchField(
-                          onOpen: _openGlobalSearch,
-                        ),
-                      ] else ...[
-                        IconButton(
-                          tooltip: 'Buscar (⌘K)',
-                          onPressed: _openGlobalSearch,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(
-                              AppBreakpoints.minTouchTarget,
-                              AppBreakpoints.minTouchTarget,
+                      if (widget.showGlobalSearch) ...[
+                        if (showSearch) ...[
+                          const SizedBox(width: 12),
+                          _GlobalSearchField(
+                            onOpen: _openGlobalSearch,
+                          ),
+                        ] else ...[
+                          IconButton(
+                            tooltip: 'Buscar (⌘K)',
+                            onPressed: _openGlobalSearch,
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(
+                                AppBreakpoints.minTouchTarget,
+                                AppBreakpoints.minTouchTarget,
+                              ),
+                            ),
+                            icon: LucideIcon(
+                              LucideGlyph.search,
+                              size: 20,
+                              color: mutedIcon,
                             ),
                           ),
-                          icon: LucideIcon(
-                            LucideGlyph.search,
-                            size: 20,
-                            color: mutedIcon,
-                          ),
-                        ),
+                        ],
+                        const SizedBox(width: 8),
                       ],
-                      const SizedBox(width: 8),
+                      ...widget.trailingActions,
+                      if (widget.onMessagesTap != null)
+                        MessagesIconButton(
+                          onPressed: widget.onMessagesTap!,
+                          unreadCount: widget.unreadMessages,
+                        ),
                       _NotificationBell(
                         unread: widget.unreadNotifications,
                         onTap: widget.onNotificationTap,
@@ -190,7 +191,29 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
                 ),
               ),
             ),
+          );
+
+    if (!widget.showGlobalSearch) return bar;
+
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            _FocusAdminSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            _FocusAdminSearchIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _FocusAdminSearchIntent: CallbackAction<_FocusAdminSearchIntent>(
+            onInvoke: (_) {
+              _openGlobalSearch();
+              return null;
+            },
           ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: bar,
         ),
       ),
     );

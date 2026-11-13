@@ -16,6 +16,7 @@ class B2bDataTableShell extends StatelessWidget {
     this.footer,
     this.padding = const EdgeInsets.all(16),
     this.empty,
+    this.rowsBusy = false,
   });
 
   /// Contenido libre (si no se usa [header]/[rows]).
@@ -28,9 +29,35 @@ class B2bDataTableShell extends StatelessWidget {
   final Widget? empty;
   final EdgeInsetsGeometry padding;
 
+  /// Atenúa las filas + barra de progreso al paginar (fetch remoto).
+  final bool rowsBusy;
+
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
+    final tableBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (header != null) header!,
+        if (rowsBusy)
+          LinearProgressIndicator(
+            minHeight: 2,
+            backgroundColor: theme.surfaceSubtle,
+            color: theme.brand,
+          ),
+        if (rows.isEmpty && empty != null)
+          empty!
+        else
+          AnimatedOpacity(
+            opacity: rowsBusy ? 0.55 : 1,
+            duration: const Duration(milliseconds: 160),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: rows,
+            ),
+          ),
+      ],
+    );
     final body = child ??
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -46,16 +73,7 @@ class B2bDataTableShell extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 side: BorderSide(color: theme.borderSubtle),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (header != null) header!,
-                  if (rows.isEmpty && empty != null)
-                    empty!
-                  else
-                    ...rows,
-                ],
-              ),
+              child: tableBody,
             ),
             if (footer != null) ...[
               const SizedBox(height: 8),

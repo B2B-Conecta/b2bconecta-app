@@ -97,6 +97,7 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
       logoStoragePath: r.aliadoLogoStoragePath,
       kycStatus: r.aliadoKycStatus,
       catalogVerifiedAt: r.aliadoCatalogVerifiedAt,
+      showEntrepreneurBadge: r.aliadoEntrepreneurBadge,
       loadApprovedDocuments: !embedded,
     );
     final importadorProfile = TransactionRequestCounterpartyProfileSection(
@@ -192,6 +193,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
       logoStoragePath: r.aliadoLogoStoragePath,
       kycStatus: r.aliadoKycStatus,
       catalogVerifiedAt: r.aliadoCatalogVerifiedAt,
+      showEntrepreneurBadge: r.aliadoEntrepreneurBadge,
       loadApprovedDocuments: !embedded,
     );
 

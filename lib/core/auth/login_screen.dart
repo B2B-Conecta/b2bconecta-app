@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
+import 'package:motolink_pro_app/app/config/terms_config.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_storage.dart';
 import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
 import 'package:motolink_pro_app/core/auth/browser_location.dart';
+import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/features/referrals/referral_invite_config.dart';
 import 'package:motolink_pro_app/features/ads/ad_attribution_storage.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
+import 'package:motolink_pro_app/features/kyc/aliado_doc_type.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_register_section.dart';
+import 'package:motolink_pro_app/features/onboarding/pending_signup_role_storage.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
@@ -42,10 +48,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _referralController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _rifController = TextEditingController();
+  final _cedulaController = TextEditingController();
+  final _locationController = TextEditingController();
   late _AuthMode _mode;
+  PublicSignupRole _signupRole = PublicSignupRole.aliado;
+  bool _entrepreneurEnabled = false;
+  final List<PickedDocumentBytes> _localPhotos = [];
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+
+  bool get _isEntrepreneurSignup =>
+      _mode == _AuthMode.register &&
+      _signupRole == PublicSignupRole.aliado &&
+      _entrepreneurEnabled;
 
   @override
   void initState() {
@@ -117,6 +135,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _referralController.dispose();
+    _phoneController.dispose();
+    _rifController.dispose();
+    _cedulaController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
@@ -176,6 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
+    final isEntrepreneur = _isEntrepreneurSignup;
 
     if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
       _showSnackBar('Completa todos los campos', isError: true);
@@ -195,6 +218,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    if (isEntrepreneur) {
+      final phone = _phoneController.text.trim();
+      final rif = _rifController.text.trim();
+      final cedula = _cedulaController.text.trim();
+      final location = _locationController.text.trim();
+      if (phone.isEmpty || rif.isEmpty || cedula.isEmpty || location.isEmpty) {
+        _showSnackBar(
+          'Completa teléfono, RIF, cédula y ubicación.',
+          isError: true,
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       final referral =
@@ -202,12 +239,44 @@ class _LoginScreenState extends State<LoginScreen> {
       if (referral.isNotEmpty) {
         await ReferralInviteStorage.savePendingCode(referral);
       }
+      final pendingRole = _signupRole == PublicSignupRole.importador
+          ? 'importador'
+          : 'aliado';
+      if (!isEntrepreneur) {
+        await PendingSignupRoleStorage.save(pendingRole);
+      } else {
+        await PendingSignupRoleStorage.clear();
+      }
+
       final res = await AuthService.signUpWithPassword(
         email: email,
         password: password,
         referralCode: referral.isEmpty ? null : referral,
       );
       if (!mounted) return;
+
+      if (isEntrepreneur) {
+        if (res.session == null) {
+          _showSnackBar(
+            'Revisa tu correo para confirmar la cuenta. Luego inicia sesión '
+            'para completar tu alta de emprendedor.',
+            isError: false,
+          );
+          return;
+        }
+        await SupabaseService.completeEntrepreneurRegistration(
+          phone: _phoneController.text.trim(),
+          rif: _rifController.text.trim(),
+          cedula: _cedulaController.text.trim(),
+          direccion: _locationController.text.trim(),
+          termsVersion: TermsConfig.currentVersion,
+        );
+        await _uploadEntrepreneurPhotosIfAny();
+        if (!mounted) return;
+        _showSnackBar('Cuenta emprendedor creada. Bienvenido.');
+        return;
+      }
+
       if (res.session != null) {
         _showSnackBar('Cuenta creada. Bienvenido.');
       } else {
@@ -227,9 +296,36 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _uploadEntrepreneurPhotosIfAny() async {
+    final slots = AliadoDocType.photoSlotsFor(AliadoDocType.storePhotoBase);
+    for (var i = 0; i < _localPhotos.length && i < slots.length; i++) {
+      final photo = _localPhotos[i];
+      try {
+        await SupabaseService.uploadMyProfileDocument(
+          docType: slots[i],
+          bytes: photo.bytes,
+          fileName: photo.fileName,
+        );
+      } catch (e, st) {
+        debugPrint('[entrepreneur photos] $e\n$st');
+      }
+    }
+  }
+
+  Future<void> _pickEntrepreneurPhoto() async {
+    if (_localPhotos.length >= 3 || _isLoading) return;
+    final picked = await pickKycDocumentBytes(context);
+    if (!mounted || picked == null) return;
+    setState(() => _localPhotos.add(picked));
+  }
+
   Future<void> _signInWithGoogle() async {
     if (_mode == _AuthMode.register) {
       trackRegistrationStarted();
+      final pendingRole = _signupRole == PublicSignupRole.importador
+          ? 'importador'
+          : 'aliado';
+      await PendingSignupRoleStorage.save(pendingRole);
     }
     setState(() => _isLoading = true);
     try {
@@ -313,10 +409,32 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildFormFields() {
+    final showEntrepreneurExtras = _isEntrepreneurSignup;
     return AutofillGroup(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_mode == _AuthMode.register) ...[
+            PublicSignupRoleSection(
+              role: _signupRole,
+              entrepreneurEnabled: _entrepreneurEnabled,
+              enabled: !_isLoading,
+              onRoleChanged: (role) {
+                if (_isLoading) return;
+                setState(() {
+                  _signupRole = role;
+                  if (role == PublicSignupRole.importador) {
+                    _entrepreneurEnabled = false;
+                  }
+                });
+              },
+              onEntrepreneurChanged: (v) {
+                if (_isLoading) return;
+                setState(() => _entrepreneurEnabled = v);
+              },
+            ),
+            const SizedBox(height: 18),
+          ],
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
@@ -337,7 +455,8 @@ class _LoginScreenState extends State<LoginScreen> {
             textInputAction: _mode == _AuthMode.login
                 ? TextInputAction.done
                 : TextInputAction.next,
-            onSubmitted: _mode == _AuthMode.login && !_isLoading ? (_) => _login() : null,
+            onSubmitted:
+                _mode == _AuthMode.login && !_isLoading ? (_) => _login() : null,
             decoration: _inputDecoration(
               hint: 'Contraseña',
               prefixIcon: Icons.lock_outlined,
@@ -377,29 +496,54 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _referralController,
-              textCapitalization: TextCapitalization.characters,
-              textInputAction: TextInputAction.done,
-              onSubmitted: !_isLoading ? (_) => _register() : null,
-              decoration: _inputDecoration(
-                hint: 'Código de vendedor / referido (opcional)',
-                prefixIcon: Icons.qr_code_2_outlined,
-                suffixIcon: IconButton(
-                  tooltip: 'Escanear QR',
-                  onPressed: _isLoading
-                      ? null
-                      : () async {
-                          final code = await ReferralQrScanSheet.scan(context);
-                          if (!mounted || code == null) return;
-                          setState(() {
-                            _referralController.text = code;
-                          });
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: showEntrepreneurExtras
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: EntrepreneurSignupFields(
+                        phoneController: _phoneController,
+                        rifController: _rifController,
+                        cedulaController: _cedulaController,
+                        locationController: _locationController,
+                        photos: _localPhotos,
+                        onAddPhoto: _pickEntrepreneurPhoto,
+                        onRemovePhoto: (i) {
+                          if (_isLoading) return;
+                          setState(() => _localPhotos.removeAt(i));
                         },
-                  icon: const Icon(Icons.photo_camera_outlined),
-                ),
-              ),
+                        enabled: !_isLoading,
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: TextField(
+                        controller: _referralController,
+                        textCapitalization: TextCapitalization.characters,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: !_isLoading ? (_) => _register() : null,
+                        decoration: _inputDecoration(
+                          hint: 'Código de vendedor / referido (opcional)',
+                          prefixIcon: Icons.qr_code_2_outlined,
+                          suffixIcon: IconButton(
+                            tooltip: 'Escanear QR',
+                            onPressed: _isLoading
+                                ? null
+                                : () async {
+                                    final code =
+                                        await ReferralQrScanSheet.scan(context);
+                                    if (!mounted || code == null) return;
+                                    setState(() {
+                                      _referralController.text = code;
+                                    });
+                                  },
+                            icon: const Icon(Icons.photo_camera_outlined),
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ],
@@ -663,8 +807,10 @@ class _LoginScreenState extends State<LoginScreen> {
               _buildFormFields(),
               const SizedBox(height: 24),
               _buildPrimaryButton(),
-              const SizedBox(height: 14),
-              _buildGoogleButton(),
+              if (_mode == _AuthMode.login || !_isEntrepreneurSignup) ...[
+                const SizedBox(height: 14),
+                _buildGoogleButton(),
+              ],
               const SizedBox(height: 8),
               _buildFooterLinks(),
             ],

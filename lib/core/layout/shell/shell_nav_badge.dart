@@ -5,9 +5,17 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 /// Claves estables para badges del panel admin.
 enum AdminShellBadgeKey {
+  /// Pedidos activos (carritos en curso).
   pedidos,
+
+  /// Reclamos de soporte abiertos / sin leer.
   mensajes,
+
+  /// Tasa BCV u atención de configuración del sistema.
   configuracion,
+
+  /// Cuentas pendientes de revisión KYC.
+  usuarios,
 }
 
 /// Indicador reactivo en un destino del shell.

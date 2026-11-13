@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/notifications/in_app_notification_model.dart';
 import 'package:motolink_pro_app/core/notifications/notification_center_sheet.dart';
@@ -16,51 +17,60 @@ Future<void> openNotificationCenter({
   required NotificationProvider provider,
   BuildContext? anchorContext,
 }) async {
+  final theme = B2BThemeExtension.of(context);
   final width = MediaQuery.sizeOf(context).width;
-  final usePopover = width >= AppBreakpoints.adminDesktop;
+  final usePopover = width >= AppBreakpoints.mobileMenu;
   if (!usePopover) {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.card,
+      useSafeArea: true,
+      backgroundColor: theme.dialogSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => NotificationCenterSheet(provider: provider),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.9,
+          ),
+          child: NotificationCenterSheet(provider: provider),
+        ),
+      ),
     );
     return;
   }
 
-  final anchor = anchorContext ?? context;
-  final box = anchor.findRenderObject() as RenderBox?;
+  const panelW = 380.0;
+  const panelH = 520.0;
   final overlay =
       Overlay.of(context).context.findRenderObject() as RenderBox?;
-  if (box == null || overlay == null) {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      builder: (_) => NotificationCenterSheet(provider: provider),
-    );
-    return;
-  }
+  final overlaySize = overlay?.size ?? MediaQuery.sizeOf(context);
 
-  final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
-  final anchorRect = Rect.fromLTWH(
-    topLeft.dx,
-    topLeft.dy,
-    box.size.width,
-    box.size.height,
-  );
-  final overlaySize = overlay.size;
-  const panelW = 400.0;
-  const panelH = 520.0;
-  var left = anchorRect.right - panelW;
+  double left;
+  double top;
+  final anchor = anchorContext ?? context;
+  final box = anchor.findRenderObject() as RenderBox?;
+  if (box != null && overlay != null) {
+    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final anchorRect = Rect.fromLTWH(
+      topLeft.dx,
+      topLeft.dy,
+      box.size.width,
+      box.size.height,
+    );
+    left = anchorRect.right - panelW;
+    top = anchorRect.bottom + 8;
+  } else {
+    // Fallback: esquina superior derecha (bajo la campana del chrome).
+    left = overlaySize.width - panelW - 24;
+    top = 64;
+  }
   if (left < 12) left = 12;
   if (left + panelW > overlaySize.width - 12) {
     left = overlaySize.width - panelW - 12;
   }
-  var top = anchorRect.bottom + 8;
   if (top + panelH > overlaySize.height - 12) {
     top = (overlaySize.height - panelH - 12).clamp(12.0, overlaySize.height);
   }
@@ -69,7 +79,7 @@ Future<void> openNotificationCenter({
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Cerrar notificaciones',
-    barrierColor: Colors.black.withOpacity(0.18),
+    barrierColor: theme.textPrimary.withOpacity(0.28),
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (ctx, anim, secondary) {
       return SafeArea(
@@ -83,7 +93,8 @@ Future<void> openNotificationCenter({
               child: FadeTransition(
                 opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
                 child: Material(
-                  color: Colors.transparent,
+                  color: theme.dialogSurface.withOpacity(0),
+                  elevation: 0,
                   child: Shortcuts(
                     shortcuts: const <ShortcutActivator, Intent>{
                       SingleActivator(LogicalKeyboardKey.escape):
@@ -150,6 +161,7 @@ class _NotificationCenterPopoverState extends State<NotificationCenterPopover> {
   bool _isKycUserType(String type) {
     final t = type.trim().toLowerCase();
     return t == 'kyc' ||
+        t == 'entrepreneur' ||
         t.contains('usuario') ||
         t.contains('cuenta') ||
         t.contains('taller') ||
@@ -181,6 +193,7 @@ class _NotificationCenterPopoverState extends State<NotificationCenterPopover> {
   Color _avatarBg(String type) {
     final t = type.trim().toLowerCase();
     if (t == 'kyc') return const Color(0xFFDC2626);
+    if (t == 'entrepreneur') return AppColors.brand;
     if (_isOrderType(t)) return const Color(0xFF1E3A8A);
     if (t == 'tasa_bcv') return const Color(0xFF0F766E);
     return AppColors.brand;
@@ -189,6 +202,7 @@ class _NotificationCenterPopoverState extends State<NotificationCenterPopover> {
   LucideGlyph _avatarGlyph(String type) {
     final t = type.trim().toLowerCase();
     if (t == 'kyc') return LucideGlyph.shieldCheck;
+    if (t == 'entrepreneur') return LucideGlyph.rocket;
     if (_isOrderType(t)) return LucideGlyph.shoppingBag;
     if (t == 'tasa_bcv') return LucideGlyph.badgeDollarSign;
     return LucideGlyph.bell;

@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/features/commissions/commission_collected_income_period.dart';
 import 'package:motolink_pro_app/features/commissions/commission_collected_income_report.dart';
 import 'package:motolink_pro_app/features/kyc/account_access_status.dart';
+import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -193,6 +194,7 @@ class AdminDashboardStats extends ChangeNotifier {
     return (res as PostgrestResponse<dynamic>).count;
   }
 
+  /// Cuenta pedidos/carritos (no líneas) en el rango.
   static Future<int> _countOrdersCreatedBetween({
     required DateTime from,
     required DateTime to,
@@ -202,7 +204,7 @@ class AdminDashboardStats extends ChangeNotifier {
     final toUtc = DateTime(to.year, to.month, to.day, 23, 59, 59, 999).toUtc();
     var q = SupabaseAccess.client
         .from('transaction_requests')
-        .select('id')
+        .select('id, checkout_group_id')
         .gte('created_at', fromUtc.toIso8601String())
         .lte('created_at', toUtc.toIso8601String());
     if (activeOnly) {
@@ -211,8 +213,17 @@ class AdminDashboardStats extends ChangeNotifier {
         TransactionRequestStatus.motoconectaAdminOperationalActive,
       );
     }
-    final res = await q.count(CountOption.exact);
-    return (res as PostgrestResponse<dynamic>).count;
+    final response = await q;
+    final list = response as List<dynamic>;
+    return countDistinctCheckoutOrders(
+      list.map((raw) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        return (
+          id: m['id']?.toString() ?? '',
+          checkoutGroupId: m['checkout_group_id']?.toString(),
+        );
+      }),
+    );
   }
 
   static Future<int> _countOrdersByStatusBetween({
@@ -222,14 +233,22 @@ class AdminDashboardStats extends ChangeNotifier {
   }) async {
     final fromUtc = DateTime(from.year, from.month, from.day).toUtc();
     final toUtc = DateTime(to.year, to.month, to.day, 23, 59, 59, 999).toUtc();
-    final res = await SupabaseAccess.client
+    final response = await SupabaseAccess.client
         .from('transaction_requests')
-        .select('id')
+        .select('id, checkout_group_id')
         .inFilter('status', statuses)
         .gte('updated_at', fromUtc.toIso8601String())
-        .lte('updated_at', toUtc.toIso8601String())
-        .count(CountOption.exact);
-    return (res as PostgrestResponse<dynamic>).count;
+        .lte('updated_at', toUtc.toIso8601String());
+    final list = response as List<dynamic>;
+    return countDistinctCheckoutOrders(
+      list.map((raw) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        return (
+          id: m['id']?.toString() ?? '',
+          checkoutGroupId: m['checkout_group_id']?.toString(),
+        );
+      }),
+    );
   }
 
   @override

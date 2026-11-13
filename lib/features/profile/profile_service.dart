@@ -382,4 +382,54 @@ class ProfileService {
       params: <String, dynamic>{'p_version': version.trim()},
     );
   }
+
+  /// Alta rápida Minorista-Emprendedor (RPC security definer).
+  static Future<ProfileModel> completeEntrepreneurRegistration({
+    required String phone,
+    required String rif,
+    required String cedula,
+    required String direccion,
+    String? businessName,
+    String? termsVersion,
+  }) async {
+    final raw = await SupabaseAccess.client.rpc(
+      'complete_entrepreneur_registration',
+      params: <String, dynamic>{
+        'p_phone': phone.trim(),
+        'p_rif': rif.trim(),
+        'p_cedula': cedula.trim(),
+        'p_direccion': direccion.trim(),
+        'p_business_name': businessName?.trim(),
+        'p_terms_version': termsVersion?.trim(),
+      },
+    );
+    if (raw is Map) {
+      return ProfileModel.fromJson(Map<String, dynamic>.from(raw));
+    }
+    if (raw is List && raw.isNotEmpty && raw.first is Map) {
+      return ProfileModel.fromJson(
+        Map<String, dynamic>.from(raw.first as Map),
+      );
+    }
+    throw StateError('Respuesta inválida de complete_entrepreneur_registration');
+  }
+
+  static Future<void> markEntrepreneurWelcomeSeen() async {
+    await SupabaseAccess.client.rpc('mark_entrepreneur_welcome_seen');
+  }
+
+  /// Marca `expired_locked` si el plazo KYC de 8 semanas ya venció.
+  static Future<String?> syncMyEntrepreneurExpiry() async {
+    final res =
+        await SupabaseAccess.client.rpc('sync_my_entrepreneur_expiry');
+    final s = res?.toString().trim();
+    return (s == null || s.isEmpty) ? null : s;
+  }
+
+  /// Ticket de soporte + `reactivation_requested`.
+  static Future<String> requestEntrepreneurReactivation() async {
+    final res =
+        await SupabaseAccess.client.rpc('request_entrepreneur_reactivation');
+    return res?.toString() ?? '';
+  }
 }

@@ -1,5 +1,30 @@
 import 'transaction_request_model.dart';
 
+/// Clave de «1 pedido» en bandeja/badge: carrito (`checkout_group_id`) o línea suelta.
+String checkoutOrderBucketKey({
+  required String id,
+  String? checkoutGroupId,
+}) {
+  final g = checkoutGroupId?.trim();
+  if (g != null && g.isNotEmpty) return 'g:$g';
+  return 'i:${id.trim()}';
+}
+
+/// Cuenta pedidos (no líneas) con la misma regla que [groupAliadoOrdersByCheckout].
+int countDistinctCheckoutOrders(
+  Iterable<({String id, String? checkoutGroupId})> rows,
+) {
+  final keys = <String>{};
+  for (final r in rows) {
+    final id = r.id.trim();
+    if (id.isEmpty) continue;
+    keys.add(
+      checkoutOrderBucketKey(id: id, checkoutGroupId: r.checkoutGroupId),
+    );
+  }
+  return keys.length;
+}
+
 /// Agrupa filas de `transaction_requests` que vienen del mismo checkout del carrito.
 List<List<TransactionRequestModel>> groupAliadoOrdersByCheckout(
   List<TransactionRequestModel> flat,
@@ -10,8 +35,10 @@ List<List<TransactionRequestModel>> groupAliadoOrdersByCheckout(
   final keyOrder = <String>[];
 
   for (final r in flat) {
-    final g = r.checkoutGroupId?.trim();
-    final key = (g != null && g.isNotEmpty) ? 'g:$g' : 'i:${r.id}';
+    final key = checkoutOrderBucketKey(
+      id: r.id,
+      checkoutGroupId: r.checkoutGroupId,
+    );
     if (!buckets.containsKey(key)) {
       keyOrder.add(key);
       buckets[key] = <TransactionRequestModel>[];
@@ -58,7 +85,8 @@ List<List<TransactionRequestModel>> groupCheckoutLinesByImportador(
 /// Clave estable para expandir / animaciones (un grupo o un pedido suelto).
 String checkoutGroupExpandKey(List<TransactionRequestModel> group) {
   if (group.isEmpty) return '';
-  final g = group.first.checkoutGroupId?.trim();
-  if (g != null && g.isNotEmpty) return 'g:$g';
-  return group.first.id;
+  return checkoutOrderBucketKey(
+    id: group.first.id,
+    checkoutGroupId: group.first.checkoutGroupId,
+  );
 }

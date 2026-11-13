@@ -180,21 +180,25 @@ class AdminRecentActivity extends ChangeNotifier {
     });
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({
+    int orderLimit = 16,
+    int profileLimit = 12,
+    int take = 8,
+  }) async {
     if (_loading || _disposed) return;
     _loading = true;
     notifyListeners();
     try {
       final results = await Future.wait([
-        _fetchRecentOrders(),
-        _fetchRecentProfiles(),
+        _fetchRecentOrders(limit: orderLimit),
+        _fetchRecentProfiles(limit: profileLimit),
       ]);
       if (_disposed) return;
       final merged = <RecentActivityItem>[
         ...results[0],
         ...results[1],
       ]..sort((a, b) => b.at.compareTo(a.at));
-      final top = merged.take(8).toList();
+      final top = merged.take(take.clamp(1, 500)).toList();
       if (top.isEmpty) {
         _snapshot = AdminRecentActivitySnapshot.structuredFallback();
       } else {
@@ -213,7 +217,9 @@ class AdminRecentActivity extends ChangeNotifier {
     }
   }
 
-  static Future<List<RecentActivityItem>> _fetchRecentOrders() async {
+  static Future<List<RecentActivityItem>> _fetchRecentOrders({
+    int limit = 16,
+  }) async {
     const select = '''
 id, status, created_at, updated_at, checkout_group_id,
 aliado:profiles!transaction_requests_aliado_id_fkey ( business_name, logo_storage_path, role ),
@@ -223,7 +229,7 @@ importador:profiles!transaction_requests_importador_id_fkey ( business_name, log
         .from('transaction_requests')
         .select(select)
         .order('updated_at', ascending: false)
-        .limit(16);
+        .limit(limit.clamp(1, 200));
     final list = raw as List<dynamic>;
     final items = <RecentActivityItem>[];
     for (final row in list) {
@@ -247,11 +253,14 @@ importador:profiles!transaction_requests_importador_id_fkey ( business_name, log
           updated != null &&
           updated.difference(created).inMinutes.abs() < 2 &&
           status == TransactionRequestStatus.pendiente;
+      // Entrega final la confirma el taller minorista (aliado), no el importador.
+      final isDelivered = status == TransactionRequestStatus.entregado;
+      final actorIsAliado = isNew || isDelivered;
 
       final aliadoName = aliado?['business_name']?.toString().trim() ?? '';
       final importerName =
           importador?['business_name']?.toString().trim() ?? '';
-      final actor = isNew
+      final actor = actorIsAliado
           ? (aliadoName.isNotEmpty ? aliadoName : 'Taller')
           : (importerName.isNotEmpty
               ? importerName
@@ -259,7 +268,8 @@ importador:profiles!transaction_requests_importador_id_fkey ( business_name, log
 
       final aliadoLogo = aliado?['logo_storage_path']?.toString();
       final importerLogo = importador?['logo_storage_path']?.toString();
-      final logo = isNew ? aliadoLogo : (importerLogo ?? aliadoLogo);
+      final logo =
+          actorIsAliado ? aliadoLogo : (importerLogo ?? aliadoLogo);
 
       final ref = _orderRef(map['checkout_group_id']?.toString() ?? id);
       final kind = isNew
@@ -277,14 +287,18 @@ importador:profiles!transaction_requests_importador_id_fkey ( business_name, log
           description: description,
           at: at.toLocal(),
           logoStoragePath: logo,
-          actorRole: isNew ? 'aliado' : importador?['role']?.toString(),
+          actorRole: actorIsAliado
+              ? 'aliado'
+              : importador?['role']?.toString(),
         ),
       );
     }
     return items;
   }
 
-  static Future<List<RecentActivityItem>> _fetchRecentProfiles() async {
+  static Future<List<RecentActivityItem>> _fetchRecentProfiles({
+    int limit = 12,
+  }) async {
     final raw = await SupabaseAccess.client
         .from('profiles')
         .select(
@@ -292,7 +306,7 @@ importador:profiles!transaction_requests_importador_id_fkey ( business_name, log
         )
         .inFilter('role', const ['aliado', 'importador'])
         .order('created_at', ascending: false)
-        .limit(12);
+        .limit(limit.clamp(1, 100));
     final list = raw as List<dynamic>;
     final items = <RecentActivityItem>[];
     for (final row in list) {

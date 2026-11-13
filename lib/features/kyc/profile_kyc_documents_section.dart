@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'aliado_profile_requirements_banner.dart';
 import 'kyc_status_highlight_widgets.dart';
 import 'profile_kyc_document_tile.dart';
@@ -341,26 +342,69 @@ class ProfileKycDocumentsSectionState
         : null;
     final note = doc?.reviewNote?.trim();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: ProfileKycDocumentTile(
-        title: AliadoDocType.labelEs(type),
-        hasFile: has,
-        statusLabel: statusLine,
-        effectiveStatus: effectiveStatus,
-        busy: busy,
-        reviewedHint: reviewedHint,
-        reviewNote: note,
-        showPickActions: DocumentReviewStatus.ownerCanReplace(effectiveStatus),
-        requiredError: _showDocValidationErrors && !has,
-        onPickCamera: () =>
-            _pickAndUpload(type, channel: DocumentPickChannel.camera),
-        onPickGallery: () =>
-            _pickAndUpload(type, channel: DocumentPickChannel.gallery),
-        onPickFile: () =>
-            _pickAndUpload(type, channel: DocumentPickChannel.file),
-        actionsEnabled: widget.beforeUpload != null || _hasPersistedProfile,
-      ),
+    return ProfileKycDocumentTile(
+      title: AliadoDocType.labelEs(type),
+      hasFile: has,
+      statusLabel: statusLine,
+      effectiveStatus: effectiveStatus,
+      busy: busy,
+      reviewedHint: reviewedHint,
+      reviewNote: note,
+      compactActions: true,
+      showPickActions: DocumentReviewStatus.ownerCanReplace(effectiveStatus),
+      requiredError: _showDocValidationErrors && !has,
+      onPickCamera: () =>
+          _pickAndUpload(type, channel: DocumentPickChannel.camera),
+      onPickGallery: () =>
+          _pickAndUpload(type, channel: DocumentPickChannel.gallery),
+      onPickFile: () =>
+          _pickAndUpload(type, channel: DocumentPickChannel.file),
+      actionsEnabled: widget.beforeUpload != null || _hasPersistedProfile,
+    );
+  }
+
+  Widget _docGrid(List<String> types) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final cols = w >= 1100
+            ? 3
+            : (w >= AppBreakpoints.mobileMenu ? 2 : 1);
+        if (cols == 1) {
+          return Column(
+            children: [
+              for (var i = 0; i < types.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _buildDocTile(types[i]),
+              ],
+            ],
+          );
+        }
+        final rows = <Widget>[];
+        for (var i = 0; i < types.length; i += cols) {
+          final cells = <Widget>[];
+          for (var c = 0; c < cols; c++) {
+            if (c > 0) cells.add(const SizedBox(width: 10));
+            if (i + c < types.length) {
+              cells.add(Expanded(child: _buildDocTile(types[i + c])));
+            } else {
+              cells.add(const Expanded(child: SizedBox.shrink()));
+            }
+          }
+          rows.add(
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: i + cols < types.length ? 8 : 0,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: cells,
+              ),
+            ),
+          );
+        }
+        return Column(children: rows);
+      },
     );
   }
 
@@ -498,7 +542,6 @@ class ProfileKycDocumentsSectionState
             const SizedBox(height: 8),
             ProfileCollapsibleSection(
               title: 'Requisitos del perfil',
-              subtitle: reqProgress.subtitle,
               infoMessage: AliadoKycSectionHelp.requisitosPerfil,
               initiallyExpanded: !reqProgress.allComplete,
               forceExpanded:
@@ -522,9 +565,7 @@ class ProfileKycDocumentsSectionState
                 st == KycStatus.rechazado,
             forceExpanded: _showDocValidationErrors &&
                 requiredUploaded < requiredTypes.length,
-            child: Column(
-              children: requiredTypes.map(_buildDocTile).toList(),
-            ),
+            child: _docGrid(requiredTypes),
           ),
           if (supplementaryTypes.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -534,14 +575,12 @@ class ProfileKycDocumentsSectionState
                   'Opcional · ${_supplementaryUploaded(supplementaryTypes)} de ${supplementaryTypes.length}',
               infoMessage: AliadoKycSectionHelp.documentacionComplementaria,
               initiallyExpanded: false,
-              child: Column(
-                children: supplementaryTypes.map(_buildDocTile).toList(),
-              ),
+              child: _docGrid(supplementaryTypes),
             ),
           ],
         ] else ...[
           const SizedBox(height: 10),
-          ...requiredTypes.map(_buildDocTile),
+          _docGrid(requiredTypes),
         ],
         if (widget._isAliado &&
             (widget.profile?.accountAccessStatus?.trim() !=

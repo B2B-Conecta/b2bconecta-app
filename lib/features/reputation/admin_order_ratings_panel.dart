@@ -530,6 +530,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
           const SizedBox(height: 14),
           B2bDataTableShell(
             padding: const EdgeInsets.all(14),
+            rowsBusy: _loading && _rows.isNotEmpty,
             toolbar: B2bDataTableToolbar(
               searchController: _searchCtrl,
               searchHint: 'Buscar taller, mayorista o comentario…',
@@ -658,6 +659,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
               alwaysShow: filtered.isNotEmpty,
               entityLabel: 'valoraciones',
               hasMore: !_end,
+              busy: _loading && _rows.isNotEmpty,
               onPageIndex: (index) {
                 setState(() => _pageIndex = index);
                 final last =
@@ -672,20 +674,6 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
               }),
             ),
           ),
-          if (_loading && _rows.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.brand,
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

@@ -48,6 +48,7 @@ enum LucideGlyph {
   circlePlay('circle-play'),
   userMinus('user-minus'),
   shieldOff('shield-off'),
+  shieldAlert('shield-alert'),
   check('check'),
   maximize2('maximize-2'),
   star('star'),
@@ -86,13 +87,17 @@ enum LucideGlyph {
   scanLine('scan-line'),
   landmark('landmark'),
   building2('building-2'),
+  rocket('rocket'),
+  sparkles('sparkles'),
+  partyPopper('party-popper'),
   creditCard('credit-card'),
   download('download'),
   searchX('search-x'),
   rotateCcw('rotate-ccw'),
   circleAlert('circle-alert'),
   megaphone('megaphone'),
-  undo2('undo-2');
+  undo2('undo-2'),
+  calendar('calendar');
 
   const LucideGlyph(this.assetName);
 

@@ -46,9 +46,13 @@ class DesktopNavigationShell extends StatefulWidget {
     this.onOpenDrawer,
     this.onSearchSubmitted,
     this.onOpenGlobalSearch,
+    this.showGlobalSearch = true,
     this.breadcrumbsOverride,
     this.onBreadcrumbBack,
     this.contentOverride,
+    this.pageIndex,
+    this.railSelectionActive = true,
+    this.accountFooterSelected = false,
   });
 
   /// Bloque opcional sobre la tarjeta de cuenta; recibe si el rail está expandido.
@@ -99,6 +103,19 @@ class DesktopNavigationShell extends StatefulWidget {
 
   /// Abre la paleta de comandos (⌘K).
   final VoidCallback? onOpenGlobalSearch;
+
+  /// Si false, oculta el campo de búsqueda del top bar corporate (p. ej. aliado).
+  final bool showGlobalSearch;
+
+  /// Índice del [IndexedStack]. Si es null, usa [selectedIndex].
+  /// Permite Perfil fuera del rail (footer) sin desalinear destinos.
+  final int? pageIndex;
+
+  /// Si false, ningún destino del rail queda marcado (p. ej. Perfil vía footer).
+  final bool railSelectionActive;
+
+  /// Resalta la tarjeta de cuenta del footer (perfil/ajustes activo).
+  final bool accountFooterSelected;
 
   @override
   State<DesktopNavigationShell> createState() => _DesktopNavigationShellState();
@@ -154,13 +171,26 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
     final extended = _prefReady
         ? _railExpanded
         : MediaQuery.sizeOf(context).width >= AppBreakpoints.desktopRailExtended;
-    final safeIndex = widget.selectedIndex.clamp(0, widget.pages.length - 1);
-    final parent = widget.destinations[
-        safeIndex.clamp(0, widget.destinations.length - 1)];
-    final dest = _resolveActiveDestination(
-      parent: parent,
-      nestedId: widget.selectedNestedId,
-    );
+    final pageIdx =
+        (widget.pageIndex ?? widget.selectedIndex).clamp(0, widget.pages.length - 1);
+    final railIdx = widget.railSelectionActive && widget.destinations.isNotEmpty
+        ? widget.selectedIndex.clamp(0, widget.destinations.length - 1)
+        : -1;
+    final parent = railIdx >= 0
+        ? widget.destinations[railIdx]
+        : const ShellDestination(
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
+            label: 'Perfil',
+            title: 'Perfil',
+            subtitle: 'Datos · KYC · alertas · seguridad',
+          );
+    final dest = railIdx >= 0
+        ? _resolveActiveDestination(
+            parent: parent,
+            nestedId: widget.selectedNestedId,
+          )
+        : parent;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -175,7 +205,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
               chrome: widget.chrome,
               showBcvFooter: widget.showBcvFooter,
               extended: extended,
-              selectedIndex: safeIndex,
+              selectedIndex: railIdx,
               selectedNestedId: widget.selectedNestedId,
               destinations: widget.destinations,
               badgeLabel: widget.railBadgeLabel,
@@ -191,12 +221,13 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
               onToggleExpanded: () => _setRailExpanded(!extended),
               navBadges: widget.navBadges,
               resolveNavBadge: widget.resolveNavBadge,
+              accountFooterSelected: widget.accountFooterSelected,
             ),
           ),
           Expanded(
             child: ScrollCompactLayout(
                 enabled: dest.compactHeaderOnScroll,
-                resetKey: Object.hash(safeIndex, widget.selectedNestedId),
+                resetKey: Object.hash(pageIdx, widget.selectedNestedId),
                 builder: (context, compact) => Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -205,7 +236,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                             breadcrumbs: widget.breadcrumbsOverride ??
                                 adminShellBreadcrumbsFor(
                                   destinations: widget.destinations,
-                                  selectedIndex: safeIndex,
+                                  selectedIndex: railIdx < 0 ? 0 : railIdx,
                                   nestedId: widget.selectedNestedId,
                                   onHome: () =>
                                       widget.onDestinationSelected(0),
@@ -219,6 +250,10 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                             onOpenDrawer: widget.onOpenDrawer,
                             onSearchSubmitted: widget.onSearchSubmitted,
                             onOpenGlobalSearch: widget.onOpenGlobalSearch,
+                            showGlobalSearch: widget.showGlobalSearch,
+                            onMessagesTap: widget.onMessagesTap,
+                            unreadMessages: widget.unreadMessages,
+                            trailingActions: widget.trailingActions,
                             signingOut: _signingOut,
                             showUserAvatar: false,
                             onUserMenuAction: (action) {
@@ -276,7 +311,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                                     : dest.bottomContentPadding),
                             child: widget.contentOverride ??
                                 IndexedStack(
-                                  index: safeIndex,
+                                  index: pageIdx,
                                   children: widget.pages,
                                 ),
                           ),
@@ -437,6 +472,7 @@ class _DesktopSideRail extends StatefulWidget {
     this.statusBuilder,
     this.navBadges,
     this.resolveNavBadge,
+    this.accountFooterSelected = false,
   });
 
   final DesktopShellChrome chrome;
@@ -459,6 +495,7 @@ class _DesktopSideRail extends StatefulWidget {
   final Widget Function(bool extended)? statusBuilder;
   final Listenable? navBadges;
   final ShellNavBadge? Function(Object? key)? resolveNavBadge;
+  final bool accountFooterSelected;
 
   @override
   State<_DesktopSideRail> createState() => _DesktopSideRailState();
@@ -506,7 +543,7 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
     Object? nestedId,
     List<ShellDestination> destinations,
   ) {
-    if (destinations.isEmpty) return null;
+    if (selectedIndex < 0 || destinations.isEmpty) return null;
     final i = selectedIndex.clamp(0, destinations.length - 1);
     final parent = destinations[i];
     if (!parent.hasChildren) return null;
@@ -769,8 +806,10 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
               extended: extended,
               profile: widget.profile,
               signingOut: widget.signingOut,
+              selected: widget.accountFooterSelected,
               openSettingsOnTap:
-                  widget.chrome == DesktopShellChrome.darkCorporate,
+                  widget.chrome == DesktopShellChrome.darkCorporate ||
+                      widget.onOpenProfile != null,
               onAction: (action) {
                 switch (action) {
                   case ShellUserMenuAction.profile:

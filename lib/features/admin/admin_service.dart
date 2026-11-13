@@ -106,6 +106,31 @@ class AdminService {
         .toList();
   }
 
+  /// Alertas operativas Minorista-Emprendedor (dashboard / bandejas).
+  static Future<List<ProfileModel>> adminListEntrepreneurAlerts() async {
+    final res =
+        await SupabaseAccess.client.rpc('admin_list_entrepreneur_alerts');
+    if (res is! List) return const [];
+    return res
+        .map(
+          (e) => ProfileModel.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+  }
+
+  static Future<void> adminExtendEntrepreneurKyc({
+    required String aliadoId,
+    int extraDays = 14,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'admin_extend_entrepreneur_kyc',
+      params: <String, dynamic>{
+        'p_aliado_id': aliadoId.trim(),
+        'p_extra_days': extraDays,
+      },
+    );
+  }
+
   /// Administrador: Auth sin ficha de negocio, del registro más reciente al más antiguo.
   static Future<List<IncompleteSignupRow>> listIncompleteSignups() async {
     final res =

@@ -30,12 +30,19 @@ class _ProfileGateState extends State<ProfileGate> {
   @override
   void initState() {
     super.initState();
-    _profileFuture = SupabaseService.fetchMyProfile();
+    _profileFuture = _loadProfile();
+  }
+
+  Future<ProfileModel?> _loadProfile() async {
+    try {
+      await SupabaseService.syncMyEntrepreneurExpiry();
+    } catch (_) {}
+    return SupabaseService.fetchMyProfile();
   }
 
   void _reloadProfile() {
     setState(() {
-      _profileFuture = SupabaseService.fetchMyProfile();
+      _profileFuture = _loadProfile();
     });
   }
 

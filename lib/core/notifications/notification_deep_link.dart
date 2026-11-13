@@ -27,7 +27,7 @@ void navigateFromNotificationPayload({
         return;
     }
   }
-  if (t0 == 'kyc') {
+  if (t0 == 'kyc' || t0 == 'entrepreneur') {
     switch (homeRole) {
       case AppHomeRole.administrador:
         final userId = (relatedId ?? '').trim();

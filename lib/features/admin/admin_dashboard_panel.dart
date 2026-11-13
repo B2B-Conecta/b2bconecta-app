@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/admin/admin_dashboard_stats.dart';
+import 'package:motolink_pro_app/features/admin/admin_entrepreneur_alerts_card.dart';
 import 'package:motolink_pro_app/features/admin/admin_recent_activity.dart';
 import 'package:motolink_pro_app/features/admin/admin_revenue_over_time.dart';
 import 'package:motolink_pro_app/features/admin/admin_top_products_week.dart';
@@ -79,6 +80,7 @@ class _AdminDashboardPanelState extends State<AdminDashboardPanel> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   StatsCardsRow(stats: _stats),
+                  const AdminEntrepreneurAlertsCard(),
                   QuickActionsCard(allowAdminRole: widget.allowAdminRole),
                   const SizedBox(height: 16),
                   if (wide)

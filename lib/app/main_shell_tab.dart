@@ -67,6 +67,14 @@ class MainShellTabController {
   static VoidCallback? _importadorValidadosNotificationDeepLink;
   static VoidCallback? _adminPedidosBandejaNotificationHandler;
   static AdminPedidosNotificationScope? _pendingAdminPedidosScope;
+  /// Admin Pedidos: activar chip «Por confirmar».
+  static bool _pendingAdminPedidosPendingOnly = false;
+  /// Admin Usuarios › Cuentas: chip «Por revisar».
+  static bool _pendingUsersPendingReviewOnly = false;
+  /// Admin Soporte: filtrar abiertos + en revisión (badge).
+  static bool _pendingSupportAttentionOnly = false;
+  /// Admin Devoluciones: solo casos `abierta`.
+  static bool _pendingReturnsOpenOnly = false;
   static int _homeTabIndex = 0;
   static int _b2bPedidosTabIndex = 1;
   static int _b2bReputationTabIndex = 2;
@@ -94,6 +102,7 @@ class MainShellTabController {
   static VoidCallback? _adminUsersHubDeepLink;
   static AdminReportsHubSection? _pendingAdminReportsSection;
   static VoidCallback? _adminReportsHubDeepLink;
+  static VoidCallback? _adminReturnsOpenOnlyDeepLink;
   static String? _pendingSupportTicketId;
   static VoidCallback? _adminSupportNotificationDeepLink;
   static VoidCallback? _b2bSupportNotificationDeepLink;
@@ -136,6 +145,10 @@ class MainShellTabController {
     _importadorValidadosNotificationDeepLink = null;
     _adminPedidosBandejaNotificationHandler = null;
     _pendingAdminPedidosScope = null;
+    _pendingAdminPedidosPendingOnly = false;
+    _pendingUsersPendingReviewOnly = false;
+    _pendingSupportAttentionOnly = false;
+    _pendingReturnsOpenOnly = false;
     _homeTabIndex = 0;
     _b2bPedidosTabIndex = 1;
     _b2bReputationTabIndex = 2;
@@ -162,6 +175,7 @@ class MainShellTabController {
     _adminUsersHubDeepLink = null;
     _pendingAdminReportsSection = null;
     _adminReportsHubDeepLink = null;
+    _adminReturnsOpenOnlyDeepLink = null;
     _pendingSupportTicketId = null;
     _adminSupportNotificationDeepLink = null;
     _b2bSupportNotificationDeepLink = null;
@@ -369,6 +383,59 @@ class MainShellTabController {
     });
   }
 
+  /// Admin Pedidos con chip «Por confirmar» preactivado.
+  static void navigateToAdminPedidosPendingConfirmation() {
+    _pendingAdminPedidosScope = AdminPedidosNotificationScope.enCurso;
+    _pendingAdminPedidosPendingOnly = true;
+    _goTo?.call(adminPedidosTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminPedidosBandejaNotificationHandler?.call();
+    });
+  }
+
+  /// Sidebar / badge: activa «Por gestionar» sin cambiar de tab si ya estás ahí.
+  static void requestAdminPedidosPendingOnly() {
+    _pendingAdminPedidosScope = AdminPedidosNotificationScope.enCurso;
+    _pendingAdminPedidosPendingOnly = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminPedidosBandejaNotificationHandler?.call();
+    });
+  }
+
+  /// Sidebar / badge: chip «Por revisar» en Cuentas.
+  static void requestAdminUsersPendingReviewOnly() {
+    _pendingUsersPendingReviewOnly = true;
+    _pendingAdminUsersSection = AdminUsersHubSection.cuentas;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminUsersHubDeepLink?.call();
+      _adminAccountNotificationDeepLink?.call();
+    });
+  }
+
+  /// Sidebar / badge: filtro «Por atender» en Soporte.
+  static void requestAdminSupportAttentionOnly() {
+    _pendingSupportAttentionOnly = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminSupportNotificationDeepLink?.call();
+    });
+  }
+
+  /// Sidebar / badge: «En revisión» en Devoluciones.
+  static void requestAdminReturnsOpenOnly() {
+    _pendingReturnsOpenOnly = true;
+    _pendingAdminReportsSection = AdminReportsHubSection.devoluciones;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _adminReportsHubDeepLink?.call();
+      _adminReturnsOpenOnlyDeepLink?.call();
+    });
+  }
+
+  static bool consumePendingAdminPedidosPendingOnly() {
+    final v = _pendingAdminPedidosPendingOnly;
+    _pendingAdminPedidosPendingOnly = false;
+    return v;
+  }
+
   /// Admin: misma pestaña Pedidos, vista «Cerrados» + expand moroso.
   static void navigateToAdminCerradosForNotification() {
     _pendingAdminPedidosScope = AdminPedidosNotificationScope.cerrados;
@@ -444,6 +511,7 @@ class MainShellTabController {
     navigateToAdminUsers(
       section: AdminUsersHubSection.cuentas,
       userId: peekPendingKycProfileId() ?? peekPendingAccountProfileId(),
+      pendingReviewOnly: true,
     );
   }
 
@@ -451,8 +519,10 @@ class MainShellTabController {
   static void navigateToAdminUsers({
     AdminUsersHubSection section = AdminUsersHubSection.cuentas,
     String? userId,
+    bool pendingReviewOnly = false,
   }) {
     _pendingAdminUsersSection = section;
+    if (pendingReviewOnly) _pendingUsersPendingReviewOnly = true;
     final id = userId?.trim();
     if (id != null && id.isNotEmpty) {
       switch (section) {
@@ -472,6 +542,12 @@ class MainShellTabController {
         _adminKycNotificationDeepLink?.call();
       }
     });
+  }
+
+  static bool consumePendingUsersPendingReviewOnly() {
+    final v = _pendingUsersPendingReviewOnly;
+    _pendingUsersPendingReviewOnly = false;
+    return v;
   }
 
   /// Admin: índice legado (ya no hay pestaña Perfil en el rail).
@@ -508,16 +584,29 @@ class MainShellTabController {
   /// Admin: pestaña Reportes / analíticas (sección opcional del hub).
   static void navigateToAdminReportes({
     AdminReportsHubSection section = AdminReportsHubSection.encomiendas,
+    bool openReturnsOnly = false,
   }) {
     _pendingAdminReportsSection = section;
+    if (openReturnsOnly) _pendingReturnsOpenOnly = true;
     _goTo?.call(adminReportesTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminReportsHubDeepLink?.call();
+      if (openReturnsOnly) _adminReturnsOpenOnlyDeepLink?.call();
     });
+  }
+
+  static bool consumePendingReturnsOpenOnly() {
+    final v = _pendingReturnsOpenOnly;
+    _pendingReturnsOpenOnly = false;
+    return v;
   }
 
   static void registerAdminReportsHubDeepLink(VoidCallback? onNavigate) {
     _adminReportsHubDeepLink = onNavigate;
+  }
+
+  static void registerAdminReturnsOpenOnlyDeepLink(VoidCallback? onNavigate) {
+    _adminReturnsOpenOnlyDeepLink = onNavigate;
   }
 
   static AdminReportsHubSection? consumePendingAdminReportsSection() {
@@ -676,11 +765,20 @@ class MainShellTabController {
       _pendingAdminUsersSection;
 
   /// Admin: pestaña Soporte.
-  static void navigateToAdminSupportForNotification() {
+  static void navigateToAdminSupportForNotification({
+    bool attentionOnly = true,
+  }) {
+    if (attentionOnly) _pendingSupportAttentionOnly = true;
     _goTo?.call(adminSupportTabIndex);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _adminSupportNotificationDeepLink?.call();
     });
+  }
+
+  static bool consumePendingSupportAttentionOnly() {
+    final v = _pendingSupportAttentionOnly;
+    _pendingSupportAttentionOnly = false;
+    return v;
   }
 
   /// Aliado/importador: pantalla de soporte desde notificación (Perfil → soporte).

@@ -88,6 +88,7 @@ class AdminShellDrawer extends StatelessWidget {
                           selectedNestedId:
                               selected ? selectedNestedId : null,
                           badge: resolveNavBadge?.call(dest.badgeKey),
+                          resolveNavBadge: resolveNavBadge,
                           onTap: () {
                             Navigator.of(context).maybePop();
                             if (dest.hasChildren &&
@@ -144,6 +145,7 @@ class _DrawerNavItem extends StatelessWidget {
     this.selectedNestedId,
     this.onNestedTap,
     this.badge,
+    this.resolveNavBadge,
   });
 
   final ShellDestination destination;
@@ -152,6 +154,7 @@ class _DrawerNavItem extends StatelessWidget {
   final VoidCallback onTap;
   final ValueChanged<Object?>? onNestedTap;
   final ShellNavBadge? badge;
+  final ShellNavBadge? Function(Object? key)? resolveNavBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +229,7 @@ class _DrawerNavItem extends StatelessWidget {
                     selected: child.id == selectedNestedId,
                     glyph: child.lucideIcon,
                     icon: child.icon,
+                    badge: resolveNavBadge?.call(child.badgeKey),
                     onTap: () => onNestedTap?.call(child.id),
                   ),
               ],
@@ -243,6 +247,7 @@ class _DrawerNestedTile extends StatelessWidget {
     required this.onTap,
     this.glyph,
     this.icon,
+    this.badge,
   });
 
   final String label;
@@ -250,6 +255,7 @@ class _DrawerNestedTile extends StatelessWidget {
   final VoidCallback onTap;
   final LucideGlyph? glyph;
   final IconData? icon;
+  final ShellNavBadge? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -293,6 +299,10 @@ class _DrawerNestedTile extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (badge != null) ...[
+                  const SizedBox(width: 6),
+                  ShellNavBadgeView(badge: badge, compact: true),
+                ],
               ],
             ),
           ),

@@ -394,6 +394,7 @@ class _MainShellState extends State<MainShell> {
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics,
       lucideIcon: LucideGlyph.barChart3,
+      badgeKey: AdminShellBadgeKey.devoluciones,
       label: 'Reportes',
       title: 'Reportes',
       subtitle: 'Encomiendas · promos · referidos · devoluciones',
@@ -431,6 +432,7 @@ class _MainShellState extends State<MainShell> {
           selectedIcon: Icons.assignment_return,
           lucideIcon: LucideGlyph.undo2,
           id: AdminReportsHubSection.devoluciones,
+          badgeKey: AdminShellBadgeKey.devoluciones,
           label: 'Devoluciones',
           title: 'Devoluciones',
           subtitle: 'Postventa, frecuencia y saldo por importador.',
@@ -468,6 +470,7 @@ class _MainShellState extends State<MainShell> {
           selectedIcon: Icons.manage_accounts,
           lucideIcon: LucideGlyph.userRound,
           id: AdminUsersHubSection.cuentas,
+          badgeKey: AdminShellBadgeKey.usuarios,
           label: 'Cuentas',
           title: 'Cuentas',
           subtitle: 'Datos fiscales, KYC, roles, alta y baja.',
@@ -629,6 +632,62 @@ class _MainShellState extends State<MainShell> {
     ];
   }
 
+  /// Badge del sidebar → chip de atención preactivado en la vista destino.
+  void _seedActionableFilterFromAdminNav(int index, {Object? nestedId}) {
+    final badges = _adminShellBadges;
+    if (badges == null) return;
+    if (index == MainShellTabController.adminPedidosTabIndex &&
+        badges.activeOrders > 0) {
+      MainShellTabController.requestAdminPedidosPendingOnly();
+      return;
+    }
+    if (index == MainShellTabController.adminSupportTabIndex &&
+        badges.openSupport > 0) {
+      MainShellTabController.requestAdminSupportAttentionOnly();
+      return;
+    }
+    if (index == MainShellTabController.adminUsersTabIndex &&
+        badges.pendingKyc > 0) {
+      final isCuentas = nestedId == null ||
+          nestedId == AdminUsersHubSection.cuentas;
+      if (isCuentas) {
+        MainShellTabController.requestAdminUsersPendingReviewOnly();
+      }
+      return;
+    }
+    if (index == MainShellTabController.adminReportesTabIndex &&
+        badges.openReturns > 0) {
+      // Badge del padre Reportes (y sub-ítem Devoluciones) = casos abiertos.
+      if (nestedId == null ||
+          nestedId == AdminReportsHubSection.devoluciones) {
+        MainShellTabController.requestAdminReturnsOpenOnly();
+      }
+    }
+  }
+
+  void _onAdminDestinationSelected(int i) {
+    setState(() {
+      _tabIndex = i;
+      _adminSettingsOpen = false;
+      MainShellTabController.clearAdminBreadcrumbTrail();
+    });
+    _seedActionableFilterFromAdminNav(i);
+  }
+
+  void _onAdminNestedDestinationSelected(int parent, Object? nestedId) {
+    setState(() {
+      _tabIndex = parent;
+      _adminSettingsOpen = false;
+      MainShellTabController.clearAdminBreadcrumbTrail();
+      if (nestedId is AdminUsersHubSection) {
+        _adminUsersSection = nestedId;
+      } else if (nestedId is AdminReportsHubSection) {
+        _adminReportsSection = nestedId;
+      }
+    });
+    _seedActionableFilterFromAdminNav(parent, nestedId: nestedId);
+  }
+
   Widget _adminSettingsBody() {
     return AdminSettingsHub(
       key: ValueKey('admin-settings-$_adminSettingsTab'),
@@ -774,29 +833,14 @@ class _MainShellState extends State<MainShell> {
             Expanded(
               child: AdminDesktopShell(
                 selectedIndex: index,
-                onDestinationSelected: (i) => setState(() {
-                  _tabIndex = i;
-                  _adminSettingsOpen = false;
-                  MainShellTabController.clearAdminBreadcrumbTrail();
-                }),
+                onDestinationSelected: _onAdminDestinationSelected,
                 selectedNestedId:
                     index == MainShellTabController.adminUsersTabIndex
                         ? _adminUsersSection
                         : index == MainShellTabController.adminReportesTabIndex
                             ? _adminReportsSection
                             : null,
-                onNestedDestinationSelected: (parent, nestedId) {
-                  setState(() {
-                    _tabIndex = parent;
-                    _adminSettingsOpen = false;
-                    MainShellTabController.clearAdminBreadcrumbTrail();
-                    if (nestedId is AdminUsersHubSection) {
-                      _adminUsersSection = nestedId;
-                    } else if (nestedId is AdminReportsHubSection) {
-                      _adminReportsSection = nestedId;
-                    }
-                  });
-                },
+                onNestedDestinationSelected: _onAdminNestedDestinationSelected,
                 destinations: dest,
                 profile: _profile,
                 unreadNotifications: _notifications.unreadCount,
@@ -869,11 +913,7 @@ class _MainShellState extends State<MainShell> {
             currentIndex: index,
             destinations: dest,
             primaryIndices: const [0, 1, 2, 5],
-            onSelect: (i) => setState(() {
-              _tabIndex = i;
-              _adminSettingsOpen = false;
-              MainShellTabController.clearAdminBreadcrumbTrail();
-            }),
+            onSelect: _onAdminDestinationSelected,
             onOpenAccountMenu: _openAccountSettings,
             navBadges: _adminShellBadges,
             resolveNavBadge: _adminShellBadges?.badgeFor,

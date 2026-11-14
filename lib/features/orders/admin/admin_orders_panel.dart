@@ -120,14 +120,25 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
 
   void _onBandejaNotificationFromMain() {
     final pending = MainShellTabController.consumePendingAdminPedidosScope();
-    if (pending != null) {
+    final pendingOnly =
+        MainShellTabController.consumePendingAdminPedidosPendingOnly();
+    if (pending != null || pendingOnly) {
       setState(() {
-        _scope = switch (pending) {
-          AdminPedidosNotificationScope.enCurso => PedidosListScope.enCurso,
-          AdminPedidosNotificationScope.cerrados => PedidosListScope.entregados,
-        };
+        if (pending != null) {
+          _scope = switch (pending) {
+            AdminPedidosNotificationScope.enCurso => PedidosListScope.enCurso,
+            AdminPedidosNotificationScope.cerrados =>
+              PedidosListScope.entregados,
+          };
+        }
         _statusFilter = null;
         _morosoOnly = false;
+        if (pendingOnly) {
+          _scope = PedidosListScope.todos;
+          _pendingOnly = true;
+        } else if (pending != null) {
+          _pendingOnly = false;
+        }
       });
     }
     unawaited(_load());
@@ -365,6 +376,15 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
               );
             }
 
+            final pendingBase = filterOrderGroupsBySignals(
+              groupAdminOrdersForDisplay(_filteredFlat),
+              creditOnly: _creditOnly,
+              replacementOnly: _replacementOnly,
+            );
+            final pendingCount = pendingBase
+                .where((g) => OrderListEntry(g).awaitingConfirmation)
+                .length;
+
             return SafeArea(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
@@ -422,7 +442,9 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
                           },
                         ),
                         pill(
-                          label: 'Por confirmar',
+                          label: pendingCount > 0
+                              ? 'Por gestionar ($pendingCount)'
+                              : 'Por gestionar',
                           selected: _pendingOnly,
                           onTap: () {
                             setState(() {
@@ -1179,7 +1201,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       onRefresh: _load,
       emptyMessage: groups.isEmpty
           ? (_pendingOnly
-              ? 'No hay pedidos por confirmar.'
+              ? 'No hay pedidos por gestionar.'
               : _emptyMessage)
           : null,
       canCancelGroup: _groupCanAnular,

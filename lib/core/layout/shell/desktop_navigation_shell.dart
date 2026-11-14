@@ -589,6 +589,30 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
     }
   }
 
+  Widget _buildNestedTile({
+    required ShellDestination child,
+    required bool parentSelected,
+    required _RailChromeColors colors,
+    required int parentIndex,
+  }) {
+    Widget tile([ShellNavBadge? badge]) => _RailNestedNavTile(
+          chrome: widget.chrome,
+          colors: colors,
+          selected: parentSelected && widget.selectedNestedId == child.id,
+          destination: child,
+          badge: badge,
+          onTap: () => _selectNested(parentIndex, child),
+        );
+    if (widget.navBadges != null && child.badgeKey != null) {
+      return ListenableBuilder(
+        listenable: widget.navBadges!,
+        builder: (context, _) =>
+            tile(widget.resolveNavBadge?.call(child.badgeKey)),
+      );
+    }
+    return tile(widget.resolveNavBadge?.call(child.badgeKey));
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = _RailChromeColors.of(
@@ -775,15 +799,11 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
                                               padding: const EdgeInsets.only(
                                                 bottom: 2,
                                               ),
-                                              child: _RailNestedNavTile(
-                                                chrome: widget.chrome,
+                                              child: _buildNestedTile(
+                                                child: child,
+                                                parentSelected: parentSelected,
                                                 colors: colors,
-                                                selected: parentSelected &&
-                                                    widget.selectedNestedId ==
-                                                        child.id,
-                                                destination: child,
-                                                onTap: () =>
-                                                    _selectNested(i, child),
+                                                parentIndex: i,
                                               ),
                                             ),
                                         ],
@@ -1058,6 +1078,7 @@ class _RailNestedNavTile extends StatelessWidget {
     required this.selected,
     required this.destination,
     required this.onTap,
+    this.badge,
   });
 
   final DesktopShellChrome chrome;
@@ -1065,6 +1086,7 @@ class _RailNestedNavTile extends StatelessWidget {
   final bool selected;
   final ShellDestination destination;
   final VoidCallback onTap;
+  final ShellNavBadge? badge;
 
   Widget _icon(Color color) {
     final glyph = selected
@@ -1126,6 +1148,10 @@ class _RailNestedNavTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (badge != null) ...[
+                    const SizedBox(width: 6),
+                    ShellNavBadgeView(badge: badge, compact: true),
+                  ],
                 ],
               ),
             ),

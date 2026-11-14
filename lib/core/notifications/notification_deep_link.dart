@@ -37,6 +37,7 @@ void navigateFromNotificationPayload({
         MainShellTabController.navigateToAdminUsers(
           section: AdminUsersHubSection.cuentas,
           userId: userId.isEmpty ? null : userId,
+          pendingReviewOnly: true,
         );
         return;
       case AppHomeRole.aliado:
@@ -59,6 +60,7 @@ void navigateFromNotificationPayload({
       if (homeRole == AppHomeRole.administrador) {
         MainShellTabController.navigateToAdminUsers(
           section: AdminUsersHubSection.cuentas,
+          pendingReviewOnly: true,
         );
         return;
       }
@@ -73,6 +75,7 @@ void navigateFromNotificationPayload({
       MainShellTabController.navigateToAdminUsers(
         section: AdminUsersHubSection.cuentas,
         userId: related,
+        pendingReviewOnly: true,
       );
       return;
     }
@@ -169,7 +172,7 @@ void navigateFromNotificationPayload({
         MainShellTabController.navigateToPedidosForNotification();
         return;
       case AppHomeRole.administrador:
-        MainShellTabController.navigateToAdminActivosForNotification();
+        MainShellTabController.navigateToAdminPedidosPendingConfirmation();
         return;
     }
   }
@@ -183,7 +186,7 @@ void navigateFromNotificationPayload({
         MainShellTabController.navigateToPedidosForNotification();
         return;
       case AppHomeRole.administrador:
-        MainShellTabController.navigateToAdminActivosForNotification();
+        MainShellTabController.navigateToAdminPedidosPendingConfirmation();
         return;
     }
   }
@@ -193,7 +196,7 @@ void navigateFromNotificationPayload({
       (title?.trim() == 'Nueva solicitud por validar');
   if (homeRole == AppHomeRole.administrador &&
       (t0 == 'validacion' || legacyOrderAsActive)) {
-    MainShellTabController.navigateToAdminActivosForNotification();
+    MainShellTabController.navigateToAdminPedidosPendingConfirmation();
     return;
   }
 

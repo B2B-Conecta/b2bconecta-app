@@ -32,11 +32,13 @@ void main() {
     expect(badges.badgeFor(AdminShellBadgeKey.mensajes), isNull);
     expect(badges.badgeFor(AdminShellBadgeKey.configuracion), isNull);
     expect(badges.badgeFor(AdminShellBadgeKey.usuarios), isNull);
+    expect(badges.badgeFor(AdminShellBadgeKey.devoluciones), isNull);
 
     // Simulate internal state via refresh paths is network-bound; assert API shape.
     expect(badges.activeOrders, 0);
     expect(badges.openSupport, 0);
     expect(badges.pendingKyc, 0);
+    expect(badges.openReturns, 0);
     expect(badges.hasUnreadChat, isFalse);
     expect(badges.configNeedsAttention, isFalse);
     badges.dispose();

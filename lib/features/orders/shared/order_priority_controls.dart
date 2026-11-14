@@ -80,8 +80,13 @@ class OrderPriorityControls extends StatelessWidget {
               Icons.receipt_long_outlined,
               !pendingOnly && scope == PedidosListScope.todos,
               () => onScope(PedidosListScope.todos)),
-          chip('Por confirmar', Icons.schedule_outlined, pendingOnly, onPending,
-              pending: true, count: pendingCount),
+          chip(
+              'Por gestionar',
+              Icons.schedule_outlined,
+              pendingOnly,
+              onPending,
+              pending: true,
+              count: pendingCount),
           chip(
               'En curso',
               Icons.local_shipping_outlined,

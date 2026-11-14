@@ -15,7 +15,14 @@ import 'package:motolink_pro_app/features/support/support_ticket_detail_screen.d
 import 'package:motolink_pro_app/features/support/support_ticket_model.dart';
 import 'package:motolink_pro_app/features/support/support_ticket_status.dart';
 
-enum _AdminSupportFilter { abiertos, enRevision, cerrados, todos }
+enum _AdminSupportFilter {
+  /// Abiertos + en revisión (coincide con el badge del sidebar).
+  atencion,
+  abiertos,
+  enRevision,
+  cerrados,
+  todos,
+}
 
 /// Ancho mínimo para lista + detalle lado a lado.
 const double _kMasterDetailMinWidth = 840;
@@ -37,7 +44,7 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
   String? _error;
   String? _selectedTicketId;
   bool _masterDetail = false;
-  _AdminSupportFilter _filter = _AdminSupportFilter.abiertos;
+  _AdminSupportFilter _filter = _AdminSupportFilter.atencion;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -46,6 +53,9 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
     MainShellTabController.registerAdminSupportNotificationDeepLink(
       _onSupportNotificationDeepLink,
     );
+    if (MainShellTabController.consumePendingSupportAttentionOnly()) {
+      _filter = _AdminSupportFilter.atencion;
+    }
     _load();
   }
 
@@ -57,6 +67,9 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
   }
 
   void _onSupportNotificationDeepLink() {
+    if (MainShellTabController.consumePendingSupportAttentionOnly()) {
+      setState(() => _filter = _AdminSupportFilter.atencion);
+    }
     final pending = MainShellTabController.peekPendingSupportTicketId() ??
         MainShellTabController.peekPendingNotificationRelatedId();
     if (pending == null) return;
@@ -120,6 +133,14 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
 
   List<SupportTicketModel> get _tabRows {
     switch (_filter) {
+      case _AdminSupportFilter.atencion:
+        return _rows
+            .where(
+              (t) =>
+                  t.status == SupportTicketStatus.abierto ||
+                  t.status == SupportTicketStatus.enRevision,
+            )
+            .toList();
       case _AdminSupportFilter.abiertos:
         return _rows
             .where((t) => t.status == SupportTicketStatus.abierto)
@@ -134,6 +155,8 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
         return _rows;
     }
   }
+
+  int get _countAtencion => _countAbiertos + _countEnRevision;
 
   List<SupportTicketModel> get _filteredRows {
     final q = _searchCtrl.text.trim().toLowerCase();
@@ -319,7 +342,13 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
             child: SegmentedFilterBar(
-              labels: const ['Abiertos', 'En revisión', 'Cerrados', 'Todos'],
+              labels: [
+                'Por atender ($_countAtencion)',
+                'Abiertos ($_countAbiertos)',
+                'En revisión ($_countEnRevision)',
+                'Cerrados',
+                'Todos',
+              ],
               selectedIndex: _filter.index,
               onSelected: (index) {
                 setState(

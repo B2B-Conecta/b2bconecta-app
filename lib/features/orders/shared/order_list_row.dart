@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+
 import 'order_list_colors.dart';
 import 'order_list_entry.dart';
 
@@ -118,6 +121,21 @@ class _OrderListRowState extends State<OrderListRow> {
         Text(
             '${entry.reference} · ${entry.products.length > 1 ? '${entry.products.length} productos · ' : ''}${entry.quantity} ${entry.quantity == 1 ? 'unidad' : 'unidades'}',
             style: TextStyle(fontSize: 12, color: colors.secondary)),
+        if (entry.awaitingConfirmation || entry.needsAttention) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _MotivePill(
+              label: entry.lines.any((l) => l.qtyAdjustmentPendienteAliado)
+                  ? 'Revisar cantidad'
+                  : entry.lines.any((l) => l.esPedidoMoroso)
+                      ? 'Pago por verificar'
+                      : entry.awaitingConfirmation
+                          ? 'Pendiente de confirmar'
+                          : 'Requiere atención',
+            ),
+          ),
+        ],
         if (widget.table) ...[
           const SizedBox(height: 4),
           Text(entry.date,
@@ -315,6 +333,34 @@ class _OrderThumbnail extends StatelessWidget {
               )),
       ]),
     ));
+  }
+}
+
+class _MotivePill extends StatelessWidget {
+  const _MotivePill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.warningBg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: theme.warningFg,
+        ),
+      ),
+    );
   }
 }
 

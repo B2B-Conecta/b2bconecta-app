@@ -15,6 +15,12 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 enum UsersTableSortColumn { user, role, status, joined }
 
+/// Filtro de rol en Cuentas.
+enum UsersRoleFilter { all, aliado, importador, admin }
+
+/// Filtro de acceso / atención en Cuentas.
+enum UsersAccessFilter { all, pendingReview, active, inactive }
+
 /// Tabla moderna de usuarios / talleres con búsqueda, orden, selección y
 /// paginación (vista Usuarios › Cuentas).
 class UsersDataTable extends StatefulWidget {
@@ -39,6 +45,8 @@ class UsersDataTable extends StatefulWidget {
     this.entrepreneursOnly = false,
     this.onEntrepreneursOnlyChanged,
     this.entrepreneurStatusFilter,
+    this.seedAccessFilter,
+    this.onSeedAccessFilterConsumed,
   });
 
   final List<ProfileModel> profiles;
@@ -66,6 +74,10 @@ class UsersDataTable extends StatefulWidget {
 
   /// Filtro por `entrepreneur_status` (bandejas del dashboard).
   final String? entrepreneurStatusFilter;
+
+  /// Semilla one-shot (deep link / badge) para chip «Por revisar».
+  final UsersAccessFilter? seedAccessFilter;
+  final VoidCallback? onSeedAccessFilterConsumed;
 
   /// Filas de demostración (sector mayorista VE) cuando no hay datos.
   static List<ProfileModel> sampleRows({DateTime? now}) {
@@ -151,6 +163,8 @@ class _UsersDataTableState extends State<UsersDataTable> {
   int _pageIndex = 0;
   late int _pageSize;
   late bool _entrepreneursOnly;
+  UsersRoleFilter _roleFilter = UsersRoleFilter.all;
+  UsersAccessFilter _accessFilter = UsersAccessFilter.all;
 
   @override
   void initState() {
@@ -160,7 +174,24 @@ class _UsersDataTableState extends State<UsersDataTable> {
     if (!listPageSizeOptions.contains(_pageSize)) {
       _pageSize = listPageSizeOptions.first;
     }
+    _applySeedAccessFilter(notifyParent: false);
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
+  }
+
+  void _applySeedAccessFilter({required bool notifyParent}) {
+    final seed = widget.seedAccessFilter;
+    if (seed == null) return;
+    _accessFilter = seed;
+    _pageIndex = 0;
+    if (notifyParent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onSeedAccessFilterConsumed?.call();
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onSeedAccessFilterConsumed?.call();
+      });
+    }
   }
 
   @override
@@ -176,6 +207,10 @@ class _UsersDataTableState extends State<UsersDataTable> {
           widget.entrepreneurStatusFilter!.trim().isNotEmpty) {
         _entrepreneursOnly = true;
       }
+    }
+    if (widget.seedAccessFilter != null &&
+        widget.seedAccessFilter != oldWidget.seedAccessFilter) {
+      _applySeedAccessFilter(notifyParent: true);
     }
   }
 
@@ -198,10 +233,50 @@ class _UsersDataTableState extends State<UsersDataTable> {
       !widget.loading &&
       widget.errorMessage == null;
 
+  bool _matchesRole(ProfileModel p) {
+    return switch (_roleFilter) {
+      UsersRoleFilter.all => true,
+      UsersRoleFilter.aliado => p.isAliado,
+      UsersRoleFilter.importador => p.isImportador,
+      UsersRoleFilter.admin => p.isAdministrador,
+    };
+  }
+
+  bool _matchesAccess(ProfileModel p) {
+    return switch (_accessFilter) {
+      UsersAccessFilter.all => true,
+      UsersAccessFilter.pendingReview =>
+        p.accountAccessStatus == AccountAccessStatus.pendingReview,
+      UsersAccessFilter.active => _isActive(p),
+      UsersAccessFilter.inactive => !_isActive(p) &&
+          p.accountAccessStatus != AccountAccessStatus.pendingReview,
+    };
+  }
+
+  /// Pendientes de revisión visibles con rol / emprendedor actuales.
+  int get _pendingReviewCount {
+    final statusFilter = widget.entrepreneurStatusFilter?.trim().toLowerCase();
+    return _source.where((p) {
+      if (!_matchesRole(p)) return false;
+      if (_entrepreneursOnly && !p.isEntrepreneurRetailer) return false;
+      if (statusFilter != null && statusFilter.isNotEmpty) {
+        final st = p.entrepreneurStatus?.trim().toLowerCase();
+        if (statusFilter == EntrepreneurStatus.pendingWarningPeriod) {
+          if (!EntrepreneurStatus.isFirstPurchaseWarning(st)) return false;
+        } else if (st != statusFilter) {
+          return false;
+        }
+      }
+      return p.accountAccessStatus == AccountAccessStatus.pendingReview;
+    }).length;
+  }
+
   List<ProfileModel> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
     final statusFilter = widget.entrepreneurStatusFilter?.trim().toLowerCase();
     final list = _source.where((p) {
+      if (!_matchesRole(p)) return false;
+      if (!_matchesAccess(p)) return false;
       if (_entrepreneursOnly && !p.isEntrepreneurRetailer) return false;
       if (statusFilter != null && statusFilter.isNotEmpty) {
         final st = p.entrepreneurStatus?.trim().toLowerCase();
@@ -400,6 +475,17 @@ class _UsersDataTableState extends State<UsersDataTable> {
             selectedCount: _selected.length,
             entrepreneursOnly: _entrepreneursOnly,
             entrepreneurStatusFilter: widget.entrepreneurStatusFilter,
+            pendingReviewCount: _pendingReviewCount,
+            roleFilter: _roleFilter,
+            accessFilter: _accessFilter,
+            onRoleFilterChanged: (v) => setState(() {
+              _roleFilter = v;
+              _pageIndex = 0;
+            }),
+            onAccessFilterChanged: (v) => setState(() {
+              _accessFilter = v;
+              _pageIndex = 0;
+            }),
             onEntrepreneursOnlyChanged: (v) {
               setState(() {
                 _entrepreneursOnly = v;
@@ -465,6 +551,8 @@ class _UsersDataTableState extends State<UsersDataTable> {
                           _searchCtrl.clear();
                           setState(() {
                             _entrepreneursOnly = false;
+                            _roleFilter = UsersRoleFilter.all;
+                            _accessFilter = UsersAccessFilter.all;
                             _pageIndex = 0;
                           });
                           widget.onEntrepreneursOnlyChanged?.call(false);
@@ -472,6 +560,8 @@ class _UsersDataTableState extends State<UsersDataTable> {
                         showClear: hasQuery ||
                             _selected.isNotEmpty ||
                             _entrepreneursOnly ||
+                            _roleFilter != UsersRoleFilter.all ||
+                            _accessFilter != UsersAccessFilter.all ||
                             (widget.entrepreneurStatusFilter?.isNotEmpty ??
                                 false),
                       )
@@ -562,6 +652,11 @@ class _Toolbar extends StatelessWidget {
     required this.selectedCount,
     required this.entrepreneursOnly,
     required this.onEntrepreneursOnlyChanged,
+    required this.pendingReviewCount,
+    required this.roleFilter,
+    required this.accessFilter,
+    required this.onRoleFilterChanged,
+    required this.onAccessFilterChanged,
     this.entrepreneurStatusFilter,
     this.onCreate,
     this.onBulkDeactivate,
@@ -574,6 +669,11 @@ class _Toolbar extends StatelessWidget {
   final int selectedCount;
   final bool entrepreneursOnly;
   final ValueChanged<bool> onEntrepreneursOnlyChanged;
+  final int pendingReviewCount;
+  final UsersRoleFilter roleFilter;
+  final UsersAccessFilter accessFilter;
+  final ValueChanged<UsersRoleFilter> onRoleFilterChanged;
+  final ValueChanged<UsersAccessFilter> onAccessFilterChanged;
   final String? entrepreneurStatusFilter;
   final VoidCallback? onCreate;
   final VoidCallback? onBulkDeactivate;
@@ -593,16 +693,74 @@ class _Toolbar extends StatelessWidget {
           EntrepreneurStatus.reactivationRequested => 'Reactivación',
           _ => null,
         };
+        final pendingSelected =
+            accessFilter == UsersAccessFilter.pendingReview;
+
+        Widget filterChip({
+          required String label,
+          required bool selected,
+          required VoidCallback onTap,
+          Color? selectedBg,
+          Color? selectedFg,
+          Widget? avatar,
+        }) {
+          final fg = selected
+              ? (selectedFg ?? theme.brand)
+              : theme.textSecondary;
+          final bg = selected
+              ? (selectedBg ?? theme.brandContainer)
+              : theme.surfaceSubtle;
+          return Material(
+            color: bg,
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: selected
+                        ? (selectedFg ?? theme.brand).withOpacity(0.35)
+                        : theme.borderSubtle,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (avatar != null) ...[
+                      avatar,
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         final search = TextField(
           controller: searchCtrl,
           decoration: InputDecoration(
             hintText: 'Buscar por nombre o correo…',
-            prefixIcon: const Padding(
-              padding: EdgeInsets.only(left: 12, right: 8),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 8),
               child: LucideIcon(
                 LucideGlyph.search,
                 size: 18,
-                color: Color(0xFF64748B),
+                color: theme.textSecondary,
               ),
             ),
             prefixIconConstraints:
@@ -625,6 +783,82 @@ class _Toolbar extends StatelessWidget {
                   BorderSide(color: AdminUsersChrome.brand, width: 1.4),
             ),
           ),
+        );
+
+        final pendingChip = filterChip(
+          label: pendingReviewCount > 0
+              ? 'Por revisar ($pendingReviewCount)'
+              : 'Por revisar',
+          selected: pendingSelected,
+          selectedBg: theme.warningBg,
+          selectedFg: theme.warningFg,
+          avatar: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: theme.warningFg,
+              shape: BoxShape.circle,
+            ),
+          ),
+          onTap: () => onAccessFilterChanged(
+            pendingSelected
+                ? UsersAccessFilter.all
+                : UsersAccessFilter.pendingReview,
+          ),
+        );
+
+        final roleChips = Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            filterChip(
+              label: 'Todos',
+              selected: roleFilter == UsersRoleFilter.all,
+              onTap: () => onRoleFilterChanged(UsersRoleFilter.all),
+            ),
+            filterChip(
+              label: 'Tiendas',
+              selected: roleFilter == UsersRoleFilter.aliado,
+              onTap: () => onRoleFilterChanged(UsersRoleFilter.aliado),
+            ),
+            filterChip(
+              label: 'Proveedores',
+              selected: roleFilter == UsersRoleFilter.importador,
+              onTap: () => onRoleFilterChanged(UsersRoleFilter.importador),
+            ),
+            filterChip(
+              label: 'Admins',
+              selected: roleFilter == UsersRoleFilter.admin,
+              onTap: () => onRoleFilterChanged(UsersRoleFilter.admin),
+            ),
+          ],
+        );
+
+        final accessChips = Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            filterChip(
+              label: 'Activos',
+              selected: accessFilter == UsersAccessFilter.active,
+              selectedBg: theme.successBg,
+              selectedFg: theme.successFg,
+              onTap: () => onAccessFilterChanged(
+                accessFilter == UsersAccessFilter.active
+                    ? UsersAccessFilter.all
+                    : UsersAccessFilter.active,
+              ),
+            ),
+            filterChip(
+              label: 'Inactivos',
+              selected: accessFilter == UsersAccessFilter.inactive,
+              onTap: () => onAccessFilterChanged(
+                accessFilter == UsersAccessFilter.inactive
+                    ? UsersAccessFilter.all
+                    : UsersAccessFilter.inactive,
+              ),
+            ),
+          ],
         );
 
         final entrepreneursChip = FilterChip(
@@ -656,12 +890,11 @@ class _Toolbar extends StatelessWidget {
           onSelected: onEntrepreneursOnlyChanged,
         );
 
-        final actions = Wrap(
+        final metaActions = Wrap(
           spacing: 8,
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            entrepreneursChip,
             Text(
               usingSamples
                   ? '$resultCount ejemplo${resultCount == 1 ? '' : 's'}'
@@ -675,30 +908,28 @@ class _Toolbar extends StatelessWidget {
             if (selectedCount > 0)
               TextButton.icon(
                 onPressed: onBulkDeactivate,
-                icon: const LucideIcon(
+                icon: LucideIcon(
                   LucideGlyph.trash2,
                   size: 16,
-                  color: Color(0xFFEF4444),
+                  color: theme.warningFg,
                 ),
                 label: Text('Desactivar ($selectedCount)'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFEF4444),
-                ),
+                style: TextButton.styleFrom(foregroundColor: theme.warningFg),
               ),
             if (onRefresh != null)
               IconButton(
                 tooltip: 'Actualizar',
                 onPressed: () => onRefresh?.call(),
-                icon: const LucideIcon(
+                icon: LucideIcon(
                   LucideGlyph.refreshCw,
                   size: 18,
-                  color: Color(0xFF64748B),
+                  color: theme.textSecondary,
                 ),
               ),
             FilledButton.icon(
               onPressed: onCreate,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: theme.brand,
                 foregroundColor: theme.surfaceCard,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -716,21 +947,38 @@ class _Toolbar extends StatelessWidget {
           ],
         );
 
-        if (narrow) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        final filterRow = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            pendingChip,
+            entrepreneursChip,
+            roleChips,
+            accessChips,
+          ],
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (narrow) ...[
               search,
               const SizedBox(height: 10),
-              actions,
+              filterRow,
+              const SizedBox(height: 10),
+              metaActions,
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 12),
+                  metaActions,
+                ],
+              ),
+              const SizedBox(height: 10),
+              filterRow,
             ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: search),
-            const SizedBox(width: 12),
-            actions,
           ],
         );
       },
@@ -967,6 +1215,17 @@ class _UserRowState extends State<_UserRow> {
                   color: AdminUsersChrome.muted,
                 ),
               ),
+              if (widget.pendingReview) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _MotivePill(
+                    label: 'KYC por revisar',
+                    bg: B2BThemeExtension.of(context).warningBg,
+                    fg: B2BThemeExtension.of(context).warningFg,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -978,7 +1237,7 @@ class _UserRowState extends State<_UserRow> {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           label,
@@ -991,6 +1250,20 @@ class _UserRowState extends State<_UserRow> {
       );
     }
 
+    final rowTheme = B2BThemeExtension.of(context);
+    final statusLabel = widget.pendingReview
+        ? 'En revisión'
+        : (widget.active ? 'Activo' : 'Inactivo');
+    final statusDot = widget.pendingReview
+        ? rowTheme.warningFg
+        : (widget.active ? rowTheme.successFg : rowTheme.textMuted);
+    final statusBg = widget.pendingReview
+        ? rowTheme.warningBg
+        : (widget.active ? rowTheme.successBg : AdminUsersChrome.zebra);
+    final statusFg = widget.pendingReview
+        ? rowTheme.warningFg
+        : (widget.active ? rowTheme.successFg : AdminUsersChrome.muted);
+
     final status = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -998,26 +1271,12 @@ class _UserRowState extends State<_UserRow> {
           width: 7,
           height: 7,
           decoration: BoxDecoration(
-            color: widget.active
-                ? const Color(0xFF16A34A)
-                : const Color(0xFF94A3B8),
+            color: statusDot,
             shape: BoxShape.circle,
           ),
         ),
         const SizedBox(width: 6),
-        badge(
-          widget.active ? 'Activo' : 'Inactivo',
-          widget.active
-              ? (AppColors.brightness == Brightness.dark
-                  ? const Color(0x2616A34A)
-                  : const Color(0xFFF0FDF4))
-              : AdminUsersChrome.zebra,
-          widget.active
-              ? (AppColors.brightness == Brightness.dark
-                  ? const Color(0xFF4ADE80)
-                  : const Color(0xFF16A34A))
-              : AdminUsersChrome.muted,
-        ),
+        badge(statusLabel, statusBg, statusFg),
       ],
     );
 
@@ -1231,6 +1490,39 @@ enum _RowAction {
   reactivate,
   deactivate,
   hardDelete,
+}
+
+class _MotivePill extends StatelessWidget {
+  const _MotivePill({
+    required this.label,
+    required this.bg,
+    required this.fg,
+  });
+
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
+  }
 }
 
 class _ActionMenuTile extends StatelessWidget {

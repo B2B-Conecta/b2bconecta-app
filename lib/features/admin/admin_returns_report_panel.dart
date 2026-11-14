@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/admin_list_skeleton.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -21,11 +23,31 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
   String? _error;
   List<Map<String, dynamic>> _importers = const [];
   List<Map<String, dynamic>> _casos = const [];
+  bool _openOnly = false;
 
   @override
   void initState() {
     super.initState();
+    MainShellTabController.registerAdminReturnsOpenOnlyDeepLink(
+      _applyPendingOpenOnly,
+    );
+    _applyPendingOpenOnly();
     _load();
+  }
+
+  @override
+  void dispose() {
+    MainShellTabController.registerAdminReturnsOpenOnlyDeepLink(null);
+    super.dispose();
+  }
+
+  void _applyPendingOpenOnly() {
+    if (!MainShellTabController.consumePendingReturnsOpenOnly()) return;
+    if (!mounted) {
+      _openOnly = true;
+      return;
+    }
+    setState(() => _openOnly = true);
   }
 
   Future<void> _load() async {
@@ -94,6 +116,14 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
       0,
       (sum, row) => sum + _num(row['saldo_vigente']),
     );
+    final visibleImporters = _openOnly
+        ? _importers.where((row) => _int(row['abiertas']) > 0).toList()
+        : _importers;
+    final visibleCasos = _openOnly
+        ? _casos
+            .where((row) => row['status']?.toString() == 'abierta')
+            .toList()
+        : _casos;
 
     final theme = B2BThemeExtension.of(context);
 
@@ -133,6 +163,37 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    B2bDataTableFilterPill(
+                      label: abiertas > 0
+                          ? 'En revisión ($abiertas)'
+                          : 'En revisión',
+                      selected: _openOnly,
+                      onTap: () => setState(() => _openOnly = !_openOnly),
+                    ),
+                    if (_openOnly)
+                      TextButton(
+                        onPressed: () => setState(() => _openOnly = false),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Limpiar',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: theme.brand,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -163,9 +224,11 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
                 const SizedBox(height: 20),
                 sectionTitle('Por importador'),
                 const SizedBox(height: 8),
-                if (_importers.isEmpty)
+                if (visibleImporters.isEmpty)
                   Text(
-                    'Todavía no hay devoluciones.',
+                    _openOnly
+                        ? 'Ningún importador con casos en revisión.'
+                        : 'Todavía no hay devoluciones.',
                     style: TextStyle(color: theme.textSecondary),
                   ),
               ],
@@ -174,9 +237,9 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList.builder(
-              itemCount: _importers.length,
+              itemCount: visibleImporters.length,
               itemBuilder: (context, i) {
-                final row = _importers[i];
+                final row = visibleImporters[i];
                 return Padding(
                   key: ValueKey<String>(
                     'ret-imp-${row['importador_id'] ?? i}',
@@ -196,9 +259,9 @@ class _AdminReturnsReportPanelState extends State<AdminReturnsReportPanel> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             sliver: SliverList.builder(
-              itemCount: _casos.length,
+              itemCount: visibleCasos.length,
               itemBuilder: (context, i) {
-                final row = _casos[i];
+                final row = visibleCasos[i];
                 return Padding(
                   key: ValueKey<String>('ret-caso-${row['id'] ?? i}'),
                   padding: const EdgeInsets.only(bottom: 8),
@@ -364,6 +427,28 @@ class _CaseCard extends StatelessWidget {
               '${row['product_name'] ?? 'Producto'} · ${row['affected_qty'] ?? 1} uds',
               style: TextStyle(fontSize: 13, color: theme.textPrimary),
             ),
+            if (row['status']?.toString() == 'abierta') ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: theme.warningBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Mediación pendiente',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: theme.warningFg,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 4),
             Text(
               [

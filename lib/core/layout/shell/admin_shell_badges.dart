@@ -35,12 +35,14 @@ class AdminShellBadges extends ChangeNotifier {
   int _activeOrders = 0;
   int _openSupport = 0;
   int _pendingKyc = 0;
+  int _openReturns = 0;
   bool _unreadChat = false;
   bool _configAttention = false;
 
   int get activeOrders => _activeOrders;
   int get openSupport => _openSupport;
   int get pendingKyc => _pendingKyc;
+  int get openReturns => _openReturns;
   bool get hasUnreadChat => _unreadChat;
   bool get configNeedsAttention => _configAttention;
 
@@ -54,6 +56,8 @@ class AdminShellBadges extends ChangeNotifier {
         _configAttention ? const ShellNavBadge.warning() : null,
       AdminShellBadgeKey.usuarios =>
         _pendingKyc > 0 ? ShellNavBadge.count(_pendingKyc) : null,
+      AdminShellBadgeKey.devoluciones =>
+        _openReturns > 0 ? ShellNavBadge.count(_openReturns) : null,
     };
   }
 
@@ -122,6 +126,12 @@ class AdminShellBadges extends ChangeNotifier {
                 payload.newRecord['account_access_status']?.toString();
             if (prev != next) _scheduleRefresh();
           },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'order_postventa_casos',
+          callback: (_) => _scheduleRefresh(),
         );
     channel.subscribe();
     _realtimeChannel = channel;
@@ -153,16 +163,19 @@ class AdminShellBadges extends ChangeNotifier {
         OrdersService.countActiveTransactionRequestsForAdmin(),
         SupportService.countOpenSupportTicketsForAdmin(),
         _countPendingKycAccounts(),
+        _countOpenReturns(),
         _resolveConfigAttention(),
       ]);
       final orders = results[0] as int;
       final support = results[1] as int;
       final kyc = results[2] as int;
-      final config = results[3] as bool;
+      final returns = results[3] as int;
+      final config = results[4] as bool;
       final chat = (_notifications?.unreadChatCount ?? 0) > 0;
       if (orders == _activeOrders &&
           support == _openSupport &&
           kyc == _pendingKyc &&
+          returns == _openReturns &&
           config == _configAttention &&
           chat == _unreadChat) {
         return;
@@ -170,6 +183,7 @@ class AdminShellBadges extends ChangeNotifier {
       _activeOrders = orders;
       _openSupport = support;
       _pendingKyc = kyc;
+      _openReturns = returns;
       _configAttention = config;
       _unreadChat = chat;
       notifyListeners();
@@ -191,6 +205,18 @@ class AdminShellBadges extends ChangeNotifier {
     } catch (_) {
       // Fallback: señal ligera por notificaciones KYC.
       return _notifications?.unreadKycCount ?? _pendingKyc;
+    }
+  }
+
+  Future<int> _countOpenReturns() async {
+    try {
+      final response = await SupabaseAccess.client
+          .from('order_postventa_casos')
+          .select('id')
+          .eq('status', 'abierta');
+      return (response as List<dynamic>).length;
+    } catch (_) {
+      return _openReturns;
     }
   }
 

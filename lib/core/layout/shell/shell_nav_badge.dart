@@ -16,6 +16,9 @@ enum AdminShellBadgeKey {
 
   /// Cuentas pendientes de revisión KYC.
   usuarios,
+
+  /// Casos de devolución / postventa en revisión.
+  devoluciones,
 }
 
 /// Indicador reactivo en un destino del shell.

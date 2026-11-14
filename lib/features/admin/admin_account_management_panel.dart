@@ -74,6 +74,7 @@ class _AdminAccountManagementPanelState
   int _pageSize = listPageSizeOptions.first;
   bool _entrepreneursOnly = false;
   String? _entrepreneurStatusFilter;
+  UsersAccessFilter? _seedAccessFilter;
 
   @override
   void initState() {
@@ -83,6 +84,7 @@ class _AdminAccountManagementPanelState
     );
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
     _consumeEntrepreneurAlertFilter();
+    _consumePendingReviewFilter();
     _load();
   }
 
@@ -92,6 +94,14 @@ class _AdminAccountManagementPanelState
     if (filter == null || filter.trim().isEmpty) return;
     _entrepreneursOnly = true;
     _entrepreneurStatusFilter = filter.trim();
+    _mode = _AccountListMode.cuentas;
+  }
+
+  void _consumePendingReviewFilter() {
+    if (!MainShellTabController.consumePendingUsersPendingReviewOnly()) {
+      return;
+    }
+    _seedAccessFilter = UsersAccessFilter.pendingReview;
     _mode = _AccountListMode.cuentas;
   }
 
@@ -131,11 +141,13 @@ class _AdminAccountManagementPanelState
 
   void _consumeAccountDeepLink() {
     _consumeEntrepreneurAlertFilter();
+    _consumePendingReviewFilter();
     final pending = MainShellTabController.consumePendingAccountProfileId() ??
         MainShellTabController.consumePendingKycProfileId();
     if (pending == null &&
         _entrepreneurStatusFilter == null &&
-        !_entrepreneursOnly) {
+        !_entrepreneursOnly &&
+        _seedAccessFilter == null) {
       return;
     }
     if (!mounted) return;
@@ -566,11 +578,17 @@ class _AdminAccountManagementPanelState
               onRefresh: _load,
               entrepreneursOnly: _entrepreneursOnly,
               entrepreneurStatusFilter: _entrepreneurStatusFilter,
+              seedAccessFilter: _seedAccessFilter,
               onEntrepreneursOnlyChanged: (v) {
                 setState(() {
                   _entrepreneursOnly = v;
                   if (!v) _entrepreneurStatusFilter = null;
                 });
+              },
+              onSeedAccessFilterConsumed: () {
+                if (_seedAccessFilter != null) {
+                  setState(() => _seedAccessFilter = null);
+                }
               },
               onCreate: () async {
                 final created = await AddUserModal.open(

@@ -49,7 +49,7 @@ class QuickActionsCard extends StatelessWidget {
       onReviewOrders!();
       return;
     }
-    MainShellTabController.navigateToAdminActivosForNotification();
+    MainShellTabController.navigateToAdminPedidosPendingConfirmation();
   }
 
   void _openReports() {

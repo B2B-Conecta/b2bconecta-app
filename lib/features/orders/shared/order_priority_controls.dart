@@ -21,7 +21,8 @@ class OrderPriorityControls extends StatelessWidget {
       required this.pendingCount,
       required this.onPending,
       required this.pendingFirst,
-      required this.onSort});
+      required this.onSort,
+      this.compact = false});
   final PedidosListScope scope;
   final ValueChanged<PedidosListScope> onScope;
   final bool pendingOnly;
@@ -29,6 +30,7 @@ class OrderPriorityControls extends StatelessWidget {
   final VoidCallback onPending;
   final bool pendingFirst;
   final ValueChanged<bool> onSort;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -118,14 +120,18 @@ class OrderPriorityControls extends StatelessWidget {
             child: const Text('Orden habitual')),
       ],
       child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          padding:
+              EdgeInsets.symmetric(horizontal: 8, vertical: compact ? 7 : 12),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.swap_vert, size: 18, color: colors.secondary),
-            const SizedBox(width: 5),
+            if (!compact) ...[
+              Icon(Icons.swap_vert, size: 18, color: colors.secondary),
+              const SizedBox(width: 5),
+            ],
             Text(pendingFirst ? 'Pendientes primero' : 'Orden habitual',
                 style: TextStyle(fontSize: 12, color: colors.secondary)),
             const SizedBox(width: 4),
-            Icon(Icons.expand_more, size: 18, color: colors.secondary),
+            Icon(compact ? Icons.arrow_downward_rounded : Icons.expand_more,
+                size: compact ? 14 : 18, color: colors.secondary),
           ])),
     );
     return LayoutBuilder(builder: (context, constraints) {
@@ -135,7 +141,10 @@ class OrderPriorityControls extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               tabs,
-              Align(alignment: Alignment.centerRight, child: sort)
+              Align(
+                  alignment:
+                      compact ? Alignment.centerLeft : Alignment.centerRight,
+                  child: sort)
             ]);
       }
       return Row(

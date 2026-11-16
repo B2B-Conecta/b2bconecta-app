@@ -16,7 +16,7 @@ export 'order_list_entry.dart';
 export 'order_list_row.dart' show OrderStatusTag;
 
 /// Full-width list and dedicated detail, preserving the mounted list on return.
-class OrderWorkspace extends StatelessWidget {
+class OrderWorkspace extends StatefulWidget {
   const OrderWorkspace(
       {super.key,
       required this.groups,
@@ -33,7 +33,8 @@ class OrderWorkspace extends StatelessWidget {
       this.groupKey,
       this.emptyMessage,
       this.canCancelGroup,
-      this.onCancelGroup});
+      this.onCancelGroup,
+      this.headerBuilder});
   final List<List<TransactionRequestModel>> groups;
   final String? selectedKey;
   final ValueChanged<String> onSelect;
@@ -44,6 +45,8 @@ class OrderWorkspace extends StatelessWidget {
   final Object resetKey;
   final VoidCallback onClearFilters;
   final bool loading;
+  final bool Function(List<TransactionRequestModel>)? canCancelGroup;
+  final ValueChanged<List<TransactionRequestModel>>? onCancelGroup;
   final AppHomeRole viewerRole;
 
   /// Clave de fila; por defecto [checkoutGroupExpandKey].
@@ -51,251 +54,298 @@ class OrderWorkspace extends StatelessWidget {
 
   /// Mensaje cuando la lista está vacía (p. ej. alcance sin resultados).
   final String? emptyMessage;
+  final Widget Function(double progress, bool detailOpen)? headerBuilder;
+
+  @override
+  State<OrderWorkspace> createState() => _OrderWorkspaceState();
+}
+
+class _OrderWorkspaceState extends State<OrderWorkspace> {
+  final _scrollProgress = ValueNotifier<double>(0);
+
+  @override
+  void dispose() {
+    _scrollProgress.dispose();
+    super.dispose();
+  }
 
   /// Admin: habilita «Cancelar / Suspender» en [OrdersDataTable].
-  final bool Function(List<TransactionRequestModel>)? canCancelGroup;
-  final ValueChanged<List<TransactionRequestModel>>? onCancelGroup;
 
   String _keyOf(List<TransactionRequestModel> g) =>
-      (groupKey ?? checkoutGroupExpandKey)(g);
+      (widget.groupKey ?? checkoutGroupExpandKey)(g);
 
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
+        final OrderWorkspace(
+          :groups,
+          :selectedKey,
+          :resetKey,
+          :onClose,
+          :onSelect,
+          :loading,
+          :controls,
+          :viewerRole,
+          :onClearFilters,
+          :emptyMessage,
+          :onRefresh,
+          :detailBuilder,
+          :canCancelGroup,
+          :onCancelGroup,
+          :headerBuilder
+        ) = widget;
         final selected =
             groups.where((g) => _keyOf(g) == selectedKey).firstOrNull;
         final detailOpen = selected != null;
+        final mobileRetailer =
+            headerBuilder != null && viewerRole == AppHomeRole.aliado;
         return ScrollCompactLayout(
             resetKey: (selectedKey, resetKey),
+            scrollProgress:
+                headerBuilder == null || detailOpen ? null : _scrollProgress,
             collapseHeadingWhenCompact: true,
-            builder: (context, compact) => PopScope<Object?>(
-                  canPop: !detailOpen,
-                  onPopInvokedWithResult: (didPop, result) {
-                    if (!didPop && detailOpen) {
-                      OrderFloatingChat.close();
-                      onClose();
-                    }
-                  },
-                  child: ColoredBox(
-                      color: OrderListColors.of(context).background,
-                      child: AnimatedPadding(
-                        duration: ScrollCompactLayout.motionDuration(context),
-                        curve: Curves.easeOutCubic,
-                        padding: EdgeInsets.fromLTRB(
-                            constraints.maxWidth >= 700 ? 20 : 12,
-                            compact
-                                ? 4
-                                : (constraints.maxWidth >= 700 ? 20 : 12),
-                            constraints.maxWidth >= 700 ? 20 : 12,
-                            detailOpen ? 20 : 4),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (loading)
-                                const LinearProgressIndicator(minHeight: 2),
-                              if (!detailOpen)
-                                Flexible(
-                                  flex: 0,
-                                  fit: FlexFit.loose,
-                                  child: SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        controls,
-                                        SizedBox(height: compact ? 4 : 12),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              Expanded(
-                                  child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                    Flexible(
-                                        flex: detailOpen ? 0 : 1,
-                                        fit: detailOpen
-                                            ? FlexFit.loose
-                                            : FlexFit.tight,
-                                        child: Offstage(
-                                            offstage: detailOpen,
-                                            child: ConstrainedBox(
-                                                constraints: BoxConstraints(
-                                                    maxWidth:
-                                                        constraints.maxWidth),
-                                                child: _surface(context,
-                                                    LayoutBuilder(builder:
-                                                        (context,
-                                                            listConstraints) {
-                                                  final useCorporateAdmin =
-                                                      viewerRole ==
-                                                          AppHomeRole
-                                                              .administrador;
-                                                  if (useCorporateAdmin) {
-                                                    return SingleChildScrollView(
-                                                      child: OrdersDataTable(
-                                                        groups: groups,
-                                                        selectedKey:
-                                                            selectedKey,
-                                                        loading: loading,
-                                                        emptyMessage:
-                                                            emptyMessage,
-                                                        onClearFilters:
-                                                            onClearFilters,
-                                                        onRefresh: onRefresh,
-                                                        resetKey: resetKey,
-                                                        canCancel:
-                                                            canCancelGroup,
-                                                        onCancel:
-                                                            onCancelGroup,
-                                                        onOpen: (g) =>
-                                                            onSelect(
-                                                                _keyOf(g)),
-                                                      ),
-                                                    );
-                                                  }
-                                                  final table = listConstraints
-                                                              .maxWidth >=
-                                                          900 &&
-                                                      MediaQuery.textScalerOf(
-                                                                  context)
-                                                              .scale(14) <
-                                                          20;
-                                                  return Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .stretch,
-                                                      children: [
-                                                        if (table)
-                                                          OrderListColumnsHeader(
-                                                            partyLabel: switch (
-                                                                viewerRole) {
-                                                              AppHomeRole
-                                                                    .aliado =>
-                                                                'Proveedor',
-                                                              AppHomeRole
-                                                                    .importador =>
-                                                                'Tienda',
-                                                              AppHomeRole
-                                                                    .administrador =>
-                                                                'Partes',
-                                                            },
-                                                          ),
-                                                        Expanded(
-                                                            child: groups
-                                                                    .isEmpty
-                                                                ? _OrdersEmpty(
-                                                                    onClear:
-                                                                        onClearFilters,
-                                                                    message:
-                                                                        emptyMessage,
-                                                                  )
-                                                                : PagedItems<
-                                                                    List<
-                                                                        TransactionRequestModel>>(
-                                                                    items:
-                                                                        groups,
-                                                                    itemKey:
-                                                                        _keyOf,
-                                                                    pagerAtBottom:
-                                                                        true,
-                                                                    pageBarBottomPadding:
-                                                                        0,
-                                                                    separator:
-                                                                        8,
-                                                                    pageBarBuilder: (bar) =>
-                                                                        _pageFooter(
-                                                                            context,
-                                                                            bar),
-                                                                    resetKey:
-                                                                        resetKey,
-                                                                    padding: const EdgeInsets
-                                                                        .only(
-                                                                        top: 8,
-                                                                        bottom:
-                                                                            8),
-                                                                    onRefresh:
-                                                                        onRefresh,
-                                                                    itemBuilder: (g) => OrderListRow(
-                                                                        entry: OrderListEntry(
-                                                                            g,
-                                                                            viewerRole:
-                                                                                viewerRole),
-                                                                        table:
-                                                                            table,
-                                                                        selected:
-                                                                            _keyOf(g) ==
-                                                                                selectedKey,
-                                                                        onOpen: () =>
-                                                                            onSelect(_keyOf(g))),
-                                                                  )),
-                                                      ]);
-                                                }))))),
-                                    if (selected != null) ...[
-                                      Expanded(
-                                          flex: 1,
-                                          child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.stretch,
-                                              children: [
-                                                AnimatedPadding(
-                                                    duration:
-                                                        ScrollCompactLayout
-                                                            .motionDuration(
-                                                                context),
-                                                    curve: Curves.easeOutCubic,
-                                                    padding:
-                                                        EdgeInsets.fromLTRB(
-                                                            16,
-                                                            compact ? 0 : 8,
-                                                            8,
-                                                            compact ? 0 : 8),
-                                                    child: Row(children: [
-                                                      IconButton(
-                                                          onPressed: () {
-                                                            OrderFloatingChat
-                                                                .close();
-                                                            onClose();
+            builder: (context, compact) {
+              final body = PopScope<Object?>(
+                canPop: !detailOpen,
+                onPopInvokedWithResult: (didPop, result) {
+                  if (!didPop && detailOpen) {
+                    OrderFloatingChat.close();
+                    onClose();
+                  }
+                },
+                child: ColoredBox(
+                    color: OrderListColors.of(context).background,
+                    child: AnimatedPadding(
+                      duration: ScrollCompactLayout.motionDuration(context),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.fromLTRB(
+                          constraints.maxWidth >= 700 ? 20 : 12,
+                          compact ? 4 : (constraints.maxWidth >= 700 ? 20 : 12),
+                          constraints.maxWidth >= 700 ? 20 : 12,
+                          detailOpen ? 20 : 4),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (loading)
+                              const LinearProgressIndicator(minHeight: 2),
+                            if (!detailOpen) ...[
+                              controls,
+                              SizedBox(
+                                  height: mobileRetailer || compact ? 4 : 12)
+                            ],
+                            Expanded(
+                                child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                  Flexible(
+                                      flex: detailOpen ? 0 : 1,
+                                      fit: detailOpen
+                                          ? FlexFit.loose
+                                          : FlexFit.tight,
+                                      child: Offstage(
+                                          offstage: detailOpen,
+                                          child: ConstrainedBox(
+                                              constraints: BoxConstraints(
+                                                  maxWidth:
+                                                      constraints.maxWidth),
+                                              child: _surface(context,
+                                                  LayoutBuilder(builder:
+                                                      (context,
+                                                          listConstraints) {
+                                                final useCorporateAdmin =
+                                                    viewerRole ==
+                                                        AppHomeRole
+                                                            .administrador;
+                                                if (useCorporateAdmin) {
+                                                  return SingleChildScrollView(
+                                                    child: OrdersDataTable(
+                                                      groups: groups,
+                                                      selectedKey: selectedKey,
+                                                      loading: loading,
+                                                      emptyMessage:
+                                                          emptyMessage,
+                                                      onClearFilters:
+                                                          onClearFilters,
+                                                      onRefresh: onRefresh,
+                                                      resetKey: resetKey,
+                                                      canCancel: canCancelGroup,
+                                                      onCancel: onCancelGroup,
+                                                      onOpen: (g) =>
+                                                          onSelect(_keyOf(g)),
+                                                    ),
+                                                  );
+                                                }
+                                                final table =
+                                                    listConstraints.maxWidth >=
+                                                            900 &&
+                                                        MediaQuery.textScalerOf(
+                                                                    context)
+                                                                .scale(14) <
+                                                            20;
+                                                return Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .stretch,
+                                                    children: [
+                                                      if (table)
+                                                        OrderListColumnsHeader(
+                                                          partyLabel: switch (
+                                                              viewerRole) {
+                                                            AppHomeRole
+                                                                  .aliado =>
+                                                              'Proveedor',
+                                                            AppHomeRole
+                                                                  .importador =>
+                                                              'Tienda',
+                                                            AppHomeRole
+                                                                  .administrador =>
+                                                              'Partes',
                                                           },
-                                                          tooltip:
-                                                              'Volver a pedidos',
-                                                          icon: const Icon(Icons
-                                                              .arrow_back)),
+                                                        ),
                                                       Expanded(
-                                                          child: Text(
-                                                              'Pedido ${OrderListEntry(selected, viewerRole: viewerRole).reference}',
-                                                              style: TextStyle(
-                                                                  fontSize: 16,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w700,
-                                                                  color: AppColors
-                                                                      .textPrimary))),
-                                                    ])),
-                                                SizedBox(
-                                                    height: compact ? 0 : 12),
-                                                Expanded(
-                                                    child: SingleChildScrollView(
-                                                        key: ValueKey(
-                                                            'order-detail-${_keyOf(selected)}'),
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .only(
-                                                                bottom: 20),
-                                                        child: detailBuilder(
-                                                            selected))),
-                                              ])),
-                                    ],
-                                  ])),
-                            ]),
-                      )),
-                ));
+                                                          child: groups.isEmpty
+                                                              ? _OrdersEmpty(
+                                                                  onClear:
+                                                                      onClearFilters,
+                                                                  message:
+                                                                      emptyMessage,
+                                                                )
+                                                              : PagedItems<
+                                                                  List<
+                                                                      TransactionRequestModel>>(
+                                                                  items: groups,
+                                                                  itemKey:
+                                                                      _keyOf,
+                                                                  pagerAtBottom:
+                                                                      true,
+                                                                  compactPageBar:
+                                                                      mobileRetailer,
+                                                                  pageSizeOptions:
+                                                                      mobileRetailer
+                                                                          ? const [
+                                                                              10
+                                                                            ]
+                                                                          : listPageSizeOptions,
+                                                                  pageBarBottomPadding:
+                                                                      0,
+                                                                  separator: 8,
+                                                                  pageBarBuilder: (bar) =>
+                                                                      _pageFooter(
+                                                                          context,
+                                                                          bar),
+                                                                  resetKey:
+                                                                      resetKey,
+                                                                  padding: EdgeInsets.only(
+                                                                      top: mobileRetailer
+                                                                          ? 2
+                                                                          : 8,
+                                                                      bottom:
+                                                                          8),
+                                                                  onRefresh:
+                                                                      onRefresh,
+                                                                  itemBuilder: (g) => OrderListRow(
+                                                                      entry: OrderListEntry(
+                                                                          g,
+                                                                          viewerRole:
+                                                                              viewerRole),
+                                                                      table:
+                                                                          table,
+                                                                      retailerCard: headerBuilder !=
+                                                                              null &&
+                                                                          viewerRole ==
+                                                                              AppHomeRole
+                                                                                  .aliado,
+                                                                      selected:
+                                                                          _keyOf(g) ==
+                                                                              selectedKey,
+                                                                      onOpen: () =>
+                                                                          onSelect(
+                                                                              _keyOf(g))),
+                                                                )),
+                                                    ]);
+                                              }))))),
+                                  if (selected != null) ...[
+                                    Expanded(
+                                        flex: 1,
+                                        child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              AnimatedPadding(
+                                                  duration: ScrollCompactLayout
+                                                      .motionDuration(context),
+                                                  curve: Curves.easeOutCubic,
+                                                  padding: EdgeInsets.fromLTRB(
+                                                      mobileRetailer ? 0 : 16,
+                                                      compact || mobileRetailer
+                                                          ? 0
+                                                          : 8,
+                                                      8,
+                                                      compact || mobileRetailer
+                                                          ? 0
+                                                          : 8),
+                                                  child: Row(children: [
+                                                    IconButton(
+                                                        onPressed: () {
+                                                          OrderFloatingChat
+                                                              .close();
+                                                          onClose();
+                                                        },
+                                                        tooltip:
+                                                            'Volver a pedidos',
+                                                        icon: const Icon(
+                                                            Icons.arrow_back)),
+                                                    Expanded(
+                                                        child: Text(
+                                                            'Pedido ${OrderListEntry(selected, viewerRole: viewerRole).reference}',
+                                                            style: TextStyle(
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: AppColors
+                                                                    .textPrimary))),
+                                                  ])),
+                                              SizedBox(
+                                                  height: compact
+                                                      ? 0
+                                                      : mobileRetailer
+                                                          ? 4
+                                                          : 12),
+                                              Expanded(
+                                                  child: SingleChildScrollView(
+                                                      key: ValueKey(
+                                                          'order-detail-${_keyOf(selected)}'),
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              bottom: 20),
+                                                      child: detailBuilder(
+                                                          selected))),
+                                            ])),
+                                  ],
+                                ])),
+                          ]),
+                    )),
+              );
+              final buildHeader = headerBuilder;
+              if (buildHeader == null) return body;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ValueListenableBuilder<double>(
+                    valueListenable: _scrollProgress,
+                    builder: (context, progress, _) =>
+                        buildHeader(progress, detailOpen),
+                  ),
+                  Expanded(child: body),
+                ],
+              );
+            });
       });
 
   Widget _surface(BuildContext context, Widget child) {
-    if (viewerRole == AppHomeRole.administrador) {
+    if (widget.viewerRole == AppHomeRole.administrador) {
       final theme = B2BThemeExtension.of(context);
       return ColoredBox(color: theme.background, child: child);
     }

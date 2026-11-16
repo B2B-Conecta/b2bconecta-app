@@ -427,3 +427,7 @@ verify_jwt = false
 # Cron / service_role: sincroniza tasa BCV desde bcv.today cada 30 min.
 [functions.sync-tasa-bcv]
 verify_jwt = false
+
+# Public institutional sample: validates publishable API keys in its handler.
+[functions.public-catalog]
+verify_jwt = false

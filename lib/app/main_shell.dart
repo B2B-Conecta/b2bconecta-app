@@ -154,7 +154,7 @@ class _MainShellState extends State<MainShell> {
         onReputation: _openAliadoReputation,
       );
       unawaited(_loadAliadoFavorites());
-    } else     if (widget.homeRole == AppHomeRole.importador) {
+    } else if (widget.homeRole == AppHomeRole.importador) {
       MainShellTabController.registerB2BNavigation(
         home: ImporterShellTabs.inicio,
         pedidos: ImporterShellTabs.pedidos,
@@ -491,8 +491,7 @@ class _MainShellState extends State<MainShell> {
           id: AdminUsersHubSection.sellosYVitrina,
           label: 'Sellos y Vitrina',
           title: 'Sellos y Vitrina',
-          subtitle:
-              'Verificado y Destacado de mayoristas en el marketplace.',
+          subtitle: 'Verificado y Destacado de mayoristas en el marketplace.',
         ),
       ],
     ),
@@ -722,15 +721,15 @@ class _MainShellState extends State<MainShell> {
               ? _adminReportsSection
               : null,
       onHome: () => setState(() {
-            _tabIndex = 0;
-            _adminSettingsOpen = false;
-            MainShellTabController.clearAdminBreadcrumbTrail();
-          }),
+        _tabIndex = 0;
+        _adminSettingsOpen = false;
+        MainShellTabController.clearAdminBreadcrumbTrail();
+      }),
       onSelectParent: (i) => setState(() {
-            _tabIndex = i;
-            _adminSettingsOpen = false;
-            MainShellTabController.clearAdminBreadcrumbTrail();
-          }),
+        _tabIndex = i;
+        _adminSettingsOpen = false;
+        MainShellTabController.clearAdminBreadcrumbTrail();
+      }),
     );
     final trail = MainShellTabController.adminBreadcrumbTrail.value;
     if (trail == null) return crumbs;
@@ -1199,9 +1198,8 @@ class _MainShellState extends State<MainShell> {
                 onOpenSettings: _openAccountSettings,
                 onOpenProfile: onOpenProfile ??
                     (role == AppHomeRole.aliado ? _openAliadoProfileTab : null),
-                onOpenNotificationPrefs: role == AppHomeRole.aliado
-                    ? _openAliadoProfileTab
-                    : null,
+                onOpenNotificationPrefs:
+                    role == AppHomeRole.aliado ? _openAliadoProfileTab : null,
                 onSignOut: AuthService.signOut,
                 railBadgeLabel: railBadgeLabel,
                 trailingActions: trailingActions,
@@ -1330,8 +1328,8 @@ class _MainShellState extends State<MainShell> {
                 ? [
                     AdminShellBreadcrumb(
                       label: 'Inicio',
-                      onTap: () =>
-                          _onB2bTabSelected(AliadoShellTabs.inicio, AppHomeRole.aliado),
+                      onTap: () => _onB2bTabSelected(
+                          AliadoShellTabs.inicio, AppHomeRole.aliado),
                     ),
                     const AdminShellBreadcrumb(label: 'Perfil'),
                   ]
@@ -1440,12 +1438,25 @@ class _OrdersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final useBranded =
-        homeRole == AppHomeRole.aliado && !embedInDesktopShell;
+    final useBranded = homeRole == AppHomeRole.aliado && !embedInDesktopShell;
     final panel = switch (homeRole) {
       AppHomeRole.importador => const ImporterActiveOrdersPanel(),
       AppHomeRole.administrador => const SizedBox.shrink(),
-      AppHomeRole.aliado => const AliadoPedidosPanel(),
+      AppHomeRole.aliado => AliadoPedidosPanel(
+          brandedHeaderBuilder: useBranded
+              ? (footer, onSearchTap, progress) => AliadoBrandedHeader(
+                    profile: profile,
+                    onMessagesTap: onMessagesTap,
+                    onNotificationTap: onNotificationTap,
+                    unreadMessages: unreadMessages,
+                    unreadNotifications: unreadNotifications,
+                    footer: footer,
+                    onSearchTap: onSearchTap,
+                    searchCollapseProgress: progress,
+                    searchActionLabel: 'Abrir búsqueda de pedidos',
+                  )
+              : null,
+        ),
     };
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -1459,21 +1470,7 @@ class _OrdersTab extends StatelessWidget {
               onMessagesTap: onMessagesTap,
               unreadMessages: unreadMessages,
             ),
-      body: useBranded
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AliadoBrandedHeader(
-                  profile: profile,
-                  onMessagesTap: onMessagesTap,
-                  onNotificationTap: onNotificationTap,
-                  unreadMessages: unreadMessages,
-                  unreadNotifications: unreadNotifications,
-                ),
-                Expanded(child: panel),
-              ],
-            )
-          : panel,
+      body: panel,
     );
   }
 }
@@ -1682,8 +1679,7 @@ class _ProfileTabState extends State<_ProfileTab>
     final useBranded =
         widget.homeRole == AppHomeRole.aliado && !widget.embedInDesktopShell;
     final theme = B2BThemeExtension.of(context);
-    final mobile =
-        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
 
     final datosBody = _scrollPad(
       child: ProfileB2BForm(
@@ -1691,8 +1687,7 @@ class _ProfileTabState extends State<_ProfileTab>
         accountActionsInShell: true,
         omitKycDocuments: _isAliado,
         overviewSupport: showSupportEntry
-            ? _buildSupportEntryCard(
-                inProfileGroup: widget.embedInDesktopShell)
+            ? _buildSupportEntryCard(inProfileGroup: widget.embedInDesktopShell)
             : null,
         key: ValueKey<Object>(
           '${widget.profile.id}_${widget.profile.businessName}_${widget.profile.rif}_${widget.profile.role}_${widget.profile.kycStatus}_${widget.profile.primerosPedidosContadoEntregados}_${widget.profile.creditLimit}_${widget.profile.creditoPreactivadoPorAdmin}_${widget.profile.logoStoragePath}_${widget.profile.fiscalMapsUrl}',

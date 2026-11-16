@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -63,7 +64,8 @@ void invokeKeepingScrollOffset(
 ) {
   final scrollable = Scrollable.maybeOf(context);
   final position = scrollable?.position;
-  final saved = (position != null && position.hasPixels) ? position.pixels : null;
+  final saved =
+      (position != null && position.hasPixels) ? position.pixels : null;
   final primary = PrimaryScrollController.maybeOf(context);
   final primarySaved =
       (primary != null && primary.hasClients) ? primary.offset : null;
@@ -80,9 +82,7 @@ void invokeKeepingScrollOffset(
       return;
     }
     final nextPrimary = PrimaryScrollController.maybeOf(context);
-    if (nextPrimary != null &&
-        nextPrimary.hasClients &&
-        primarySaved != null) {
+    if (nextPrimary != null && nextPrimary.hasClients && primarySaved != null) {
       nextPrimary.jumpTo(
         primarySaved.clamp(0.0, nextPrimary.position.maxScrollExtent),
       );
@@ -106,6 +106,7 @@ class ListPageBar extends StatelessWidget {
     this.alwaysShow = false,
     this.entityLabel,
     this.topPadding = 12,
+    this.compact = false,
     this.bottomPadding = 10,
     this.busy = false,
     this.keepScrollOffset = true,
@@ -134,6 +135,7 @@ class ListPageBar extends StatelessWidget {
   final String? entityLabel;
 
   final double topPadding;
+  final bool compact;
   final double bottomPadding;
 
   /// Indicador inline sutil mientras se carga otra página (fetch remoto).
@@ -189,6 +191,34 @@ class ListPageBar extends StatelessWidget {
             ? 'Mostrando $start–$end de $total'
             : 'Mostrando $start–$end de $total $noun');
 
+    if (compact) {
+      return Row(
+        children: [
+          Expanded(
+              child: Text('$start–$end de $total',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary))),
+          _StepButton(
+            icon: Icons.chevron_left,
+            tooltip: 'Anterior',
+            onPressed: index > 0 ? () => onPageIndex(index - 1) : null,
+            outlined: true,
+          ),
+          const SizedBox(width: 4),
+          _StepButton(
+            icon: Icons.chevron_right,
+            tooltip: 'Siguiente',
+            onPressed: index < lastPage || hasMore
+                ? () => onPageIndex(index + 1)
+                : null,
+            outlined: true,
+          ),
+        ],
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
       child: Column(
@@ -236,9 +266,8 @@ class ListPageBar extends StatelessWidget {
                 icon: LucideIcon(
                   LucideGlyph.chevronLeft,
                   size: 16,
-                  color: index > 0 && !busy
-                      ? theme.textPrimary
-                      : theme.textMuted,
+                  color:
+                      index > 0 && !busy ? theme.textPrimary : theme.textMuted,
                 ),
               ),
               Text(
@@ -339,6 +368,51 @@ class _SizeChip extends StatelessWidget {
   }
 }
 
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.wide = false,
+    this.outlined = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool wide;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark
+        ? Color.lerp(AppColors.brandBlue, Colors.white, .72)!
+        : AppColors.brand;
+    return IconButton(
+      tooltip: tooltip,
+      style: outlined
+          ? IconButton.styleFrom(
+              minimumSize: const Size.square(40),
+              side: BorderSide(color: AppColors.borderSubtle),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9)),
+            )
+          : null,
+      onPressed: onPressed,
+      visualDensity: wide ? VisualDensity.standard : VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: 44,
+        minHeight: 44,
+      ),
+      icon: Icon(icon,
+          size: wide ? 26 : 20,
+          color: onPressed == null ? accent.withOpacity(.3) : accent),
+    );
+  }
+}
+
 /// Listado de 10 en 10, con tope de 20 por vista.
 class PagedItems<T> extends StatefulWidget {
   const PagedItems({
@@ -360,6 +434,7 @@ class PagedItems<T> extends StatefulWidget {
     this.pageBarBuilder,
     this.pageBarBottomPadding = 10,
     this.entityLabel,
+    this.compactPageBar = false,
   });
 
   final List<T> items;
@@ -389,6 +464,7 @@ class PagedItems<T> extends StatefulWidget {
   final Widget Function(Widget bar)? pageBarBuilder;
   final double pageBarBottomPadding;
   final String? entityLabel;
+  final bool compactPageBar;
 
   @override
   State<PagedItems<T>> createState() => _PagedItemsState<T>();
@@ -478,6 +554,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       entityLabel: widget.entityLabel,
       bottomPadding: widget.pageBarBottomPadding,
       busy: _pagingBusy,
+      compact: widget.compactPageBar,
     );
     Widget buildItem(int i) {
       final item = page[i];

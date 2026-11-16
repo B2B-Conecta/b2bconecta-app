@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Reclaims header space after scrolling, without changing scroll controllers.
@@ -8,12 +9,16 @@ class ScrollCompactLayout extends StatefulWidget {
     required this.builder,
     this.enabled = true,
     this.resetKey,
+    this.scrollProgress,
     this.collapseHeadingWhenCompact,
   });
 
   final Widget Function(BuildContext context, bool compact) builder;
   final bool enabled;
   final Object? resetKey;
+
+  /// Optional normalized progress for a header that follows the scroll offset.
+  final ValueNotifier<double>? scrollProgress;
 
   /// A nested workspace can hide the list heading while preserving detail titles.
   /// Null leaves that decision to the active descendant workspace.
@@ -56,6 +61,7 @@ class _ScrollCompactLayoutState extends State<ScrollCompactLayout> {
     }
     if (oldWidget.resetKey != widget.resetKey || !widget.enabled) {
       _compact = false;
+      widget.scrollProgress?.value = 0;
     }
   }
 
@@ -69,6 +75,7 @@ class _ScrollCompactLayoutState extends State<ScrollCompactLayout> {
         notification is OverscrollNotification &&
         notification.metrics.pixels <= 8 &&
         notification.overscroll < 0) {
+      widget.scrollProgress?.value = 0;
       setState(() => _compact = false);
       return false;
     }
@@ -84,6 +91,7 @@ class _ScrollCompactLayoutState extends State<ScrollCompactLayout> {
           .dispatch(context);
     }
     final offset = notification.metrics.pixels;
+    widget.scrollProgress?.value = (offset / 70).clamp(0.0, 1.0);
     if (!_compact && offset > 64) {
       setState(() => _compact = true);
     } else if (_compact && offset <= 8) {
@@ -106,6 +114,7 @@ class _ScrollCompactLayoutState extends State<ScrollCompactLayout> {
           onNotification: _onScroll,
           child: ScrollCompactState(
             compact: _compact,
+            scrollProgress: widget.scrollProgress,
             hideHeading: _compact &&
                 (widget.collapseHeadingWhenCompact ??
                     _descendantCollapsesHeading),
@@ -126,11 +135,17 @@ class ScrollCompactState extends InheritedWidget {
     super.key,
     required this.compact,
     this.hideHeading = false,
+    this.scrollProgress,
     required super.child,
   });
 
   final bool compact;
   final bool hideHeading;
+  final ValueListenable<double>? scrollProgress;
+
+  static ValueListenable<double>? progressOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<ScrollCompactState>()
+      ?.scrollProgress;
 
   static bool hideHeadingOf(BuildContext context) =>
       context
@@ -146,5 +161,42 @@ class ScrollCompactState extends InheritedWidget {
 
   @override
   bool updateShouldNotify(ScrollCompactState oldWidget) =>
-      compact != oldWidget.compact || hideHeading != oldWidget.hideHeading;
+      compact != oldWidget.compact ||
+      hideHeading != oldWidget.hideHeading ||
+      scrollProgress != oldWidget.scrollProgress;
+}
+
+/// Fades a heading and releases its space in proportion to scroll progress.
+class ScrollFadeHeading extends StatelessWidget {
+  const ScrollFadeHeading({
+    super.key,
+    required this.progress,
+    required this.child,
+  });
+
+  final double progress;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final remaining =
+        reducedMotion ? (progress > .3 ? 0.0 : 1.0) : 1 - progress;
+    if (remaining == 0) return const SizedBox.shrink();
+    return ClipRect(
+      child: Align(
+        alignment: Alignment.topLeft,
+        heightFactor: remaining,
+        child: ExcludeSemantics(
+          excluding: progress > .3,
+          child: Opacity(
+            opacity: reducedMotion
+                ? 1
+                : 1 - Curves.easeOut.transform((progress / .7).clamp(0.0, 1.0)),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
 }

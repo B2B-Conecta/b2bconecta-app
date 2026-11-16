@@ -28,11 +28,11 @@ class OrdersService {
   ) async {
     final id = requestId.trim();
     if (id.isEmpty) return null;
-    final row = await SupabaseAccess.client
+    final row = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .eq('id', id)
-        .maybeSingle();
+        .maybeSingle());
     if (row == null) return null;
     return TransactionRequestModel.fromJson(Map<String, dynamic>.from(row));
   }
@@ -44,11 +44,11 @@ class OrdersService {
     if (primary == null) return const [];
     final cg = primary.checkoutGroupId?.trim();
     if (cg == null || cg.isEmpty) return [primary];
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .eq('checkout_group_id', cg)
-        .order('created_at', ascending: true);
+        .order('created_at', ascending: true));
     final list = response as List<dynamic>;
     return list
         .map((row) => TransactionRequestModel.fromJson(
@@ -192,7 +192,24 @@ class OrdersService {
     importador:profiles!transaction_requests_importador_id_fkey ( business_name, rif, phone, estado, ciudad, direccion, fiscal_maps_url, latitude, longitude, logo_storage_path, kyc_status, catalog_verified_at, accepted_pago_metodos, pago_metodo_instrucciones, pago_solo_divisas )
   ''';
 
-  static String get _trSelectForListWithSubs => _trSelectMotoconecta;
+  // Keep order reads available while an environment catches up with phase 2.
+  static Future<T> _readOrders<T>(
+    Future<T> Function(String fields) query,
+  ) async {
+    try {
+      return await query(_trSelectMotoconecta);
+    } on PostgrestException catch (error) {
+      if (error.code != '42703' ||
+          !error.message
+              .contains('transaction_requests.aliado_entrepreneur_badge')) {
+        rethrow;
+      }
+      return query(_trSelectMotoconecta.replaceFirst(
+        'aliado_entrepreneur_badge,',
+        '',
+      ));
+    }
+  }
 
   static String get _trSelectForListFlat => _trSelectMotoconecta;
 
@@ -202,11 +219,11 @@ class OrdersService {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return [];
 
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .eq('aliado_id', uid)
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false));
 
     final list = response as List<dynamic>;
     return list
@@ -221,15 +238,15 @@ class OrdersService {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return [];
 
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .eq('aliado_id', uid)
         .inFilter(
           'status',
           TransactionRequestStatus.motoconectaAliadoPedidosActivosYCerrados,
         )
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false));
 
     final list = response as List<dynamic>;
     return list
@@ -250,15 +267,15 @@ class OrdersService {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return [];
 
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectMotoconecta)
+        .select(fields)
         .eq('importador_id', uid)
         .inFilter(
           'status',
           TransactionRequestStatus.motoconectaAdminOperationalActive,
         )
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false));
     final list = response as List<dynamic>;
     return list
         .map((row) => TransactionRequestModel.fromJson(
@@ -278,15 +295,15 @@ class OrdersService {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return [];
 
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectMotoconecta)
+        .select(fields)
         .eq('importador_id', uid)
         .inFilter(
           'status',
           TransactionRequestStatus.motoconectaImporterOrdersUnifiedStatuses,
         )
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false));
     final list = response as List<dynamic>;
     return list
         .map((row) => TransactionRequestModel.fromJson(
@@ -303,10 +320,10 @@ class OrdersService {
   /// Bandeja admin: todas las solicitudes.
   static Future<List<TransactionRequestModel>>
       fetchTransactionRequestsForAdmin() async {
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListFlat)
-        .order('created_at', ascending: false);
+        .select(fields)
+        .order('created_at', ascending: false));
 
     final list = response as List<dynamic>;
     return list
@@ -318,14 +335,14 @@ class OrdersService {
   /// Pedidos en curso (pestaña Pedidos activos — admin).
   static Future<List<TransactionRequestModel>>
       fetchActiveTransactionRequestsForAdmin() async {
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .inFilter(
           'status',
           TransactionRequestStatus.motoconectaAdminOperationalActive,
         )
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false));
 
     final list = response as List<dynamic>;
     return list
@@ -379,11 +396,11 @@ class OrdersService {
   /// Pedidos cerrados: entregados o rechazados (admin).
   static Future<List<TransactionRequestModel>>
       fetchClosedTransactionRequestsForAdmin() async {
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .inFilter('status', TransactionRequestStatus.adminClosedOrders)
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false));
 
     final list = response as List<dynamic>;
     return list
@@ -395,12 +412,12 @@ class OrdersService {
   /// Admin: en curso + cerrados (una sola consulta para la bandeja unificada).
   static Future<List<TransactionRequestModel>>
       fetchUnifiedTransactionRequestsForAdmin() async {
-    final response = await SupabaseAccess.client
+    final response = await _readOrders((fields) => SupabaseAccess.client
         .from('transaction_requests')
-        .select(_trSelectForListWithSubs)
+        .select(fields)
         .inFilter(
             'status', TransactionRequestStatus.adminBandejaUnifiedStatuses)
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false));
 
     final list = response as List<dynamic>;
     return list
@@ -1112,7 +1129,8 @@ class OrdersService {
                 .from('transaction_requests')
                 .select('id,$relation($columns)')
                 .inFilter('id', batch)
-                .order('created_at', ascending: false, referencedTable: relation)
+                .order('created_at',
+                    ascending: false, referencedTable: relation)
                 .order('id', ascending: false, referencedTable: relation)
                 .limit(1, referencedTable: relation),
           ));

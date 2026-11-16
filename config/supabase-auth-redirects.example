@@ -35,7 +35,21 @@
 #     https://<project-ref>.supabase.co/auth/v1/callback
 #   App redirect URLs above already cover web + ve.com.b2bconecta.app://auth-callback
 #
-# Password recovery on web uses PKCE: open the email link in the SAME browser
-# (and same origin) where "Forgot password" was clicked.
+# Password recovery AND signup confirmation on web use PKCE: open the email
+# link in the SAME browser (and same origin / app) where the action started.
+#
+# Email templates (Auth → Emails):
+#   Prefer {{ .ConfirmationURL }} so RedirectTo from the client is honored.
+#   Do not hardcode Site URL alone for confirmation links.
+#
+# Android:
+#   Mobile builds use ve.com.b2bconecta.app://auth-callback (see mobile-*.env).
+#   HTTPS App Links for /producto and /vitrina require fingerprints in
+#   web/.well-known/assetlinks.json (currently empty until Play signing SHA-256
+#   is filled). Auth mail deep links use the custom scheme, not HTTPS yet.
+#
+# Canonical DEV web origin in this repo:
+#   https://b2bconecta-app-git-dev-b2bconecta.vercel.app
+# (Not `dev-b2bconecta.vercel.app` unless that alias is also allow-listed.)
 #
 # Ver config/ENVIRONMENTS.md

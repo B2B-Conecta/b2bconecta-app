@@ -76,6 +76,11 @@ class _AdminAccountManagementPanelState
   String? _entrepreneurStatusFilter;
   UsersAccessFilter? _seedAccessFilter;
 
+  /// Evita que al abrir/cerrar el expediente el State de la tabla se recree
+  /// (cambio de rama Align→Row) y se pierdan filtros / búsqueda / página.
+  final GlobalKey _usersTableKey =
+      GlobalKey(debugLabel: 'admin-accounts-users-table');
+
   @override
   void initState() {
     super.initState();
@@ -83,26 +88,51 @@ class _AdminAccountManagementPanelState
       _consumeAccountDeepLink,
     );
     _searchCtrl.addListener(() => setState(() => _pageIndex = 0));
-    _consumeEntrepreneurAlertFilter();
-    _consumePendingReviewFilter();
+    _applyPendingDeepLinkFlags(openPreviewIfNeeded: false);
     _load();
   }
 
-  void _consumeEntrepreneurAlertFilter() {
-    final filter =
+  /// Solo aplica banderas pendientes reales (badge / ⌘K / campana).
+  /// No se re-ejecuta en cada `_load` solo porque ya había filtros locales.
+  bool _applyPendingDeepLinkFlags({required bool openPreviewIfNeeded}) {
+    final pendingReview =
+        MainShellTabController.consumePendingUsersPendingReviewOnly();
+    final entrepreneurFilter =
         MainShellTabController.consumePendingEntrepreneurAlertFilter();
-    if (filter == null || filter.trim().isEmpty) return;
-    _entrepreneursOnly = true;
-    _entrepreneurStatusFilter = filter.trim();
-    _mode = _AccountListMode.cuentas;
-  }
+    final pendingProfile =
+        MainShellTabController.consumePendingAccountProfileId() ??
+            MainShellTabController.consumePendingKycProfileId();
 
-  void _consumePendingReviewFilter() {
-    if (!MainShellTabController.consumePendingUsersPendingReviewOnly()) {
-      return;
+    if (!pendingReview &&
+        (entrepreneurFilter == null || entrepreneurFilter.trim().isEmpty) &&
+        pendingProfile == null) {
+      return false;
     }
-    _seedAccessFilter = UsersAccessFilter.pendingReview;
+
     _mode = _AccountListMode.cuentas;
+    if (pendingReview) {
+      _seedAccessFilter = UsersAccessFilter.pendingReview;
+    }
+    if (entrepreneurFilter != null && entrepreneurFilter.trim().isNotEmpty) {
+      _entrepreneursOnly = true;
+      _entrepreneurStatusFilter = entrepreneurFilter.trim();
+    }
+    if (pendingProfile != null) {
+      _previewProfileId = pendingProfile;
+      // No limpiar búsqueda/filtros: el expediente se abre encima del listado.
+    }
+    if (openPreviewIfNeeded &&
+        pendingProfile != null &&
+        mounted &&
+        !isAdminDesktopLayout(context)) {
+      final p = _findProfile(pendingProfile);
+      if (p != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(_openAccountPreview(p));
+        });
+      }
+    }
+    return true;
   }
 
   @override
@@ -140,33 +170,9 @@ class _AdminAccountManagementPanelState
   }
 
   void _consumeAccountDeepLink() {
-    _consumeEntrepreneurAlertFilter();
-    _consumePendingReviewFilter();
-    final pending = MainShellTabController.consumePendingAccountProfileId() ??
-        MainShellTabController.consumePendingKycProfileId();
-    if (pending == null &&
-        _entrepreneurStatusFilter == null &&
-        !_entrepreneursOnly &&
-        _seedAccessFilter == null) {
-      return;
-    }
     if (!mounted) return;
-    setState(() {
-      _mode = _AccountListMode.cuentas;
-      if (pending != null) {
-        _previewProfileId = pending;
-        _searchCtrl.clear();
-      }
-    });
-    if (pending == null) return;
-    if (!isAdminDesktopLayout(context)) {
-      final p = _findProfile(pending);
-      if (p != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _openAccountPreview(p);
-        });
-      }
-    }
+    final applied = _applyPendingDeepLinkFlags(openPreviewIfNeeded: true);
+    if (applied) setState(() {});
   }
 
   Future<void> _load() async {
@@ -177,10 +183,12 @@ class _AdminAccountManagementPanelState
     try {
       final rows = await SupabaseService.ownerListProfilesWithDossier();
       if (!mounted) return;
+      // Solo datos: no re-consumir deep links ni tocar filtros activos.
       setState(() {
         _rows = rows;
         _loading = false;
       });
+      // Si llegó un deep link mientras cargábamos, ábrelo sin resetear filtros.
       _consumeAccountDeepLink();
     } catch (e) {
       if (!mounted) return;
@@ -570,6 +578,7 @@ class _AdminAccountManagementPanelState
             ..._incompleteSection()
           else ...[
             UsersDataTable(
+              key: _usersTableKey,
               profiles: _rows,
               viewer: widget.viewer,
               loading: _loading,
@@ -658,7 +667,8 @@ class _AdminAccountManagementPanelState
       ),
     );
 
-    if (!desktop || _mode == _AccountListMode.incompletos || preview == null) {
+    // Móvil / incompletos: listado a ancho de formulario.
+    if (!desktop || _mode == _AccountListMode.incompletos) {
       return Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
@@ -672,6 +682,8 @@ class _AdminAccountManagementPanelState
       );
     }
 
+    // Desktop Cuentas: misma estructura con/sin expediente para no recrear
+    // el State de UsersDataTable (filtros, búsqueda, página, scroll).
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -682,70 +694,72 @@ class _AdminAccountManagementPanelState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(flex: 3, child: listBody),
-            const VerticalDivider(width: 1),
-            SizedBox(
-              width: 380,
-              child: Material(
-                color: AdminUsersChrome.cardColor,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            preview.businessName?.trim().isNotEmpty == true
-                                ? preview.businessName!.trim()
-                                : (preview.email ?? 'Sin nombre'),
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AdminUsersChrome.titleColor,
+            if (preview != null) ...[
+              const VerticalDivider(width: 1),
+              SizedBox(
+                width: 380,
+                child: Material(
+                  color: AdminUsersChrome.cardColor,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              preview.businessName?.trim().isNotEmpty == true
+                                  ? preview.businessName!.trim()
+                                  : (preview.email ?? 'Sin nombre'),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AdminUsersChrome.titleColor,
+                              ),
                             ),
                           ),
-                        ),
-                        IconButton(
-                          tooltip: 'Cerrar',
-                          onPressed: () =>
-                              setState(() => _previewProfileId = null),
-                          icon: LucideIcon(
-                            LucideGlyph.close,
-                            size: 18,
-                            color: AdminUsersChrome.muted,
+                          IconButton(
+                            tooltip: 'Cerrar',
+                            onPressed: () =>
+                                setState(() => _previewProfileId = null),
+                            icon: LucideIcon(
+                              LucideGlyph.close,
+                              size: 18,
+                              color: AdminUsersChrome.muted,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    OwnerAccountDossier(
-                      profile: preview,
-                      isSelf: preview.id == widget.viewer.id,
-                    ),
-                    OwnerEntrepreneurControlPanel(
-                      profile: preview,
-                      onChanged: () {
-                        unawaited(_load());
-                      },
-                      onDeactivate: _canOperate(preview)
-                          ? () => _deactivate(preview)
-                          : null,
-                      onHardDelete: widget.viewer.isOwner
-                          ? () => _hardDelete(preview)
-                          : null,
-                    ),
-                    OwnerAccountKycDossierSection(
-                      profile: preview,
-                      viewerRole: widget.viewer.role,
-                      onChanged: () {
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                    _previewRoleToggle(preview),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      OwnerAccountDossier(
+                        profile: preview,
+                        isSelf: preview.id == widget.viewer.id,
+                      ),
+                      OwnerEntrepreneurControlPanel(
+                        profile: preview,
+                        onChanged: () {
+                          unawaited(_load());
+                        },
+                        onDeactivate: _canOperate(preview)
+                            ? () => _deactivate(preview)
+                            : null,
+                        onHardDelete: widget.viewer.isOwner
+                            ? () => _hardDelete(preview)
+                            : null,
+                      ),
+                      OwnerAccountKycDossierSection(
+                        profile: preview,
+                        viewerRole: widget.viewer.role,
+                        onChanged: () {
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                      _previewRoleToggle(preview),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

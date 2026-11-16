@@ -1,12 +1,27 @@
-/// Utilidades para interpretar fragmentos `#...` de enlaces Auth (web / deep links).
+/// Utilidades para interpretar fragmentos `#...` / query de enlaces Auth (web / deep links).
+
+enum AuthCallbackKind {
+  /// Restablecer contraseña.
+  recovery,
+
+  /// Confirmación de correo tras registro.
+  signup,
+
+  /// Magic link / invite / desconocido con sesión.
+  other,
+}
+
 class AuthLinkParseResult {
   const AuthLinkParseResult({
-    required this.isPasswordRecovery,
+    required this.kind,
     this.errorMessage,
   });
 
-  final bool isPasswordRecovery;
+  final AuthCallbackKind kind;
   final String? errorMessage;
+
+  bool get isPasswordRecovery => kind == AuthCallbackKind.recovery;
+  bool get isSignupConfirmation => kind == AuthCallbackKind.signup;
 }
 
 /// Indica si la URL actual trae un callback de Supabase Auth (PKCE, implicit o error).
@@ -30,23 +45,33 @@ bool hasAuthCallbackInUri(Uri uri) {
 AuthLinkParseResult parseAuthUriFragment(Uri uri) {
   final params = _authParamsFromUri(uri);
   if (params.isEmpty) {
-    return const AuthLinkParseResult(isPasswordRecovery: false);
+    return const AuthLinkParseResult(kind: AuthCallbackKind.other);
   }
   final error = params['error']?.trim();
   final errorCode = params['error_code']?.trim();
+  final kind = _kindFromType(params['type']);
   if ((error != null && error.isNotEmpty) ||
       (errorCode != null && errorCode.isNotEmpty)) {
     return AuthLinkParseResult(
-      isPasswordRecovery: false,
-      errorMessage: mapAuthLinkError(params),
+      kind: kind,
+      errorMessage: mapAuthLinkError(params, kind: kind),
     );
   }
 
-  if (params['type'] == 'recovery') {
-    return const AuthLinkParseResult(isPasswordRecovery: true);
-  }
+  return AuthLinkParseResult(kind: kind);
+}
 
-  return const AuthLinkParseResult(isPasswordRecovery: false);
+AuthCallbackKind _kindFromType(String? raw) {
+  switch ((raw ?? '').trim().toLowerCase()) {
+    case 'recovery':
+      return AuthCallbackKind.recovery;
+    case 'signup':
+    case 'email':
+    case 'email_change':
+      return AuthCallbackKind.signup;
+    default:
+      return AuthCallbackKind.other;
+  }
 }
 
 /// Recuperación PKCE: el flag local persiste aunque `detectSessionInUri` consuma el `code`.
@@ -70,15 +95,25 @@ Map<String, String> _authParamsFromUri(Uri uri) {
       (errorCode != null && errorCode.isNotEmpty)) {
     return Map<String, String>.from(uri.queryParameters);
   }
+  // PKCE solo con ?code= (sin type): no hay params tipados.
+  if (uri.queryParameters.containsKey('code')) {
+    return Map<String, String>.from(uri.queryParameters);
+  }
   return const {};
 }
 
-String mapAuthLinkError(Map<String, String> params) {
+String mapAuthLinkError(
+  Map<String, String> params, {
+  AuthCallbackKind kind = AuthCallbackKind.other,
+}) {
   final code = (params['error_code'] ?? params['error'] ?? '').toLowerCase();
   final description = _decodeParam(params['error_description'] ?? '');
 
-  if (code.contains('otp_expired') || description.toLowerCase().contains('expired')) {
-    return 'El enlace del correo expiró o ya fue usado. Solicita uno nuevo.';
+  if (code.contains('otp_expired') ||
+      description.toLowerCase().contains('expired')) {
+    return kind == AuthCallbackKind.signup
+        ? 'El enlace de confirmación expiró o ya fue usado. Puedes reenviar el correo o iniciar sesión si ya confirmaste.'
+        : 'El enlace del correo expiró o ya fue usado. Solicita uno nuevo.';
   }
   if (code.contains('access_denied') && description.isNotEmpty) {
     return description;
@@ -86,7 +121,9 @@ String mapAuthLinkError(Map<String, String> params) {
   if (description.isNotEmpty) {
     return description;
   }
-  return 'No se pudo completar la autenticación desde el enlace.';
+  return kind == AuthCallbackKind.signup
+      ? 'No se pudo confirmar el correo desde este enlace.'
+      : 'No se pudo completar la autenticación desde el enlace.';
 }
 
 String _decodeParam(String raw) {

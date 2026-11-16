@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -16,6 +17,10 @@ import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import 'shell_destination.dart';
 import 'shell_nav_badge.dart';
 import 'shell_user_menu.dart';
+
+class _OpenGlobalSearchIntent extends Intent {
+  const _OpenGlobalSearchIntent();
+}
 
 /// Layout escritorio: rail lateral (ocultable), barra superior y contenido.
 class DesktopNavigationShell extends StatefulWidget {
@@ -192,7 +197,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
           )
         : parent;
 
-    return Scaffold(
+    Widget scaffold = Scaffold(
       backgroundColor: AppColors.background,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -320,6 +325,35 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                     )),
           ),
         ],
+      ),
+    );
+
+    final openSearch = widget.onOpenGlobalSearch;
+    if (openSearch == null || !widget.showGlobalSearch) return scaffold;
+
+    // Atajo global del shell (no solo cuando el top bar tiene foco).
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            _OpenGlobalSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            _OpenGlobalSearchIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _OpenGlobalSearchIntent: CallbackAction<_OpenGlobalSearchIntent>(
+            onInvoke: (_) {
+              openSearch();
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: false,
+          canRequestFocus: false,
+          skipTraversal: true,
+          child: scaffold,
+        ),
       ),
     );
   }

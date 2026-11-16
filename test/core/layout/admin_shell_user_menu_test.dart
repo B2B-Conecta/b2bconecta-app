@@ -58,7 +58,7 @@ void main() {
             isOwner: true,
           ),
           unreadNotifications: 0,
-          onNotificationTap: () {},
+          onNotificationTap: (_) {},
         ),
       ),
     );

@@ -17,8 +17,10 @@ import 'package:motolink_pro_app/features/onboarding/entrepreneur_register_secti
 import 'package:motolink_pro_app/features/onboarding/pending_signup_role_storage.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/onboarding/open_public_legal.dart';
+import 'auth_link_utils.dart';
 import 'login_forgot_password_dialog.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 import 'package:motolink_pro_app/features/referrals/referral_qr_scan_sheet.dart';
@@ -30,11 +32,19 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.initialErrorMessage,
+    this.offerResendSignupConfirmation = false,
+    this.authCallbackKind = AuthCallbackKind.other,
     this.startInRegister = false,
   });
 
   /// Mensaje de error tras abrir un enlace Auth inválido o expirado.
   final String? initialErrorMessage;
+
+  /// Mostrar CTA para reenviar correo de confirmación (signup).
+  final bool offerResendSignupConfirmation;
+
+  /// Contexto del callback Auth (signup vs recovery) para el banner.
+  final AuthCallbackKind authCallbackKind;
 
   /// `/registro` y anuncios: abrir el formulario de cuenta, no el login.
   final bool startInRegister;
@@ -59,22 +69,25 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _resendingConfirm = false;
+  bool _dismissLinkBanner = false;
 
   bool get _isEntrepreneurSignup =>
       _mode == _AuthMode.register &&
       _signupRole == PublicSignupRole.aliado &&
       _entrepreneurEnabled;
 
+  bool get _showLinkBanner {
+    if (_dismissLinkBanner) return false;
+    final msg = widget.initialErrorMessage?.trim() ?? '';
+    return msg.isNotEmpty;
+  }
+
   @override
   void initState() {
     super.initState();
     _mode = widget.startInRegister ? _AuthMode.register : _AuthMode.login;
-    final msg = widget.initialErrorMessage?.trim();
-    if (msg != null && msg.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showSnackBar(msg, isError: true);
-      });
-    }
+    // El error del enlace se muestra en banner (no SnackBar de «recuperación»).
     if (widget.startInRegister) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _syncBrowserPath(_AuthMode.register);
@@ -143,16 +156,139 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
+    final theme = B2BThemeExtension.of(context);
     final messenger =
         scaffoldMessengerKey.currentState ?? ScaffoldMessenger.of(context);
     messenger.showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white)),
-        backgroundColor: isError ? Colors.red.shade800 : Colors.green.shade800,
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isError ? theme.warningFg : theme.successFg,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: isError ? theme.warningBg : theme.successBg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _resendSignupConfirmation() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !_validateEmail(email)) {
+      _showSnackBar(
+        'Ingresa el correo con el que te registraste para reenviar la confirmación.',
+        isError: true,
+      );
+      return;
+    }
+    setState(() => _resendingConfirm = true);
+    try {
+      await AuthService.resendSignupConfirmation(email);
+      if (!mounted) return;
+      _showSnackBar(
+        'Te enviamos un nuevo correo de confirmación. Ábrelo en este mismo navegador o en la app donde te registraste.',
+      );
+      setState(() => _dismissLinkBanner = true);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      _showSnackBar(
+        AuthService.mapAuthErrorMessage(
+          e.message,
+          kind: AuthCallbackKind.signup,
+        ),
+        isError: true,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('No se pudo reenviar el correo. Intenta de nuevo.',
+          isError: true);
+    } finally {
+      if (mounted) setState(() => _resendingConfirm = false);
+    }
+  }
+
+  Widget _buildAuthLinkBanner() {
+    final theme = B2BThemeExtension.of(context);
+    final msg = widget.initialErrorMessage?.trim() ?? '';
+    final signup = widget.offerResendSignupConfirmation ||
+        widget.authCallbackKind == AuthCallbackKind.signup;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: theme.warningBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, size: 20, color: theme.warningFg),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  msg,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    color: theme.warningFg,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Cerrar',
+                onPressed: () => setState(() => _dismissLinkBanner = true),
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.close, size: 18, color: theme.warningFg),
+              ),
+            ],
+          ),
+          if (signup) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  onPressed:
+                      _resendingConfirm ? null : _resendSignupConfirmation,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.brand,
+                    foregroundColor: theme.surfaceCard,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(
+                    _resendingConfirm ? 'Enviando…' : 'Reenviar confirmación',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _mode = _AuthMode.login;
+                      _dismissLinkBanner = true;
+                    });
+                    _syncBrowserPath(_AuthMode.login);
+                  },
+                  child: Text(
+                    'Ir a iniciar sesión',
+                    style: TextStyle(
+                      color: theme.brand,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -803,6 +939,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
+              ],
+              if (_showLinkBanner) ...[
+                _buildAuthLinkBanner(),
+                const SizedBox(height: 16),
               ],
               _buildFormFields(),
               const SizedBox(height: 24),

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/core/auth/auth_link_utils.dart';
+import 'package:motolink_pro_app/core/auth/auth_service.dart';
 
 void main() {
   test('detects password recovery fragment', () {
@@ -8,7 +9,17 @@ void main() {
     );
     final result = parseAuthUriFragment(uri);
     expect(result.isPasswordRecovery, isTrue);
+    expect(result.isSignupConfirmation, isFalse);
     expect(result.errorMessage, isNull);
+  });
+
+  test('detects signup confirmation fragment', () {
+    final uri = Uri.parse(
+      'http://localhost:3000/#access_token=x&type=signup',
+    );
+    final result = parseAuthUriFragment(uri);
+    expect(result.isSignupConfirmation, isTrue);
+    expect(result.isPasswordRecovery, isFalse);
   });
 
   test('detects PKCE auth callback with code query param', () {
@@ -53,15 +64,30 @@ void main() {
     );
   });
 
-  test('maps expired otp error from fragment', () {
+  test('maps expired otp error from fragment for signup', () {
     final uri = Uri.parse(
-      'http://localhost:3000/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired',
+      'http://localhost:3000/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired&type=signup',
     );
     final result = parseAuthUriFragment(uri);
-    expect(result.isPasswordRecovery, isFalse);
+    expect(result.isSignupConfirmation, isTrue);
     expect(
       result.errorMessage,
-      'El enlace del correo expiró o ya fue usado. Solicita uno nuevo.',
+      contains('confirmación'),
     );
+  });
+
+  test('code verifier message is signup-aware', () {
+    final signup = AuthService.mapAuthErrorMessage(
+      'Code verifier could not be found',
+      kind: AuthCallbackKind.signup,
+    );
+    expect(signup.toLowerCase(), contains('confirmación'));
+    expect(signup.toLowerCase(), isNot(contains('recuperación')));
+
+    final recovery = AuthService.mapAuthErrorMessage(
+      'Code verifier could not be found',
+      kind: AuthCallbackKind.recovery,
+    );
+    expect(recovery.toLowerCase(), contains('recuperación'));
   });
 }

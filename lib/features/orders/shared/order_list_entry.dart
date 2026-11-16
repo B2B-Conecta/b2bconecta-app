@@ -86,6 +86,26 @@ class OrderListEntry {
         : ImporterOrderDate.formatFechaPedido(value);
   }
 
+  String get compactDate {
+    final value = ImporterOrderDate.fechaGrupoParaFiltro(lines)?.toLocal();
+    if (value == null) return 'Sin fecha';
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
+    return '${value.day.toString().padLeft(2, '0')} ${months[value.month - 1]}';
+  }
+
   String get amount =>
       '${formatRefAmount(lines.fold<double>(0, (sum, l) => sum + l.precioTotal))} ${orderAmountCurrency(lines)}';
   String? get bolivares => orderAmountCurrency(lines) == 'REF' &&

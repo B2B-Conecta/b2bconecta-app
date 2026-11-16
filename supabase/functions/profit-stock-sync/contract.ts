@@ -1,6 +1,7 @@
 export const schemaVersion = 2;
 export const maxBodyBytes = 65536;
 export const expectedProjectRef = "kdrccmqcrruixuworlmz";
+export const allowedProjectRefs = [expectedProjectRef, "czswojzpekcsisudgfsg"] as const;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);

@@ -21,6 +21,13 @@ flutter config --enable-web --no-analytics
 flutter precache --web
 flutter pub get
 
+echo "==> Building the Excel / PDF catalog reader"
+if ! command -v pnpm >/dev/null 2>&1; then
+  npm install --global pnpm@11.25.0
+fi
+pnpm --dir tools/catalog-reader install --frozen-lockfile --ignore-scripts
+pnpm --dir tools/catalog-reader run build
+
 echo "==> Building Flutter web (release)"
 # Flutter 3.24 CanvasKit can leave decoded Chromium VideoFrames unclosed.
 # Use CanvasKit's own image codecs until the engine is upgraded and verified.

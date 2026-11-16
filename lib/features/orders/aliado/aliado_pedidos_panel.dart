@@ -2,6 +2,7 @@ import '../shared/order_priority_controls.dart';
 import 'package:flutter/material.dart';
 
 import 'aliado_pedidos_filters_draft.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_header_search.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
@@ -44,7 +45,11 @@ import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart
 import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 
 class AliadoPedidosPanel extends StatefulWidget {
-  const AliadoPedidosPanel({super.key});
+  const AliadoPedidosPanel({super.key, this.brandedHeaderBuilder});
+
+  final Widget Function(
+          Widget? footer, VoidCallback? onSearchTap, double progress)?
+      brandedHeaderBuilder;
 
   @override
   State<AliadoPedidosPanel> createState() => _AliadoPedidosPanelState();
@@ -1085,9 +1090,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             ])
           : null,
       receipt: _buildRecepcionLeading(context, chunk),
-      deliveryActions: deliveryActions
-          ? _AliadoShippingCostSummary(request: r)
-          : null,
+      deliveryActions:
+          deliveryActions ? _AliadoShippingCostSummary(request: r) : null,
       paymentStatus: fasePagoBloqueLabelEs(fasePagoBloqueImportador(chunk)),
       paymentOpen:
           chunk.any((l) => l.hasProveedorFactura && !l.pedidoEntregadoYPagado),
@@ -1170,6 +1174,8 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
 
     return AliadoExpandableOrderCard(
       workspaceDetail: workspaceDetail,
+      compactDetail: workspaceDetail && widget.brandedHeaderBuilder != null,
+      viewerProfile: _profile,
       detailSectionsBuilder: workspaceDetail
           ? (ctx, chunk, index, total) =>
               _detailSections(ctx, chunk, index, total, cgForBundle)
@@ -1224,15 +1230,61 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     });
   }
 
+  Widget _headerSearch({
+    bool autofocus = false,
+    VoidCallback? onSearch,
+    VoidCallback? onFilters,
+  }) =>
+      AliadoHeaderSearch(
+        controller: _searchCtrl,
+        hint: 'Buscar pedido o proveedor…',
+        searchLabel: 'Buscar pedidos',
+        filterLabel: 'Filtros de pedidos',
+        filterCount: _currentFiltersDraft().activePanelFilterCount,
+        autofocus: autofocus,
+        onSearch: onSearch ?? () => FocusScope.of(context).unfocus(),
+        onFilters: onFilters ?? _openPedidosFiltersSheet,
+      );
+
+  Future<void> _openCompactSearch() async {
+    final openFilters = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheet).bottom),
+          child: _headerSearch(
+            autofocus: true,
+            onSearch: () => Navigator.pop(sheet, false),
+            onFilters: () => Navigator.pop(sheet, true),
+          ),
+        ),
+      ),
+    );
+    if (mounted && openFilters == true) await _openPedidosFiltersSheet();
+  }
+
+  Widget _withHeader(Widget body) {
+    final buildHeader = widget.brandedHeaderBuilder;
+    if (buildHeader == null) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [buildHeader(null, null, 0), Expanded(child: body)],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _rows.isEmpty) {
-      return const Center(
+      return _withHeader(const Center(
         child: CircularProgressIndicator(color: AppColors.brand),
-      );
+      ));
     }
     if (_error != null) {
-      return Center(
+      return _withHeader(Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1243,10 +1295,10 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             TextButton(onPressed: _load, child: const Text('Reintentar')),
           ],
         ),
-      );
+      ));
     }
     if (_rows.isEmpty) {
-      return RefreshIndicator(
+      return _withHeader(RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -1262,7 +1314,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             ),
           ],
         ),
-      );
+      ));
     }
 
     final filtered = _filtered;
@@ -1305,10 +1357,21 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           .toList();
     }
     if (_pendingFirst) visibleGroups = prioritizePendingOrders(visibleGroups);
+    final branded = widget.brandedHeaderBuilder != null;
     return OrderWorkspace(
+      headerBuilder: !branded
+          ? null
+          : (progress, detailOpen) => widget.brandedHeaderBuilder!(
+                detailOpen ? null : _headerSearch(),
+                detailOpen ? null : _openCompactSearch,
+                detailOpen ? 0 : progress,
+              ),
       groups: visibleGroups,
       selectedKey: _expandedRequestId,
-      onSelect: (key) => setState(() => _expandedRequestId = key),
+      onSelect: (key) {
+        FocusScope.of(context).unfocus();
+        setState(() => _expandedRequestId = key);
+      },
       onClose: () => setState(() => _expandedRequestId = null),
       onClearFilters: _clearFilters,
       loading: _loading,
@@ -1328,16 +1391,20 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
           _buildOrderCard(context, group, workspaceDetail: true),
       controls:
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        OrdersListHeading(count: visibleGroups.length),
-        OrderListFilterBar(
-          softStyle: true,
-          searchController: _searchCtrl,
-          onSearchChanged: (_) => setState(() {}),
-          hintText: 'Buscar producto, código o proveedor…',
-          padding: const EdgeInsets.only(bottom: 8),
-          onFilters: _openPedidosFiltersSheet,
-          activeFilterCount: filterBadge,
+        OrdersListHeading(
+          count: visibleGroups.length,
+          mobileTitle: branded ? 'Mis pedidos' : null,
         ),
+        if (!branded)
+          OrderListFilterBar(
+            softStyle: true,
+            searchController: _searchCtrl,
+            onSearchChanged: (_) => setState(() {}),
+            hintText: 'Buscar producto, código o proveedor…',
+            padding: const EdgeInsets.only(bottom: 8),
+            onFilters: _openPedidosFiltersSheet,
+            activeFilterCount: filterBadge,
+          ),
         OrderPriorityControls(
           scope: _scope,
           onScope: _selectScope,
@@ -1351,6 +1418,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
             _pendingOnly = true;
           }),
           pendingFirst: _pendingFirst,
+          compact: branded,
           onSort: (value) => setState(() => _pendingFirst = value),
         ),
         if (activeFilterChips != null) activeFilterChips,

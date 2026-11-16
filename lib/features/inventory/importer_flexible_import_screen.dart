@@ -1,13 +1,19 @@
-import 'dart:typed_data';
-
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'catalog_import/catalog_import_field.dart';
 import 'catalog_import/catalog_import_mapping.dart';
 import 'catalog_import/catalog_import_result.dart';
 import 'catalog_import_orchestrator.dart';
+import 'catalog_import_photo_review.dart';
+import 'catalog_import_photos.dart';
+import 'catalog_photo_source.dart';
+import 'catalog_workbook_photos.dart';
+import 'product_image_bulk_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'catalog_import_header_guess.dart';
 import 'catalog_import_preview_details_dialog.dart';
 import 'flexible_catalog_import_service.dart';
@@ -24,6 +30,8 @@ class ImporterFlexibleImportScreen extends StatefulWidget {
     required this.fileMeta,
     required this.preview,
     required this.pagoSoloDivisas,
+    this.documentPhotos,
+    this.sourceRowOffset = 0,
   });
 
   final String fileName;
@@ -31,6 +39,8 @@ class ImporterFlexibleImportScreen extends StatefulWidget {
   final CatalogImportFileMeta fileMeta;
   final CatalogImportPreview preview;
   final bool pagoSoloDivisas;
+  final CatalogPhotoSource? documentPhotos;
+  final int sourceRowOffset;
 
   static Future<CatalogImportResult?> open(
     BuildContext context, {
@@ -39,6 +49,8 @@ class ImporterFlexibleImportScreen extends StatefulWidget {
     required CatalogImportFileMeta fileMeta,
     required CatalogImportPreview preview,
     required bool pagoSoloDivisas,
+    CatalogPhotoSource? documentPhotos,
+    int sourceRowOffset = 0,
   }) {
     return Navigator.of(context).push<CatalogImportResult>(
       MaterialPageRoute(
@@ -48,6 +60,8 @@ class ImporterFlexibleImportScreen extends StatefulWidget {
           fileMeta: fileMeta,
           preview: preview,
           pagoSoloDivisas: pagoSoloDivisas,
+          documentPhotos: documentPhotos,
+          sourceRowOffset: sourceRowOffset,
         ),
       ),
     );
@@ -62,12 +76,21 @@ class _ImporterFlexibleImportScreenState
     extends State<ImporterFlexibleImportScreen> {
   late final Map<String, String?> _columnSelections;
   CatalogImportUpsertMode _upsertMode = CatalogImportUpsertMode.updateAll;
-  bool _dryRun = false;
+  String _progressLabel = 'Revisando archivo…';
+  final _corrections = <int, Map<String, String>>{};
+  List<CatalogPhotoDraft> _photos = [];
+  List<String> _invalidPhotoFiles = [];
+  late CatalogPhotoSource? _workbookPhotos = widget.documentPhotos;
+  bool _workbookReviewed = false;
+  bool _confirmedExtractedData = false;
+  bool _readingWorkbookPhotos = false;
+  String? _photoZipName;
   bool _captureUnmapped = true;
   bool _decimalCommaOnPrice = false;
   ImporterNewProductsVisibility _newProductsVisibility =
       ImporterNewProductsVisibility.paused;
   bool _importing = false;
+  bool _savingPhotos = false;
   bool _optionalExpanded = false;
   bool _advancedOptionsExpanded = false;
   bool _erpSectionExpanded = false;
@@ -80,7 +103,6 @@ class _ImporterFlexibleImportScreenState
   static const _maxContentWidth = 1180.0;
 
   static const _optionalFields = [
-    CatalogImportField.stock,
     CatalogImportField.minOrderQty,
     CatalogImportField.description,
     CatalogImportField.salePriceUsd,
@@ -107,15 +129,14 @@ class _ImporterFlexibleImportScreenState
     CatalogImportField.salePriceUsd:
         'Precio promocional en USD, si aplica. Debe ser menor al precio de lista.',
     CatalogImportField.stock:
-        'Unidades en almacén. Si no mapeas esta columna, queda en 0.',
+        'Unidades en almacén. Asocia «Cantidad» solo si representa existencias. Escribe 0 si el repuesto está agotado.',
     CatalogImportField.minOrderQty:
         'Unidades mínimas por pedido. Si el proveedor la define, esa cantidad manda (mínimo 1). Si no mapeas la columna, los productos nuevos quedan en 5.',
     CatalogImportField.category:
         'Familia o línea (Motor, Frenos, Eléctrico, etc.).',
     CatalogImportField.compatibility:
         'Modelos de moto compatibles (ej. CG150, Bera 150).',
-    CatalogImportField.imageUrl:
-        'Enlace público a la foto del repuesto.',
+    CatalogImportField.imageUrl: 'Enlace público a la foto del repuesto.',
     CatalogImportField.parentSku:
         'Mismo código en las filas que son variantes de un producto. Vacío = producto simple.',
     CatalogImportField.variantAttributeName:
@@ -130,11 +151,13 @@ class _ImporterFlexibleImportScreenState
         'si = visible en catálogo; no = pausado. Vacío: nuevos siguen el selector de la importación; existentes no cambian.',
   };
 
-  static String _labelVe(CatalogImportField field) => switch (field) {
+  String _labelVe(CatalogImportField field) => switch (field) {
         CatalogImportField.sku => 'Código / SKU',
         CatalogImportField.name => 'Nombre del repuesto',
         CatalogImportField.description => 'Descripción',
-        CatalogImportField.priceUsd => 'Precio mayorista (USD)',
+        CatalogImportField.priceUsd => widget.pagoSoloDivisas
+            ? 'Precio de lista (USD)'
+            : 'Precio de lista (REF)',
         CatalogImportField.salePriceUsd => 'Precio oferta (USD)',
         CatalogImportField.stock => 'Existencia / stock',
         CatalogImportField.minOrderQty => 'Cantidad mínima de pedido',
@@ -154,6 +177,9 @@ class _ImporterFlexibleImportScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _readWorkbookImages();
+    });
     final guessed = CatalogImportHeaderGuess.suggestAll(widget.preview.headers);
     _columnSelections = {
       for (final f in CatalogImportField.values) f.key: guessed[f.key],
@@ -241,7 +267,9 @@ class _ImporterFlexibleImportScreenState
   }
 
   Set<String> get _mappedSources => {
-        ..._columnSelections.values.whereType<String>().where((s) => s.isNotEmpty),
+        ..._columnSelections.values
+            .whereType<String>()
+            .where((s) => s.isNotEmpty),
         ..._customFieldMappings
             .map((r) => r.sourceColumn)
             .whereType<String>()
@@ -263,7 +291,7 @@ class _ImporterFlexibleImportScreenState
       .where((f) => (_columnSelections[f.key] ?? '').isNotEmpty)
       .length;
 
-  CatalogImportMapping _buildMapping() {
+  CatalogImportMapping _buildMapping({required bool dryRun}) {
     final columnMap = <String, CatalogImportColumnBinding>{};
     for (final field in CatalogImportField.values) {
       final source = _columnSelections[field.key];
@@ -292,7 +320,7 @@ class _ImporterFlexibleImportScreenState
       file: widget.fileMeta,
       options: CatalogImportOptions(
         upsertMode: _upsertMode,
-        dryRun: _dryRun,
+        dryRun: dryRun,
         newProductsActive: _newProductsVisibility.isActive,
         pagoSoloDivisas: widget.pagoSoloDivisas,
       ),
@@ -305,134 +333,607 @@ class _ImporterFlexibleImportScreenState
     );
   }
 
-  Future<void> _runImport() async {
-    final mapping = _buildMapping();
-    final missing = mapping.missingRequiredFields();
-    if (missing.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Completa el mapeo de: ${missing.join(', ')}',
+  void _startProgress(String label) {
+    setState(() {
+      _importing = true;
+      _progressLabel = label;
+      _processedRows = 0;
+      _lastProgressUiUpdateMs = 0;
+      _partial = null;
+    });
+  }
+
+  bool _validateMapping() {
+    final missing = _buildMapping(dryRun: true).missingRequiredFields();
+    if (missing.isEmpty) return true;
+    _showMessage('Completa el mapeo de: ${missing.join(', ')}');
+    return false;
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<CatalogImportResult> _execute({
+    required bool dryRun,
+    Map<String, CatalogPhotoTarget>? targets,
+    Set<String> photoSkuKeys = const {},
+    void Function(String)? onSourceSku,
+    void Function(String)? onProductSaved,
+  }) {
+    return CatalogImportOrchestrator.execute(
+      bytes: widget.bytes,
+      mapping: _buildMapping(dryRun: dryRun),
+      corrections: _corrections,
+      photoSkuKeys: photoSkuKeys,
+      onSourceSku: onSourceSku,
+      onProductSaved: onProductSaved,
+      onPhotoCandidate: targets == null
+          ? null
+          : (row, available) {
+              targets[row.sku.trim().toLowerCase()] =
+                  (row: row, available: available);
+            },
+      onProgress: (rows, partial) {
+        if (!mounted) return;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _lastProgressUiUpdateMs < 120 &&
+            rows < (widget.preview.totalDataRowsEstimate ?? rows)) {
+          return;
+        }
+        _lastProgressUiUpdateMs = now;
+        setState(() {
+          _processedRows = rows;
+          _partial = partial;
+        });
+      },
+    );
+  }
+
+  Future<void> _readWorkbookImages() async {
+    if (widget.fileMeta.format != CatalogImportFileFormat.xlsx) return;
+    setState(() => _readingWorkbookPhotos = true);
+    CatalogPhotoSource result;
+    try {
+      result = await compute(readWorkbookPhotos, (
+        bytes: widget.bytes,
+        sheetName: widget.fileMeta.sheetName,
+      ));
+    } catch (_) {
+      result = (
+        sheet: null,
+        photos: const [],
+        issues: const [
+          'No se pudieron leer las fotos incrustadas.',
+        ]
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _workbookPhotos = (
+        sheet: result.sheet,
+        photos: result.photos
+            .where((photo) =>
+                photo.sourceRow == null ||
+                photo.sourceRow! >= widget.fileMeta.dataStartsAtRow)
+            .toList(),
+        issues: result.issues,
+      );
+      _readingWorkbookPhotos = false;
+    });
+  }
+
+  Future<void> _reviewPhotos({required bool chooseZip}) async {
+    if (!_validateMapping()) return;
+    _startProgress('Preparando las fotos…');
+    try {
+      final picked = chooseZip
+          ? await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: const ['zip'],
+              withData: true,
+            )
+          : null;
+      if (!mounted || (chooseZip && picked == null)) return;
+
+      final targets = <String, CatalogPhotoTarget>{};
+      final sourceSkus = <String>{};
+      await _execute(
+        dryRun: true,
+        targets: targets,
+        onSourceSku: sourceSkus.add,
+      );
+      if (!mounted) return;
+
+      var drafts = _photos.toList();
+      final workbook = _workbookPhotos;
+      var zipName = _photoZipName;
+      var invalid = _invalidPhotoFiles;
+      if (picked != null) {
+        final file = picked.files.single;
+        final bytes = file.bytes;
+        if (bytes == null) {
+          throw const FormatException('No se pudo leer el ZIP.');
+        }
+        final preview = ProductImageBulkService.parseZipBytes(
+          bytes,
+          knownSkuKeys: sourceSkus,
+          keepAmbiguousForReview: true,
+        );
+        drafts = [
+          ...drafts.where((draft) => draft.workbookPhoto != null),
+          for (final file in preview.files)
+            CatalogPhotoDraft(
+              file: file,
+              sku: file.sku,
+              slot: file.slot,
+              approved: targets[file.sku.toLowerCase()]?.available == true,
+            ),
+        ];
+        zipName = file.name;
+        invalid = preview.invalidEntries;
+      }
+      if (!_workbookReviewed && workbook != null) {
+        drafts.addAll(
+          CatalogPhotoDraft.fromWorkbook(
+            workbook.photos,
+            targets,
+            existing: drafts,
+            sourceRowOffset: widget.sourceRowOffset,
+          ),
+        );
+      }
+      if (picked != null || !_workbookReviewed) {
+        final conflicts = CatalogPhotoDraft.assignmentErrors(drafts, targets);
+        drafts = [
+          for (final draft in drafts)
+            conflicts.containsKey(draft.skuKey)
+                ? draft.copyWith(approved: false)
+                : draft,
+        ];
+      }
+
+      setState(() => _importing = false);
+      final reviewed =
+          await Navigator.of(context).push<List<CatalogPhotoDraft>>(
+        MaterialPageRoute(
+          builder: (_) => CatalogImportPhotoReview(
+            drafts: drafts,
+            targets: targets,
+            invalidEntries: [...?workbook?.issues, ...invalid],
+            originLabel: widget.fileName.toLowerCase().endsWith('.pdf')
+                ? 'PDF'
+                : 'Excel',
           ),
         ),
       );
-      return;
+      if (!mounted || reviewed == null) return;
+      setState(() {
+        _photos = reviewed;
+        _workbookReviewed = workbook != null;
+        _photoZipName = zipName;
+        _invalidPhotoFiles = invalid;
+      });
+    } on FormatException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } catch (_) {
+      if (mounted) {
+        _showMessage('No se pudieron preparar las fotos. Reintenta.');
+      }
+    } finally {
+      if (mounted && _importing) setState(() => _importing = false);
     }
+  }
 
-    setState(() {
-      _importing = true;
-      _processedRows = 0;
-      _partial = null;
-    });
+  Widget _buildPhotoSection() {
+    final name = _photoZipName;
+    final workbook = _workbookPhotos;
+    final embedded = workbook?.photos.length ?? 0;
+    final hasWorkbookDetails =
+        embedded > 0 || (workbook?.issues.isNotEmpty ?? false);
+    final canReview = name != null || hasWorkbookDetails;
+    final reviewReady = !_importing && !_readingWorkbookPhotos;
+    final included = _photos.where((photo) => photo.approved).length;
+    return _sectionCard(
+      icon: Icons.photo_library_outlined,
+      title: 'Fotos del catálogo',
+      subtitle: _readingWorkbookPhotos
+          ? 'Buscando fotos en el Excel…'
+          : embedded > 0 && !_workbookReviewed
+              ? '$embedded fotos detectadas · ${workbook?.sheet ?? widget.fileName}'
+              : _photos.isNotEmpty
+                  ? '$included de ${_photos.length} fotos incluidas'
+                  : 'Adjunta un ZIP de fotos para incluirlas en el lote.',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          if (canReview)
+            OutlinedButton.icon(
+              onPressed:
+                  reviewReady ? () => _reviewPhotos(chooseZip: false) : null,
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Revisar fotos'),
+            ),
+          if (name == null)
+            OutlinedButton.icon(
+              onPressed:
+                  reviewReady ? () => _reviewPhotos(chooseZip: true) : null,
+              icon: const Icon(Icons.attach_file),
+              label: const Text('Adjuntar ZIP'),
+            ),
+          if (name != null) ...[
+            TextButton(
+              onPressed:
+                  reviewReady ? () => _reviewPhotos(chooseZip: true) : null,
+              child: const Text('Cambiar ZIP'),
+            ),
+            TextButton(
+              onPressed: _importing
+                  ? null
+                  : () => setState(() {
+                        _photos = _photos
+                            .where((draft) => draft.workbookPhoto != null)
+                            .toList();
+                        _invalidPhotoFiles = [];
+                        _photoZipName = null;
+                      }),
+              child: const Text('Quitar ZIP'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
+  Future<void> _runImport() async {
+    if (!_validateMapping()) return;
+    _startProgress('Revisando archivo…');
     try {
-      final result = await CatalogImportOrchestrator.execute(
-        bytes: widget.bytes,
-        mapping: mapping,
-        onProgress: (rows, partial) {
-          if (!mounted) return;
-          final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - _lastProgressUiUpdateMs < 120 && rows < (widget.preview.totalDataRowsEstimate ?? rows)) {
-            return;
-          }
-          _lastProgressUiUpdateMs = now;
-          setState(() {
-            _processedRows = rows;
-            _partial = partial;
-          });
-        },
+      final targets = <String, CatalogPhotoTarget>{};
+      final result = await _execute(
+        dryRun: true,
+        targets: _photos.isEmpty ? null : targets,
       );
+      if (!mounted) return;
+      setState(() => _importing = false);
 
-      if (!mounted) return;
-      setState(() => _importing = false);
-      await _showResultDialog(result);
-      if (!mounted) return;
-      Navigator.pop(context, result);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _importing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo importar: $e')),
+      final assignmentErrors =
+          CatalogPhotoDraft.assignmentErrors(_photos, targets);
+      final photos = <String, List<ProductImageBulkFile>>{};
+      for (final draft in _photos.where((draft) => draft.approved)) {
+        photos.putIfAbsent(draft.skuKey, () => []).add(draft.assigned);
+      }
+
+      _confirmedExtractedData = false;
+      final confirmed = await _showSimulation(result, photos, assignmentErrors);
+      if (!mounted || confirmed != true) return;
+
+      _startProgress('Guardando repuestos…');
+      final savedSkus = <String>{};
+      final imported = await _execute(
+        dryRun: false,
+        photoSkuKeys: photos.keys.toSet(),
+        onProductSaved: savedSkus.add,
       );
+      if (!mounted) return;
+      final eligiblePhotos = {
+        for (final sku in savedSkus) sku: photos[sku]!,
+      };
+      setState(() {
+        _progressLabel = 'Guardando fotos…';
+        _savingPhotos = true;
+      });
+      final savedPhotos = await CatalogPhotoWriteResult.save(eligiblePhotos);
+      if (!mounted) return;
+      setState(() {
+        _importing = false;
+        _savingPhotos = false;
+      });
+      await _showImportOutcome(
+        imported,
+        savedPhotos,
+        eligiblePhotos,
+        photos.keys.where((sku) => !savedSkus.contains(sku)).toList(),
+      );
+      if (mounted) Navigator.pop(context, imported);
+    } catch (_) {
+      if (mounted) _showMessage('No se pudo completar la importación.');
+    } finally {
+      if (mounted && _importing) setState(() => _importing = false);
     }
   }
 
-  String _formatImportError(CatalogImportRowError e) {
-    final sku = e.sku?.trim();
-    final skuBit = (sku == null || sku.isEmpty)
-        ? ''
-        : ' · ${_clipImportSku(sku)}';
-    return 'Fila ${e.rowIndex}$skuBit: ${e.message}';
+  String _formatImportError(CatalogImportRowError error) {
+    final sku = error.sku?.trim();
+    final code = sku == null || sku.isEmpty ? '' : ' · $sku';
+    return 'Fila ${error.rowIndex + widget.sourceRowOffset}$code · ${error.message}';
   }
 
-  String _clipImportSku(String sku) {
-    if (sku.length <= 36) return sku;
-    return '${sku.substring(0, 36)}…';
+  Future<void> _downloadReviewedWorkbook() async {
+    try {
+      final bytes = await FlexibleCatalogImportService.buildReviewedWorkbook(
+        bytes: widget.bytes,
+        mapping: _buildMapping(dryRun: true),
+        corrections: _corrections,
+      );
+      if (!mounted) return;
+      final result = await saveExcelForExport(
+        name: 'b2bconecta_inventario_revisado',
+        bytes: bytes,
+      );
+      if (mounted && result != ExcelExportResult.cancelled) {
+        _showMessage(
+            excelExportSavedMessage('Inventario revisado descargado.'));
+      }
+    } on FormatException catch (error) {
+      if (mounted) _showMessage(error.message);
+    } catch (_) {
+      if (mounted) _showMessage('No se pudo descargar el inventario revisado.');
+    }
   }
 
-  Future<void> _showResultDialog(CatalogImportResult result) async {
-    final errors = result.allErrors.take(20).toList();
-    await showDialog<void>(
+  Future<bool?> _showSimulation(
+    CatalogImportResult result,
+    Map<String, List<ProductImageBulkFile>> photos,
+    Map<String, String> assignmentErrors,
+  ) {
+    final included =
+        photos.values.fold(0, (total, files) => total + files.length);
+    final isPdf = widget.fileName.toLowerCase().endsWith('.pdf');
+    var downloading = false;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, updateDialog) => AlertDialog(
+          title: const Text('Revisa antes de guardar'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                    '${result.inserted} por crear · ${result.updated} por actualizar'),
+                Text(
+                    '${result.skipped} filas omitidas · ${result.errorCount} con errores'),
+                Text('${result.priceChanges} cambios de precio · '
+                    '${result.stockChanges} cambios de stock'),
+                if (result.imageUrlChanges > 0)
+                  Text('${result.imageUrlChanges} cambios de URL de foto'),
+                if (_photoZipName != null ||
+                    (_workbookPhotos?.photos.isNotEmpty ?? false)) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                      'Fotos incluidas: $included · Repuestos con fotos: ${photos.length}'),
+                  Text('${_photos.length - included} fotos sin incluir'
+                      '${_invalidPhotoFiles.isEmpty ? '' : ' · ${_invalidPhotoFiles.length} archivos descartados'}'),
+                  const Text('Las galerías con fotos se conservan.'),
+                  if (!_workbookReviewed &&
+                      (_workbookPhotos?.photos.isNotEmpty ?? false))
+                    const Text(
+                        'Las fotos detectadas se incluyen después de revisarlas.'),
+                  if (assignmentErrors.isNotEmpty)
+                    Text(
+                      'Vuelve a revisar ${assignmentErrors.length} asignaciones de fotos.',
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                    ),
+                ],
+                if (widget.documentPhotos != null && isPdf)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                        'Revisé el SKU, el precio y el stock extraídos del PDF.'),
+                    value: _confirmedExtractedData,
+                    onChanged: (value) => updateDialog(
+                        () => _confirmedExtractedData = value ?? false),
+                  ),
+                if (result.validationErrors.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Corrige las filas o guarda solo las válidas.'),
+                  for (final error in result.validationErrors.take(20))
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(_formatImportError(error)),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () async {
+                        await _correctRow(error.rowIndex,
+                            message: error.message);
+                        if (ctx.mounted) Navigator.pop(ctx, false);
+                      },
+                    ),
+                  if (result.validationErrors.length > 20)
+                    const Text('Se muestran los primeros 20 errores.'),
+                ],
+                if (result.validationErrors.isEmpty && result.successCount > 0)
+                  TextButton.icon(
+                    onPressed:
+                        downloading || (isPdf && !_confirmedExtractedData)
+                            ? null
+                            : () async {
+                                updateDialog(() => downloading = true);
+                                await _downloadReviewedWorkbook();
+                                if (ctx.mounted)
+                                  updateDialog(() => downloading = false);
+                              },
+                    icon: const Icon(Icons.download_outlined),
+                    label: Text(downloading
+                        ? 'Preparando Excel…'
+                        : 'Descargar Excel revisado'),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Volver'),
+            ),
+            FilledButton(
+              onPressed: result.successCount == 0 ||
+                      assignmentErrors.isNotEmpty ||
+                      (isPdf && !_confirmedExtractedData)
+                  ? null
+                  : () => Navigator.pop(ctx, true),
+              child: const Text('Confirmar importación'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<Map<String, String>?> _correctRow(
+    int rowIndex, {
+    String? message,
+    Map<String, String>? originalValues,
+  }) async {
+    final mapping = _buildMapping(dryRun: true);
+    final original = originalValues ??
+        FlexibleCatalogImportService.readRows(
+          bytes: widget.bytes,
+          meta: widget.fileMeta,
+          rowNumbers: {rowIndex},
+        )[rowIndex];
+    if (original == null) return null;
+
+    final fields = <String, String>{};
+    for (final field in CatalogImportField.values) {
+      final source = mapping.columnMap[field.key]?.source;
+      if (source != null) fields.putIfAbsent(source, () => field.label);
+    }
+    if (originalValues != null) {
+      for (final header in original.keys) {
+        fields.putIfAbsent(header, () => header);
+      }
+    }
+    final values = {...original, ...?_corrections[rowIndex]};
+    final edited = <String, String>{};
+    final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-          result.dryRun ? 'Revisión completada' : 'Importación completada',
-        ),
+        title: Text('Corregir fila ${rowIndex + widget.sourceRowOffset}'),
         content: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!result.dryRun) ...[
-                Text('Repuestos nuevos: ${result.inserted}'),
-                Text('Repuestos actualizados: ${result.updated}'),
-                Text('Filas omitidas: ${result.skipped}'),
-              ] else
-                Text(
-                  'Filas válidas (sin guardar): ${result.skipped}',
-                ),
-              Text('Errores detectados: ${result.errorCount}'),
-              if (!result.dryRun && result.inserted > 0 &&
-                  !_newProductsVisibility.isActive) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'Los repuestos nuevos quedan en pausa (ocultos para tiendas minoristas). '
-                  'Actívalos en Mi inventario cuando quieras publicarlos.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.brandAccent,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-              if (errors.isNotEmpty) ...[
+              if (message != null) ...[
+                Text(message),
                 const SizedBox(height: 12),
-                const Text(
-                  'Detalle (primeros 20):',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                ...errors.map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      _formatImportError(e),
-                      style: const TextStyle(fontSize: 12),
+              ],
+              for (final source in fields.keys)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextFormField(
+                    initialValue: values[source],
+                    decoration: InputDecoration(
+                      labelText: fields[source],
+                      border: const OutlineInputBorder(),
                     ),
+                    onChanged: (value) => edited[source] = value,
                   ),
                 ),
-              ],
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Aplicar corrección'),
           ),
         ],
       ),
     );
+    if (!mounted || saved != true || edited.isEmpty) return null;
+    setState(() => _corrections.putIfAbsent(rowIndex, () => {}).addAll(edited));
+    if (originalValues == null) {
+      _showMessage(
+          'Fila ${rowIndex + widget.sourceRowOffset} corregida. Vuelve a simular.');
+    }
+    return edited;
+  }
+
+  Future<void> _showImportOutcome(
+    CatalogImportResult products,
+    CatalogPhotoWriteResult initial,
+    Map<String, List<ProductImageBulkFile>> eligiblePhotos,
+    List<String> excluded,
+  ) async {
+    var photos = initial;
+    var saved = initial.saved;
+    var skipped = initial.skipped;
+    final pageContext = context;
+    while (true) {
+      if (!pageContext.mounted) return;
+      final retry = await showDialog<bool>(
+        context: pageContext,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Resultado de la importación'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                    '${products.inserted} repuestos creados · ${products.updated} actualizados'),
+                Text(
+                    '${products.skipped} filas omitidas · ${products.errorCount} errores'),
+                if (products.inserted > 0 && !_newProductsVisibility.isActive)
+                  const Text('Los repuestos nuevos quedan en pausa.'),
+                for (final error in products.allErrors.take(20))
+                  Text(_formatImportError(error)),
+                if (eligiblePhotos.isNotEmpty || excluded.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('Galerías guardadas: $saved'),
+                  if (skipped > 0)
+                    Text('Galerías con fotos existentes: $skipped'),
+                  if (excluded.isNotEmpty)
+                    Text(
+                        'Sin confirmación del repuesto: ${excluded.take(20).join(', ')}'),
+                  for (final item in photos.pending.entries.take(20))
+                    Text('${item.key} · ${item.value}'),
+                  if (photos.pending.length > 20)
+                    Text(
+                        '${photos.pending.length} galerías pendientes en total.'),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cerrar'),
+            ),
+            if (photos.pending.isNotEmpty)
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Reintentar fotos'),
+              ),
+          ],
+        ),
+      );
+      if (!pageContext.mounted || retry != true) return;
+      _startProgress('Reintentando fotos…');
+      setState(() => _savingPhotos = true);
+      photos = await CatalogPhotoWriteResult.save({
+        for (final sku in photos.pending.keys) sku: eligiblePhotos[sku]!,
+      });
+      saved += photos.saved;
+      skipped += photos.skipped;
+      if (mounted) {
+        setState(() {
+          _importing = false;
+          _savingPhotos = false;
+        });
+      }
+    }
   }
 
   static String _upsertModeLabel(
@@ -443,9 +944,8 @@ class _ImporterFlexibleImportScreenState
         CatalogImportUpsertMode.updateAll => compact
             ? 'Actualizar todo'
             : 'Actualizar nombre, precio, stock y demás campos',
-        CatalogImportUpsertMode.priceStockOnly => compact
-            ? 'Solo precio y stock'
-            : 'Solo actualizar precio en USD y existencia',
+        CatalogImportUpsertMode.priceStockOnly =>
+          compact ? 'Solo precio y stock' : 'Actualizar precios y existencias',
         CatalogImportUpsertMode.insertOnly => compact
             ? 'Solo códigos nuevos'
             : 'No tocar existentes; solo cargar códigos nuevos',
@@ -454,11 +954,11 @@ class _ImporterFlexibleImportScreenState
   static String _upsertModeDescription(CatalogImportUpsertMode mode) =>
       switch (mode) {
         CatalogImportUpsertMode.updateAll =>
-            'Sobrescribe nombre, precio en USD, existencia y demás datos mapeados.',
+          'Actualiza nombre, precios, existencias y otros datos del catálogo.',
         CatalogImportUpsertMode.priceStockOnly =>
-            'Ideal para actualizar listas de precios sin cambiar fichas ya publicadas.',
+          'Actualiza precios y existencias. Revisa también la oferta, la garantía y los campos opcionales del archivo.',
         CatalogImportUpsertMode.insertOnly =>
-            'Útil para ampliar catálogo sin modificar repuestos que ya vendes.',
+          'Útil para ampliar catálogo sin modificar repuestos que ya vendes.',
       };
 
   IconData _upsertModeIcon(CatalogImportUpsertMode mode) => switch (mode) {
@@ -612,22 +1112,24 @@ class _ImporterFlexibleImportScreenState
 
   Widget _fileSummaryCard() {
     final estimate = widget.preview.totalDataRowsEstimate;
-    final ext = widget.fileMeta.format == CatalogImportFileFormat.csv
-        ? 'CSV'
-        : 'Excel';
+    final ext = widget.fileName.split('.').last.toUpperCase();
+    final headerRow = widget.fileMeta.headerRow + widget.sourceRowOffset;
+    final sheetName = widget.fileMeta.sheetName;
 
     return _sectionCard(
       icon: Icons.description_outlined,
       title: widget.fileName,
-      subtitle:
-          '$ext · ${widget.preview.headers.length} columnas · '
+      subtitle: '$ext · ${widget.preview.headers.length} columnas · '
           '${estimate ?? '?'} repuestos aprox.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (ext != 'PDF')
+            Text('Encabezados en la fila $headerRow'
+                '${sheetName == null ? '' : ' · $sheetName'}'),
           Text(
-            'Revisa el archivo y asocia columnas. '
-            'SKU, nombre y precio se detectan solos cuando es posible.',
+            'Revisa que el SKU, el nombre, el precio y el stock '
+            'correspondan a las columnas de tu archivo.',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.35,
@@ -635,6 +1137,13 @@ class _ImporterFlexibleImportScreenState
             ),
           ),
           const SizedBox(height: 6),
+          if (widget.documentPhotos != null) ...[
+            const Text(
+                'Revisa el SKU, los precios y el stock extraídos antes de guardar.'),
+            for (final issue in widget.documentPhotos!.issues.take(8))
+              Text(issue, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 6),
+          ],
           _previewDetailsButton(),
         ],
       ),
@@ -642,15 +1151,14 @@ class _ImporterFlexibleImportScreenState
   }
 
   Widget _autoMapReadyBanner() {
-    final ready =
-        _mappedRequiredCount == catalogImportRequiredFields.length;
+    final ready = _mappedRequiredCount == catalogImportRequiredFields.length;
     if (!ready) return const SizedBox.shrink();
 
     final autoExtras = _captureUnmapped ? _unmappedHeaders().length : 0;
     final detail = autoExtras > 0
-        ? ' Detectamos SKU, nombre y precio. '
-            '$autoExtras columna(s) extra se guardarán como datos internos.'
-        : ' Detectamos SKU, nombre y precio. Revisa y toca Importar.';
+        ? 'Columnas obligatorias asociadas. '
+            'Se guardarán $autoExtras columnas extra como datos internos.'
+        : 'Columnas obligatorias asociadas.';
 
     return Container(
       width: double.infinity,
@@ -727,12 +1235,13 @@ class _ImporterFlexibleImportScreenState
   }
 
   Widget _stepIndicator({required bool desktop}) {
-    final step1Done = _mappedRequiredCount == catalogImportRequiredFields.length;
+    final step1Done =
+        _mappedRequiredCount == catalogImportRequiredFields.length;
     final step2Count = _customFieldMappings
-        .where((r) => (r.fieldLabel.trim().isNotEmpty) && r.sourceColumn != null)
+        .where(
+            (r) => (r.fieldLabel.trim().isNotEmpty) && r.sourceColumn != null)
         .length;
-    final autoCount =
-        _captureUnmapped ? _unmappedHeaders().length : 0;
+    final autoCount = _captureUnmapped ? _unmappedHeaders().length : 0;
 
     Widget step(int n, String label, String detail, bool done) {
       return Expanded(
@@ -812,20 +1321,18 @@ class _ImporterFlexibleImportScreenState
           step2Count > 0 || (_captureUnmapped && autoCount > 0),
         ),
         const SizedBox(width: 8),
-        step(3, 'Confirmar', _dryRun ? 'Simulación' : 'Importar', step1Done),
+        step(3, 'Confirmar', 'Revisar y guardar', step1Done),
       ],
     );
   }
 
   Widget _coreMappingCard({required bool desktop}) {
-    final optionalFields = _optionalFields
-        .where((f) {
-          if (!widget.pagoSoloDivisas) return true;
-          // Solo divisas: un precio USD de lista; sin oferta ni % pago USD.
-          return f != CatalogImportField.usdPaymentDiscountPct &&
-              f != CatalogImportField.salePriceUsd;
-        })
-        .toList();
+    final optionalFields = _optionalFields.where((f) {
+      if (!widget.pagoSoloDivisas) return true;
+      // Solo divisas: un precio USD de lista; sin oferta ni % pago USD.
+      return f != CatalogImportField.usdPaymentDiscountPct &&
+          f != CatalogImportField.salePriceUsd;
+    }).toList();
 
     Widget requiredGrid() {
       return LayoutBuilder(
@@ -857,80 +1364,78 @@ class _ImporterFlexibleImportScreenState
       icon: Icons.storefront_outlined,
       title: 'Asocia tus columnas',
       subtitle:
-          'SKU, nombre y precio son obligatorios. Stock vacío se importa como 0.',
+          'SKU, nombre, precio y stock son obligatorios. Escribe 0 si el producto no tiene existencias.',
       child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Obligatorios',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              requiredGrid(),
-              const SizedBox(height: 4),
-              Material(
-                color: AppColors.fieldFill,
-                borderRadius: AppDecorations.radius12,
-                child: InkWell(
-                  borderRadius: AppDecorations.radius12,
-                  onTap: _importing
-                      ? null
-                      : () => setState(
-                            () => _optionalExpanded = !_optionalExpanded,
-                          ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Campos opcionales',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        Icon(
-                          _optionalExpanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                          color: AppColors.textSecondary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              if (_optionalExpanded) ...[
-                const SizedBox(height: 10),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final twoCol = desktop && constraints.maxWidth >= 520;
-                    final itemWidth = twoCol
-                        ? (constraints.maxWidth - 12) / 2
-                        : constraints.maxWidth;
-
-                    Widget field(CatalogImportField f) => SizedBox(
-                          width: itemWidth,
-                          child: _fieldDropdown(f, compact: twoCol),
-                        );
-
-                    if (!twoCol) {
-                      return Column(
-                        children: optionalFields.map(field).toList(),
-                      );
-                    }
-                    return Wrap(
-                      spacing: 12,
-                      runSpacing: 0,
-                      children: optionalFields.map(field).toList(),
-                    );
-                  },
-                ),
-              ],
-            ],
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Obligatorios',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
+          const SizedBox(height: 8),
+          requiredGrid(),
+          const SizedBox(height: 4),
+          Material(
+            color: AppColors.fieldFill,
+            borderRadius: AppDecorations.radius12,
+            child: InkWell(
+              borderRadius: AppDecorations.radius12,
+              onTap: _importing
+                  ? null
+                  : () => setState(
+                        () => _optionalExpanded = !_optionalExpanded,
+                      ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Campos opcionales',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Icon(
+                      _optionalExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_optionalExpanded) ...[
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final twoCol = desktop && constraints.maxWidth >= 520;
+                final itemWidth = twoCol
+                    ? (constraints.maxWidth - 12) / 2
+                    : constraints.maxWidth;
+
+                Widget field(CatalogImportField f) => SizedBox(
+                      width: itemWidth,
+                      child: _fieldDropdown(f, compact: twoCol),
+                    );
+
+                if (!twoCol) {
+                  return Column(
+                    children: optionalFields.map(field).toList(),
+                  );
+                }
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 0,
+                  children: optionalFields.map(field).toList(),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -951,178 +1456,178 @@ class _ImporterFlexibleImportScreenState
 
   Widget _customFieldsMappingContent({required bool desktop}) {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _unmappedColumnsBanner(),
-          if (_customFieldMappings.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _importing
-                      ? null
-                      : () => setState(() {
-                            for (final r in _customFieldMappings) {
-                              r.visibleToAliado = false;
-                            }
-                          }),
-                  icon: const Icon(Icons.lock_outline, size: 16),
-                  label: const Text('Ocultar todos para tiendas minoristas'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _importing
-                      ? null
-                      : () => setState(() {
-                            for (final r in _customFieldMappings) {
-                              r.visibleToAliado = true;
-                            }
-                          }),
-                  icon: const Icon(Icons.visibility_outlined, size: 16),
-                  label: const Text('Mostrar todos a tiendas minoristas'),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 12),
-          if (_customFieldMappings.isEmpty && _unmappedHeaders().isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.fieldFill,
-                borderRadius: AppDecorations.radius12,
-              ),
-              child: const Text(
-                'No hay columnas adicionales sugeridas. Usa «Agregar campo» '
-                'o activa «Guardar columnas adicionales» para capturar el resto '
-                'automáticamente al importar.',
-                style: TextStyle(fontSize: 12, height: 1.4),
-              ),
-            ),
-          ...List.generate(_customFieldMappings.length, (i) {
-            final row = _customFieldMappings[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  IconButton(
-                    tooltip: row.visibleToAliado
-                        ? 'Visible para tiendas minoristas (tocar para ocultar)'
-                        : 'Solo interno (tocar para mostrar a tiendas minoristas)',
-                    onPressed: _importing
-                        ? null
-                        : () => setState(() {
-                              row.visibleToAliado = !row.visibleToAliado;
-                            }),
-                    icon: Icon(
-                      row.visibleToAliado
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      color: row.visibleToAliado
-                          ? AppColors.successGreen
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                  Expanded(
-                    flex: desktop ? 4 : 5,
-                    child: TextFormField(
-                      initialValue: row.fieldLabel,
-                      decoration: InputDecoration(
-                        labelText: 'Nombre en inventario',
-                        hintText: 'Ej. Marca',
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        border: OutlineInputBorder(
-                          borderRadius: AppDecorations.radius12,
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (v) => row.fieldLabel = v,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: desktop ? 5 : 6,
-                    child: DropdownButtonFormField<String?>(
-                      value: row.sourceColumn,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: 'Columna del archivo',
-                        filled: true,
-                        fillColor: AppColors.fieldFill,
-                        border: OutlineInputBorder(
-                          borderRadius: AppDecorations.radius12,
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      items: widget.preview.headers
-                          .map(
-                            (h) => DropdownMenuItem<String?>(
-                              value: h,
-                              child: Text(h, overflow: TextOverflow.ellipsis),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _importing
-                          ? null
-                          : (v) => setState(() => row.sourceColumn = v),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Quitar',
-                    onPressed: _importing
-                        ? null
-                        : () => setState(() {
-                              _customFieldMappings.removeAt(i);
-                            }),
-                    icon: Icon(Icons.close, color: Colors.red.shade400),
-                  ),
-                ],
-              ),
-            );
-          }),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _unmappedColumnsBanner(),
+        if (_customFieldMappings.isNotEmpty) ...[
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
+            runSpacing: 4,
             children: [
-              TextButton.icon(
+              OutlinedButton.icon(
                 onPressed: _importing
                     ? null
                     : () => setState(() {
-                          _customFieldMappings.add(
-                            ImportCustomFieldMappingRow(fieldLabel: ''),
-                          );
-                        }),
-                icon: const Icon(Icons.add),
-                label: const Text('Agregar campo'),
-              ),
-              TextButton.icon(
-                onPressed: _importing
-                    ? null
-                    : () => setState(() {
-                          for (final h in _unmappedHeaders()) {
-                            final exists = _customFieldMappings.any(
-                              (r) => r.sourceColumn == h,
-                            );
-                            if (exists) continue;
-                            _customFieldMappings.add(
-                              ImportCustomFieldMappingRow(
-                                fieldLabel: formatProductCustomFieldLabel(
-                                  slugProductCustomFieldKey(h),
-                                ),
-                                sourceColumn: h,
-                              ),
-                            );
+                          for (final r in _customFieldMappings) {
+                            r.visibleToAliado = false;
                           }
                         }),
-                icon: const Icon(Icons.auto_fix_high_outlined),
-                label: const Text('Sugerir columnas libres'),
+                icon: const Icon(Icons.lock_outline, size: 16),
+                label: const Text('Ocultar todos para tiendas minoristas'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _importing
+                    ? null
+                    : () => setState(() {
+                          for (final r in _customFieldMappings) {
+                            r.visibleToAliado = true;
+                          }
+                        }),
+                icon: const Icon(Icons.visibility_outlined, size: 16),
+                label: const Text('Mostrar todos a tiendas minoristas'),
               ),
             ],
           ),
         ],
+        const SizedBox(height: 12),
+        if (_customFieldMappings.isEmpty && _unmappedHeaders().isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.fieldFill,
+              borderRadius: AppDecorations.radius12,
+            ),
+            child: const Text(
+              'No hay columnas adicionales sugeridas. Usa «Agregar campo» '
+              'o activa «Guardar columnas adicionales» para capturar el resto '
+              'automáticamente al importar.',
+              style: TextStyle(fontSize: 12, height: 1.4),
+            ),
+          ),
+        ...List.generate(_customFieldMappings.length, (i) {
+          final row = _customFieldMappings[i];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  tooltip: row.visibleToAliado
+                      ? 'Visible para tiendas minoristas (tocar para ocultar)'
+                      : 'Solo interno (tocar para mostrar a tiendas minoristas)',
+                  onPressed: _importing
+                      ? null
+                      : () => setState(() {
+                            row.visibleToAliado = !row.visibleToAliado;
+                          }),
+                  icon: Icon(
+                    row.visibleToAliado
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: row.visibleToAliado
+                        ? AppColors.successGreen
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                Expanded(
+                  flex: desktop ? 4 : 5,
+                  child: TextFormField(
+                    initialValue: row.fieldLabel,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre en inventario',
+                      hintText: 'Ej. Marca',
+                      filled: true,
+                      fillColor: AppColors.fieldFill,
+                      border: OutlineInputBorder(
+                        borderRadius: AppDecorations.radius12,
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (v) => row.fieldLabel = v,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: desktop ? 5 : 6,
+                  child: DropdownButtonFormField<String?>(
+                    value: row.sourceColumn,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Columna del archivo',
+                      filled: true,
+                      fillColor: AppColors.fieldFill,
+                      border: OutlineInputBorder(
+                        borderRadius: AppDecorations.radius12,
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    items: widget.preview.headers
+                        .map(
+                          (h) => DropdownMenuItem<String?>(
+                            value: h,
+                            child: Text(h, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _importing
+                        ? null
+                        : (v) => setState(() => row.sourceColumn = v),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Quitar',
+                  onPressed: _importing
+                      ? null
+                      : () => setState(() {
+                            _customFieldMappings.removeAt(i);
+                          }),
+                  icon: Icon(Icons.close, color: Colors.red.shade400),
+                ),
+              ],
+            ),
+          );
+        }),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              onPressed: _importing
+                  ? null
+                  : () => setState(() {
+                        _customFieldMappings.add(
+                          ImportCustomFieldMappingRow(fieldLabel: ''),
+                        );
+                      }),
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar campo'),
+            ),
+            TextButton.icon(
+              onPressed: _importing
+                  ? null
+                  : () => setState(() {
+                        for (final h in _unmappedHeaders()) {
+                          final exists = _customFieldMappings.any(
+                            (r) => r.sourceColumn == h,
+                          );
+                          if (exists) continue;
+                          _customFieldMappings.add(
+                            ImportCustomFieldMappingRow(
+                              fieldLabel: formatProductCustomFieldLabel(
+                                slugProductCustomFieldKey(h),
+                              ),
+                              sourceColumn: h,
+                            ),
+                          );
+                        }
+                      }),
+              icon: const Icon(Icons.auto_fix_high_outlined),
+              label: const Text('Sugerir columnas libres'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1166,8 +1671,7 @@ class _ImporterFlexibleImportScreenState
             return ActionChip(
               avatar: const Icon(Icons.add, size: 16),
               label: Text(h, style: const TextStyle(fontSize: 11.5)),
-              onPressed:
-                  _importing ? null : () => _addErpFieldFromColumn(h),
+              onPressed: _importing ? null : () => _addErpFieldFromColumn(h),
             );
           }).toList(),
         ),
@@ -1237,9 +1741,8 @@ class _ImporterFlexibleImportScreenState
     return LayoutBuilder(
       builder: (context, constraints) {
         final threeCol = constraints.maxWidth >= 860;
-        final tileWidth = threeCol
-            ? (constraints.maxWidth - 24) / 3
-            : constraints.maxWidth;
+        final tileWidth =
+            threeCol ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth;
 
         return Wrap(
           spacing: 12,
@@ -1344,9 +1847,8 @@ class _ImporterFlexibleImportScreenState
             'Actívalo si tu Excel muestra precios como 12,50 (habitual en '
             'exportaciones venezolanas).',
         value: _decimalCommaOnPrice,
-        onChanged: _importing
-            ? null
-            : (v) => setState(() => _decimalCommaOnPrice = v),
+        onChanged:
+            _importing ? null : (v) => setState(() => _decimalCommaOnPrice = v),
       ),
       _ImportOptionTileData(
         icon: Icons.library_add_outlined,
@@ -1355,18 +1857,8 @@ class _ImporterFlexibleImportScreenState
             'Si una columna no la mapeas arriba, se guarda automáticamente '
             'con el nombre de la columna del Excel.',
         value: _captureUnmapped,
-        onChanged: _importing
-            ? null
-            : (v) => setState(() => _captureUnmapped = v),
-      ),
-      _ImportOptionTileData(
-        icon: Icons.fact_check_outlined,
-        title: 'Revisar sin guardar',
-        subtitle:
-            'Valida el archivo y muestra errores antes de modificar tu '
-            'inventario en B2B Conecta.',
-        value: _dryRun,
-        onChanged: _importing ? null : (v) => setState(() => _dryRun = v),
+        onChanged:
+            _importing ? null : (v) => setState(() => _captureUnmapped = v),
       ),
     ];
 
@@ -1391,7 +1883,8 @@ class _ImporterFlexibleImportScreenState
           const SizedBox(height: 16),
           const _OptionsSubheading(
             title: 'Productos nuevos',
-            hint: 'Visibilidad para tiendas minoristas de códigos que aún no están en inventario',
+            hint:
+                'Visibilidad para tiendas minoristas de códigos que aún no están en inventario',
           ),
           const SizedBox(height: 10),
           if (desktop)
@@ -1490,6 +1983,7 @@ class _ImporterFlexibleImportScreenState
           bytes: widget.bytes,
           meta: widget.fileMeta,
           sampleRowCount: FlexibleCatalogImportService.detailsPreviewMaxRows,
+          corrections: _corrections,
         );
       });
     } catch (e) {
@@ -1510,7 +2004,21 @@ class _ImporterFlexibleImportScreenState
       fileName: widget.fileName,
       coreHeaders: _coreMappedSources,
       erpHeaders: _erpMappedSources,
+      rowOffset: widget.sourceRowOffset,
+      onEditRow: widget.documentPhotos == null
+          ? null
+          : (row, values) => _correctRow(row, originalValues: values),
     );
+  }
+
+  List<Map<String, String>> get _reviewedSampleRows {
+    final rows = widget.preview.sampleRows;
+    final numbers = widget.preview.sampleRowNumbers;
+    if (_corrections.isEmpty || numbers.length != rows.length) return rows;
+    return [
+      for (var i = 0; i < rows.length; i++)
+        {...rows[i], ...?_corrections[numbers[i]]},
+    ];
   }
 
   Widget _previewDetailsButton() {
@@ -1550,7 +2058,7 @@ class _ImporterFlexibleImportScreenState
           const SizedBox(height: 6),
           _PreviewTable(
             headers: widget.preview.headers,
-            rows: widget.preview.sampleRows,
+            rows: _reviewedSampleRows,
             coreHeaders: _coreMappedSources,
             erpHeaders: _erpMappedSources,
           ),
@@ -1562,17 +2070,18 @@ class _ImporterFlexibleImportScreenState
   Widget _actionBar({required bool desktop}) {
     final ready = _mappedRequiredCount == catalogImportRequiredFields.length;
     final statusText = ready
-        ? 'Listo para importar · ${widget.preview.totalDataRowsEstimate ?? '?'} filas estimadas'
+        ? 'Listo para simular · ${widget.preview.totalDataRowsEstimate ?? '?'} filas estimadas'
         : 'Faltan campos obligatorios por asociar';
 
     final importButton = FilledButton.icon(
-      onPressed: _importing || !ready ? null : _runImport,
+      onPressed:
+          _importing || _readingWorkbookPhotos || !ready ? null : _runImport,
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 46),
         padding: const EdgeInsets.symmetric(horizontal: 24),
       ),
-      icon: Icon(_dryRun ? Icons.fact_check_outlined : Icons.upload),
-      label: Text(_dryRun ? 'Simular importación' : 'Importar inventario'),
+      icon: const Icon(Icons.fact_check_outlined),
+      label: const Text('Simular importación'),
     );
 
     return Material(
@@ -1674,6 +2183,8 @@ class _ImporterFlexibleImportScreenState
                     _stepIndicator(desktop: desktop),
                     const SizedBox(height: 12),
                     _autoMapReadyBanner(),
+                    _buildPhotoSection(),
+                    const SizedBox(height: 14),
                     if (desktop)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1722,7 +2233,7 @@ class _ImporterFlexibleImportScreenState
                             const SizedBox(height: 8),
                             _PreviewTable(
                               headers: widget.preview.headers,
-                              rows: widget.preview.sampleRows,
+                              rows: _reviewedSampleRows,
                               coreHeaders: _coreMappedSources,
                               erpHeaders: _erpMappedSources,
                             ),
@@ -1732,10 +2243,10 @@ class _ImporterFlexibleImportScreenState
                       const SizedBox(height: 10),
                       _collapsiblePanel(
                         title: 'Datos extra del ERP',
-                        subtitle: _captureUnmapped &&
-                                _unmappedHeaders().isNotEmpty
-                            ? '${_unmappedHeaders().length} columna(s) auto'
-                            : 'Opcional · mapeo manual',
+                        subtitle:
+                            _captureUnmapped && _unmappedHeaders().isNotEmpty
+                                ? '${_unmappedHeaders().length} columna(s) auto'
+                                : 'Opcional · mapeo manual',
                         icon: Icons.dataset_outlined,
                         expanded: _erpSectionExpanded,
                         onExpandedChanged: (v) =>
@@ -1759,31 +2270,34 @@ class _ImporterFlexibleImportScreenState
     final desktop =
         MediaQuery.sizeOf(context).width >= AppBreakpoints.b2bDesktop;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surfaceTinted,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('Carga masiva'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              'Tu Excel o CSV → inventario B2B Conecta en 3 pasos',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary.withOpacity(0.95),
+    return PopScope(
+      canPop: !_importing,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surfaceTinted,
+          surfaceTintColor: Colors.transparent,
+          title: const Text('Carga masiva'),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(28),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Revisa tus repuestos y fotos antes de guardar',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary.withOpacity(0.95),
+                ),
               ),
             ),
           ),
         ),
-      ),
-      body: Stack(
-        children: [
-          _buildBody(desktop),
-          if (_importing) _buildProgressOverlay(),
-        ],
+        body: Stack(
+          children: [
+            _buildBody(desktop),
+            if (_importing) _buildProgressOverlay(),
+          ],
+        ),
       ),
     );
   }
@@ -1807,20 +2321,20 @@ class _ImporterFlexibleImportScreenState
                   const CircularProgressIndicator(),
                   const SizedBox(height: 20),
                   Text(
-                    _dryRun
-                        ? 'Revisando archivo…'
-                        : 'Cargando inventario…',
+                    _progressLabel,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '$_processedRows de ${estimate ?? '?'} filas procesadas',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                  if (partial != null) ...[
+                  if (!_savingPhotos) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '$_processedRows de ${estimate ?? '?'} filas procesadas',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
+                  if (partial != null && !_savingPhotos) ...[
                     const SizedBox(height: 14),
                     Text('Nuevos: ${partial.inserted}'),
                     Text('Actualizados: ${partial.updated}'),
@@ -2014,9 +2528,7 @@ class _PreviewTableState extends State<_PreviewTable> {
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: Icon(
-                    isCore
-                        ? Icons.storefront_outlined
-                        : Icons.dataset_outlined,
+                    isCore ? Icons.storefront_outlined : Icons.dataset_outlined,
                     size: 14,
                     color: _headerColor(h),
                   ),

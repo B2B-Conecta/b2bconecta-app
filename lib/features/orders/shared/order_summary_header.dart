@@ -22,6 +22,7 @@ class OrderSummaryHeader extends StatelessWidget {
       this.onCancel,
       this.showToggle = true,
       this.detailSummary = false,
+      this.compactDetail = false,
       this.showRoutineGuidance = true,
       this.actionsInHeader = false,
       this.cancelBusy = false});
@@ -36,6 +37,7 @@ class OrderSummaryHeader extends StatelessWidget {
   final bool cancelBusy;
   final bool showToggle;
   final bool detailSummary;
+  final bool compactDetail;
   final bool showRoutineGuidance;
   final bool actionsInHeader;
 
@@ -106,6 +108,7 @@ class OrderSummaryHeader extends StatelessWidget {
     if (detailSummary) {
       return OrderDetailOverview(
           lines: lines,
+          compactRetailer: compactDetail,
           actionsInHeader: actionsInHeader,
           viewerRole: viewerRole,
           nextStep: showRoutineGuidance ||

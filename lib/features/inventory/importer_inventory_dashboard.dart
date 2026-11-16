@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_browse_layout.dart';
 
@@ -9,8 +10,9 @@ import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'importer_product_edit_screen.dart';
-import 'catalog_import_orchestrator.dart';
+import 'catalog_document_reader.dart';
 import 'excel_catalog_service.dart';
+import 'flexible_catalog_import_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'importer_bulk_photos_screen.dart';
 import 'importer_flexible_import_screen.dart';
@@ -879,10 +881,68 @@ class _ImporterInventoryDashboardState
     }
   }
 
+  Future<CatalogDocumentSheet?> _readCatalogSheet(
+      PickedDocumentBytes file) async {
+    final progress = ValueNotifier('Leyendo ${file.fileName}…');
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final route = DialogRoute<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Preparando catálogo'),
+          content: ValueListenableBuilder<String>(
+            valueListenable: progress,
+            builder: (_, message, __) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(message),
+                const SizedBox(height: 16),
+                const LinearProgressIndicator(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    navigator.push(route);
+    List<CatalogDocumentSheet> sheets;
+    try {
+      sheets = await readCatalogDocument(file.bytes, file.fileName, (message) {
+        if (route.isActive) progress.value = message;
+      });
+    } finally {
+      if (route.isActive) navigator.removeRoute(route);
+      await route.completed;
+      progress.dispose();
+    }
+    if (!mounted) return null;
+    if (sheets.isEmpty) {
+      throw const FormatException(
+          'El documento no contiene una tabla utilizable.');
+    }
+    if (sheets.length == 1) return sheets.single;
+    return showDialog<CatalogDocumentSheet>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Selecciona una hoja o tabla'),
+        children: [
+          for (final sheet in sheets)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, sheet),
+              child: Text(sheet.name),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _startBulkImport() async {
     final picked = await pickSpreadsheetFile();
     if (picked == null) return;
-    final bytes = picked.bytes;
+    var bytes = picked.bytes;
     if (bytes.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -896,19 +956,29 @@ class _ImporterInventoryDashboardState
     }
 
     final name = picked.fileName;
-    final isCsv = name.toLowerCase().endsWith('.csv');
-    final fileMeta = CatalogImportFileMeta(
-      name: name,
-      format:
-          isCsv ? CatalogImportFileFormat.csv : CatalogImportFileFormat.xlsx,
-    );
-
+    final ext = name.split('.').last.toLowerCase();
+    CatalogDocumentSheet? sheet;
+    late final CatalogImportFileMeta fileMeta;
     CatalogImportPreview preview;
     try {
-      preview = CatalogImportOrchestrator.preview(
+      if (ext == 'xls' || ext == 'pdf') {
+        if (!mounted) return;
+        sheet = await _readCatalogSheet(picked);
+        if (sheet == null || !mounted) return;
+        bytes = sheet.csv;
+      }
+      final prepared = FlexibleCatalogImportService.prepareFile(
         bytes: bytes,
-        fileMeta: fileMeta,
+        meta: CatalogImportFileMeta(
+          name: name,
+          format: ext == 'csv' || sheet != null
+              ? CatalogImportFileFormat.csv
+              : CatalogImportFileFormat.xlsx,
+        ),
+        detectHeader: sheet == null,
       );
+      fileMeta = prepared.file;
+      preview = prepared.preview;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -934,6 +1004,10 @@ class _ImporterInventoryDashboardState
       fileMeta: fileMeta,
       preview: preview,
       pagoSoloDivisas: _pagoSoloDivisas,
+      documentPhotos: sheet == null
+          ? null
+          : (sheet: sheet.name, photos: sheet.photos, issues: sheet.notices),
+      sourceRowOffset: sheet?.headerOffset ?? 0,
     );
 
     if (!mounted || importResult == null) return;
@@ -1373,7 +1447,11 @@ class _ImporterInventoryDashboardState
           }
         },
         itemBuilder: (_) => const [
-          PopupMenuItem(value: 'import', child: Text('Importar Excel / CSV')),
+          PopupMenuItem(
+            value: 'import',
+            child: Text(
+                kIsWeb ? 'Importar Excel / CSV / PDF' : 'Importar Excel / CSV'),
+          ),
           PopupMenuItem(value: 'photos', child: Text('Importar ZIP de fotos')),
           PopupMenuItem(value: 'template', child: Text('Descargar plantilla')),
           PopupMenuDivider(),

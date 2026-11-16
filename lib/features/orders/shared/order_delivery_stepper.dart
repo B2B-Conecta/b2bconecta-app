@@ -6,8 +6,10 @@ import 'transaction_request_status.dart';
 
 /// The dispatch journey is independent from the negotiated payment schedule.
 class OrderDeliveryStepper extends StatelessWidget {
-  const OrderDeliveryStepper({super.key, required this.lines});
+  const OrderDeliveryStepper(
+      {super.key, required this.lines, this.horizontalCompact = false});
   final List<TransactionRequestModel> lines;
+  final bool horizontalCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +66,86 @@ class OrderDeliveryStepper extends StatelessWidget {
                             fontSize: 12,
                             height: 1.4,
                             color: colors.secondary))),
-              if (compact)
+              if (horizontalCompact &&
+                  MediaQuery.textScalerOf(context).scale(11) <= 14)
+                Column(
+                  children: [
+                    Row(children: [
+                      for (var i = 0; i < 4; i++)
+                        Expanded(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Row(children: [
+                                Expanded(
+                                    child: Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color: i == 0
+                                            ? Colors.transparent
+                                            : i <= current
+                                                ? colors.accent
+                                                : colors.secondary
+                                                    .withOpacity(.4))),
+                                Expanded(
+                                    child: Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color: i == 3
+                                            ? Colors.transparent
+                                            : i < current
+                                                ? colors.accent
+                                                : colors.secondary
+                                                    .withOpacity(.4))),
+                              ]),
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: i < current || done
+                                      ? colors.accent
+                                      : colors.detailSurface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    width: i == current && !done ? 4 : 1.5,
+                                    color: i <= current
+                                        ? colors.accent
+                                        : colors.secondary.withOpacity(.6),
+                                  ),
+                                ),
+                                child: i < current || done
+                                    ? Icon(Icons.check,
+                                        size: 12,
+                                        color: colors.dark
+                                            ? Colors.black
+                                            : Colors.white)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                    ]),
+                    const SizedBox(height: 4),
+                    Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < 4; i++)
+                            Expanded(
+                                child: Text(names[i],
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.15,
+                                        fontWeight: i == current
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: i <= current
+                                            ? colors.accent
+                                            : colors.ink))),
+                        ]),
+                  ],
+                )
+              else if (compact)
                 Wrap(spacing: 12, runSpacing: 16, children: [
                   for (var i = 0; i < 4; i++)
                     SizedBox(

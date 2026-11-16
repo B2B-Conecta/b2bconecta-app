@@ -536,7 +536,7 @@ class SupabaseService {
 
   static Future<Map<String, ProductSkuImageIndexEntry>>
       fetchMyInventorySkuImageIndex({
-    int limit = 5000,
+    int? limit,
   }) =>
           InventoryService.fetchMyInventorySkuImageIndex(limit: limit);
 

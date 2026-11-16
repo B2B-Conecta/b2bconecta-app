@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/aliado_header_search.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';

@@ -40,6 +40,13 @@ class ProductImageBulkPreview {
   int get skuCount => bySku.length;
   int get matchedSkuCount => bySku.length - unknownSkus.length;
 
+  int get uploadableSkuCount {
+    final excluded = [...unknownSkus, ...overLimitSkus]
+        .map((sku) => sku.toLowerCase())
+        .toSet();
+    return bySku.keys.where((sku) => !excluded.contains(sku)).length;
+  }
+
   factory ProductImageBulkPreview.empty() => const ProductImageBulkPreview(
         files: [],
         bySku: {},
@@ -55,7 +62,14 @@ class ProductImageBulkService {
   static ProductImageBulkPreview parseZipBytes(
     Uint8List bytes, {
     required Set<String> knownSkuKeys,
+    bool keepAmbiguousForReview = false,
   }) {
+    const maxZipBytes = 50 * 1024 * 1024;
+    const maxExtractedBytes = 100 * 1024 * 1024;
+    if (bytes.length > maxZipBytes) {
+      throw const FormatException(
+          'El ZIP supera 50 MiB. Divide las fotos en varios archivos.');
+    }
     Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes);
@@ -65,13 +79,14 @@ class ProductImageBulkService {
 
     final files = <ProductImageBulkFile>[];
     final invalid = <String>[];
+    var extractedBytes = 0;
 
     for (final entry in archive) {
       if (!entry.isFile) continue;
       final name = entry.name;
       if (name.contains('__MACOSX') || name.endsWith('.DS_Store')) continue;
 
-      final parsed = parseProductImageFilename(name);
+      var parsed = parseProductImageFilename(name);
       if (parsed == null) {
         invalid.add(name);
         continue;
@@ -79,6 +94,28 @@ class ProductImageBulkService {
 
       final dot = name.lastIndexOf('.');
       final ext = name.substring(dot + 1).toLowerCase();
+      final filename = name.replaceAll(r'\', '/').split('/').last;
+      final exactSku = filename.substring(0, filename.lastIndexOf('.')).trim();
+      if (parsed.slot != 1 && knownSkuKeys.contains(exactSku.toLowerCase())) {
+        if (knownSkuKeys.contains(parsed.sku.toLowerCase())) {
+          if (!keepAmbiguousForReview) {
+            invalid.add('$name: SKU ambiguo entre $exactSku y ${parsed.sku}');
+            continue;
+          }
+          parsed = const ProductImageFilenameParse(sku: '', slot: 1);
+        } else {
+          parsed = ProductImageFilenameParse(sku: exactSku, slot: 1);
+        }
+      }
+      if (entry.size > 10 * 1024 * 1024) {
+        invalid.add('$name: supera 10 MiB');
+        continue;
+      }
+      extractedBytes += entry.size;
+      if (extractedBytes > maxExtractedBytes) {
+        throw const FormatException(
+            'Las fotos superan 100 MiB al descomprimir. Divide el ZIP.');
+      }
       final content = entry.content;
       if (content is! List<int> || content.isEmpty) {
         invalid.add(name);
@@ -96,7 +133,7 @@ class ProductImageBulkService {
       );
     }
 
-    if (files.isEmpty) {
+    if (files.isEmpty && invalid.isEmpty) {
       throw const FormatException(
         'El ZIP no contiene imágenes válidas. '
         'Nombra los archivos como SKU.jpg, SKU_2.jpg o SKU_3.jpg',
@@ -115,7 +152,8 @@ class ProductImageBulkService {
       if (!knownSkuKeys.contains(e.key)) {
         unknown.add(e.value.first.sku);
       }
-      if (e.value.length > kMaxProductImages) {
+      if (e.value.length > kMaxProductImages ||
+          e.value.map((file) => file.slot).toSet().length != e.value.length) {
         overLimit.add(e.value.first.sku);
       }
     }
@@ -132,7 +170,7 @@ class ProductImageBulkService {
     );
   }
 
-  /// Agrupa archivos por slot (1..3); si hay duplicado de slot, gana el último.
+  /// Agrupa archivos por slot (1..3); los conflictos se deben rechazar antes de subir.
   static Map<int, ProductImageBulkFile> filesBySlot(
     List<ProductImageBulkFile> files,
   ) {

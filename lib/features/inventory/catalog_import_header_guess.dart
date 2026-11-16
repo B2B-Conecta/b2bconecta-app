@@ -8,6 +8,11 @@ class CatalogImportHeaderGuess {
     CatalogImportField.sku: [
       'sku',
       'cod_art',
+      'cod_producto',
+      'codigo_producto',
+      'codigo_de_producto',
+      'codigo_del_producto',
+      'codigo_articulo',
       'codigo',
       'cod',
       'articulo',
@@ -15,15 +20,19 @@ class CatalogImportHeaderGuess {
       'ref',
       'item',
       'part',
+      'referencia',
     ],
     CatalogImportField.name: [
       'nombre',
+      'nombre_comercial',
+      'nombre_del_producto',
+      'nombre_del_repuesto',
       'name',
+      'producto',
+      'titulo',
       'descripcion',
       'description',
       'desc',
-      'producto',
-      'titulo',
     ],
     CatalogImportField.description: [
       'descripcion_larga',
@@ -35,7 +44,9 @@ class CatalogImportHeaderGuess {
     CatalogImportField.priceUsd: [
       'precio',
       'price',
+      'precio_de_lista',
       'precio_mayor',
+      'precio_mayorista',
       'precio_usd',
       'pvp',
       'costo',
@@ -51,9 +62,10 @@ class CatalogImportHeaderGuess {
     CatalogImportField.stock: [
       'stock',
       'existencia',
+      'existencias',
       'exist',
-      'qty',
-      'cantidad',
+      'cantidad_en_stock',
+      'cantidad_disponible',
       'inventario',
       'disponible',
     ],
@@ -137,16 +149,34 @@ class CatalogImportHeaderGuess {
     ],
   };
 
+  static final _optionalSuffix = RegExp(r'_opcional$');
+  static final _ambiguousStock =
+      RegExp(r'(^|_)(pedido|solicitad[ao]s?|orden|reservad[ao]s?)(_|$)');
+  static final _offerPrice =
+      RegExp(r'(^|_)(oferta|promo|promocion|descuento)(_|$)');
+  static final _secondaryCode =
+      RegExp(r'(^|_)(barras|auxiliar|gtin|ean|upc|pedido|orden)(_|$)');
+
   /// Devuelve mapa `field.key` → nombre de columna sugerido (o null).
   static Map<String, String?> suggestAll(List<String> headers) {
     final used = <String>{};
     final out = <String, String?>{};
+    final normalized = headers
+        .map((header) => (
+              header: header,
+              key: _normalize(header).replaceFirst(_optionalSuffix, '')
+            ))
+        .where((entry) => entry.key.isNotEmpty)
+        .toList();
 
-    for (final field in CatalogImportField.values) {
-      final guess = _guessOne(field, headers, used);
-      if (guess != null) {
-        used.add(guess);
-        out[field.key] = guess;
+    for (final exact in [true, false]) {
+      for (final field in CatalogImportField.values) {
+        if (out.containsKey(field.key)) continue;
+        final guess = _guessOne(field, normalized, used, exact: exact);
+        if (guess != null) {
+          used.add(guess);
+          out[field.key] = guess;
+        }
       }
     }
     return out;
@@ -154,18 +184,17 @@ class CatalogImportHeaderGuess {
 
   static String? _guessOne(
     CatalogImportField field,
-    List<String> headers,
-    Set<String> used,
-  ) {
+    List<({String header, String key})> normalized,
+    Set<String> used, {
+    required bool exact,
+  }) {
     final patterns = _patterns[field] ?? const [];
-    final normalized = headers
-        .map((h) => (header: h, key: _normalize(h)))
-        .where((e) => !used.contains(e.header))
-        .toList();
-
     for (final pattern in patterns) {
       for (final entry in normalized) {
-        if (field == CatalogImportField.stock && _looksLikeMinOrderQty(entry.key)) {
+        if (used.contains(entry.header)) continue;
+        if (field == CatalogImportField.stock &&
+            (_looksLikeMinOrderQty(entry.key) ||
+                _ambiguousStock.hasMatch(entry.key))) {
           continue;
         }
         if ((field == CatalogImportField.sku ||
@@ -173,12 +202,33 @@ class CatalogImportHeaderGuess {
             _looksLikeParentSku(entry.key)) {
           continue;
         }
-        if (entry.key == pattern || entry.key.contains(pattern)) {
+        if (field == CatalogImportField.priceUsd &&
+            _offerPrice.hasMatch(entry.key)) {
+          continue;
+        }
+        if (field == CatalogImportField.sku &&
+            _secondaryCode.hasMatch(entry.key)) continue;
+        if (exact ? entry.key == pattern : _matchesPrefix(entry.key, pattern)) {
           return entry.header;
         }
       }
     }
     return null;
+  }
+
+  static bool _matchesPrefix(String key, String pattern) {
+    const exactOnly = {'ref', 'item', 'art', 'part', 'exist', 'sale', 'promo'};
+    return !exactOnly.contains(pattern) && key.startsWith('${pattern}_');
+  }
+
+  static int headerScore(List<String> cells) {
+    final fields = suggestAll(cells);
+    final required = catalogImportRequiredFields
+        .where((field) => fields.containsKey(field.key))
+        .length;
+    final hasSku = fields.containsKey(CatalogImportField.sku.key);
+    final hasName = fields.containsKey(CatalogImportField.name.key);
+    return required >= 2 && (hasSku || hasName) ? required : 0;
   }
 
   static bool _looksLikeParentSku(String normalizedHeader) {
@@ -198,6 +248,10 @@ class CatalogImportHeaderGuess {
     return raw
         .trim()
         .toLowerCase()
+        .replaceAllMapped(RegExp('[áéíóúüñ]'), (match) {
+          const accents = 'áéíóúüñ';
+          return 'aeiouun'[accents.indexOf(match[0]!)];
+        })
         .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
         .replaceAll(RegExp(r'^_|_$'), '');
   }

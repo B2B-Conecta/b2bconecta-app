@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -18,12 +19,16 @@ enum CatalogImportPreviewDetailsAction {
 }
 
 /// Modal compacto para revisar el archivo: desglose, búsqueda, paginado 10/20.
-Future<CatalogImportPreviewDetailsAction?> showCatalogImportPreviewDetailsDialog({
+Future<CatalogImportPreviewDetailsAction?>
+    showCatalogImportPreviewDetailsDialog({
   required BuildContext context,
   required CatalogImportPreview preview,
   required String fileName,
   required Set<String> coreHeaders,
   required Set<String> erpHeaders,
+  Future<Map<String, String>?> Function(int row, Map<String, String> values)?
+      onEditRow,
+  int rowOffset = 0,
 }) {
   return showGeneralDialog<CatalogImportPreviewDetailsAction>(
     context: context,
@@ -37,6 +42,8 @@ Future<CatalogImportPreviewDetailsAction?> showCatalogImportPreviewDetailsDialog
         fileName: fileName,
         coreHeaders: coreHeaders,
         erpHeaders: erpHeaders,
+        onEditRow: onEditRow,
+        rowOffset: rowOffset,
       );
     },
     transitionBuilder: (ctx, animation, secondary, child) {
@@ -60,12 +67,17 @@ class CatalogImportPreviewDetailsDialog extends StatefulWidget {
     required this.fileName,
     required this.coreHeaders,
     required this.erpHeaders,
+    this.onEditRow,
+    this.rowOffset = 0,
   });
 
   final CatalogImportPreview preview;
   final String fileName;
   final Set<String> coreHeaders;
   final Set<String> erpHeaders;
+  final Future<Map<String, String>?> Function(
+      int row, Map<String, String> values)? onEditRow;
+  final int rowOffset;
 
   @override
   State<CatalogImportPreviewDetailsDialog> createState() =>
@@ -86,9 +98,32 @@ class _CatalogImportPreviewDetailsDialogState
 
   bool get _isFull => _panelSize == CatalogImportPreviewPanelSize.full;
 
+  late final _rows = widget.preview.sampleRows.toList();
+  late final _sourceRows = Map<Map<String, String>, int>.identity()
+    ..addEntries([
+      for (var i = 0; i < widget.preview.sampleRowNumbers.length; i++)
+        MapEntry(_rows[i], widget.preview.sampleRowNumbers[i]),
+    ]);
+
+  Future<void> _editRow(Map<String, String> row) async {
+    final rowIndex = _sourceRows[row];
+    final edit = widget.onEditRow;
+    if (rowIndex == null || edit == null) return;
+    final changes = await edit(rowIndex, row);
+    if (!mounted || changes == null) return;
+    setState(() {
+      final position = _rows.indexOf(row);
+      final updated = {...row, ...changes};
+      _rows[position] = updated;
+      _sourceRows.remove(row);
+      _sourceRows[updated] = rowIndex;
+      _pageIndex = 0;
+    });
+  }
+
   List<Map<String, String>> get _filteredRows {
     final q = _query.trim().toLowerCase();
-    final rows = widget.preview.sampleRows;
+    final rows = _rows;
     if (q.isEmpty) return rows;
     return [
       for (final row in rows)
@@ -395,6 +430,7 @@ class _CatalogImportPreviewDetailsDialogState
       columnSpacing: columnSpacing,
       horizontalMargin: dense ? 8 : 14,
       columns: [
+        if (widget.onEditRow != null) const DataColumn(label: Text('Editar')),
         DataColumn(
           label: Text(
             '#',
@@ -423,9 +459,20 @@ class _CatalogImportPreviewDetailsDialogState
         for (var i = 0; i < rows.length; i++)
           DataRow(
             cells: [
+              if (widget.onEditRow != null)
+                DataCell(IconButton(
+                  tooltip:
+                      'Editar fila ${(_sourceRows[rows[i]] ?? 0) + widget.rowOffset}',
+                  onPressed: _sourceRows.containsKey(rows[i])
+                      ? () => unawaited(_editRow(rows[i]))
+                      : null,
+                  icon: const Icon(Icons.edit_outlined, size: 17),
+                )),
               DataCell(
                 Text(
-                  '${_pageIndex * _pageSize + i + 1}',
+                  _sourceRows[rows[i]] == null
+                      ? '${_pageIndex * _pageSize + i + 1}'
+                      : '${_sourceRows[rows[i]]! + widget.rowOffset}',
                   style: TextStyle(
                     fontSize: fontSize,
                     fontWeight: FontWeight.w700,

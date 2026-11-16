@@ -181,7 +181,7 @@ Future<PickedDocumentBytes?> pickSpreadsheetFile() async {
   }
   final res = await FilePicker.platform.pickFiles(
     type: FileType.custom,
-    allowedExtensions: const ['xlsx', 'csv'],
+    allowedExtensions: const ['xlsx', 'xlsm', 'csv'],
     withData: true,
   );
   return _fromPlatformFile(res, fallbackName: 'catalogo.xlsx');

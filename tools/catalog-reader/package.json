@@ -1,0 +1,22 @@
+{
+  "name": "b2b-catalog-reader",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node prepare-ocr.mjs && node prepare-photo.mjs && vite build"
+  },
+  "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "onnxruntime-web": "1.22.0",
+    "pdfjs-dist": "5.4.624",
+    "tesseract.js": "6.0.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "vite": "6.4.1"
+  }
+}

@@ -1,3 +1,4 @@
+import 'inventory_service.dart';
 import 'product_image_bulk_result.dart';
 import 'product_image_bulk_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -11,6 +12,7 @@ class ProductImageBulkOrchestrator {
     required ProductImageBulkPreview preview,
     required Map<String, ProductSkuImageIndexEntry> skuIndex,
     required ProductImageBulkMergeMode mode,
+    bool atomicFillEmpty = false,
     void Function(int done, int total)? onProgress,
   }) async {
     final errors = <ProductImageBulkError>[];
@@ -20,11 +22,13 @@ class ProductImageBulkOrchestrator {
     final work = <String, List<ProductImageBulkFile>>{};
     for (final e in preview.bySku.entries) {
       if (!skuIndex.containsKey(e.key)) continue;
-      if (e.value.length > kMaxProductImages) {
+      if (e.value.length > kMaxProductImages ||
+          e.value.map((file) => file.slot).toSet().length != e.value.length) {
         errors.add(
           ProductImageBulkError(
             sku: e.value.first.sku,
-            message: 'Más de $kMaxProductImages fotos en el ZIP',
+            message:
+                'Más de $kMaxProductImages fotos o posiciones repetidas en el ZIP',
           ),
         );
         continue;
@@ -76,7 +80,9 @@ class ProductImageBulkOrchestrator {
         }
       }
 
-      if (uploadedBySlot.isEmpty) {
+      if (uploadedBySlot.isEmpty ||
+          ((atomicFillEmpty || mode == ProductImageBulkMergeMode.replace) &&
+              uploadedBySlot.length != bySlot.length)) {
         skipped++;
         done++;
         onProgress?.call(done, total);
@@ -91,12 +97,20 @@ class ProductImageBulkOrchestrator {
 
       if (merged.isEmpty) {
         skipped++;
+      } else if (atomicFillEmpty) {
+        if (await InventoryService.fillProductGalleryIfEmpty(
+          productId: entry.productId,
+          urls: merged,
+        )) {
+          updated++;
+        } else {
+          skipped++;
+        }
       } else {
         batchRows.add({
           'product_id': entry.productId,
           'image_urls': merged,
         });
-        updated++;
       }
 
       done++;
@@ -113,6 +127,8 @@ class ProductImageBulkOrchestrator {
         final rpc = await SupabaseService.importadorBulkSetProductImages(
           rows: chunk,
         );
+        updated += rpc.updated;
+        skipped += rpc.skipped;
         errors.addAll(rpc.errors);
       }
     }

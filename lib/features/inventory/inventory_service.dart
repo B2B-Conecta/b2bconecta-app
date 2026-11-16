@@ -243,10 +243,8 @@ class InventoryService {
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) return 0;
-    dynamic query = SupabaseAccess.client
-        .from('products')
-        .select('id')
-        .eq('owner_id', uid);
+    dynamic query =
+        SupabaseAccess.client.from('products').select('id').eq('owner_id', uid);
     query = _applyMyInventoryFilters(
       query,
       searchQuery: searchQuery,
@@ -659,38 +657,76 @@ class InventoryService {
     }).eq('id', productId);
   }
 
+  /// Stable, owner-scoped pages; stays below the API row cap.
+  static Stream<List<Map<String, dynamic>>> readMyInventoryPages(String fields,
+      {int? limit}) async* {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null)
+      throw StateError('Inicia sesión para consultar tu inventario.');
+    const pageSize = 500;
+    String? lastId;
+    var remaining = limit;
+    while (remaining == null || remaining > 0) {
+      final size =
+          remaining == null || remaining >= pageSize ? pageSize : remaining;
+      var query = SupabaseAccess.client
+          .from('products')
+          .select(fields)
+          .eq('owner_id', uid);
+      if (lastId != null) query = query.gt('id', lastId);
+      final rows = await query.order('id').limit(size);
+      if (rows.isEmpty) return;
+      yield rows;
+      lastId = rows.last['id'] as String;
+      if (remaining != null) remaining -= rows.length;
+    }
+  }
+
   /// Mapa sku (lower) → { id, imageUrls } para carga masiva de fotos.
   static Future<Map<String, ProductSkuImageIndexEntry>>
       fetchMyInventorySkuImageIndex({
-    int limit = 5000,
+    int? limit,
   }) async {
-    final uid = SupabaseAccess.currentUserId;
-    if (uid == null) return {};
-
-    final response = await SupabaseAccess.client
-        .from('products')
-        .select('id, sku, image_urls, image_url')
-        .eq('owner_id', uid)
-        .limit(limit);
-
     final map = <String, ProductSkuImageIndexEntry>{};
-    for (final row in response as List<dynamic>) {
-      final m = Map<String, dynamic>.from(row as Map);
-      final sku = m['sku']?.toString().trim() ?? '';
-      if (sku.isEmpty) continue;
-      final id = m['id']?.toString() ?? '';
-      if (id.isEmpty) continue;
-      final urls = parseProductImageUrlsJson(
-        m['image_urls'],
-        legacyImageUrl: m['image_url']?.toString(),
-      );
-      map[sku.toLowerCase()] = ProductSkuImageIndexEntry(
-        productId: id,
-        sku: sku,
-        imageUrls: urls,
-      );
+    await for (final page in readMyInventoryPages(
+      'id, sku, image_urls, image_url',
+      limit: limit,
+    )) {
+      for (final m in page) {
+        final sku = m['sku']?.toString().trim() ?? '';
+        if (sku.isEmpty) continue;
+        final id = m['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        final urls = parseProductImageUrlsJson(
+          m['image_urls'],
+          legacyImageUrl: m['image_url']?.toString(),
+        );
+        map[sku.toLowerCase()] = ProductSkuImageIndexEntry(
+          productId: id,
+          sku: sku,
+          imageUrls: urls,
+        );
+      }
     }
     return map;
+  }
+
+  /// Fills an empty gallery only if it is still empty when the write runs.
+  static Future<bool> fillProductGalleryIfEmpty({
+    required String productId,
+    required List<String> urls,
+  }) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    final updated = await SupabaseAccess.client
+        .from('products')
+        .update({'image_urls': urls})
+        .eq('id', productId)
+        .eq('owner_id', uid)
+        .filter('image_urls', 'eq', '[]')
+        .or('image_url.is.null,image_url.eq.')
+        .select('id');
+    return updated.isNotEmpty;
   }
 
   static Future<ProductImageBulkResult> importadorBulkSetProductImages({
@@ -703,7 +739,9 @@ class InventoryService {
       params: {'p_rows': rows},
     );
 
-    if (res is! Map) return const ProductImageBulkResult();
+    if (res is! Map) {
+      throw StateError('La base no confirmó la actualización de las fotos.');
+    }
 
     final errorsRaw = res['errors'];
     final errors = <ProductImageBulkError>[];
@@ -712,6 +750,7 @@ class InventoryService {
         if (e is Map) {
           errors.add(
             ProductImageBulkError(
+              sku: e['sku']?.toString(),
               message: e['message']?.toString() ?? 'Error',
             ),
           );

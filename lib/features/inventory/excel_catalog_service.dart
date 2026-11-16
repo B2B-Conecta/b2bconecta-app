@@ -142,15 +142,17 @@ class ExcelCatalogService {
 
   /// Exporta filas reales del inventario del importador con el mismo layout
   /// que la plantilla de carga masiva.
-  static Uint8List buildInventoryExportBytes(List<PartModel> parts) {
+  static Uint8List buildInventoryExportBytes(List<PartModel> parts) =>
+      buildInventoryRowsBytes(parts.map(inventoryExportCells));
+
+  static Uint8List buildInventoryRowsBytes(Iterable<List<String>> rows) {
     final excel = Excel.createExcel();
     final sheet = excel['Sheet1'];
     sheet.appendRow(
       templateHeaders.map((h) => TextCellValue(h)).toList(),
     );
 
-    for (final p in parts) {
-      final row = inventoryExportCells(p);
+    for (final row in rows) {
       if (row.length != templateHeaders.length) {
         throw StateError(
           'Exportación desalineada: ${row.length} celdas vs '

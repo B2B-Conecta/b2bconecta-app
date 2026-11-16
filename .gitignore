@@ -48,6 +48,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/tools/catalog-reader/node_modules/
+/tools/catalog-reader/public/
+/web/assets/catalog-reader/
 
 # Symbolication related
 app.*.symbols

@@ -45,7 +45,8 @@ extension CatalogImportFieldX on CatalogImportField {
   bool get isRequired => switch (this) {
         CatalogImportField.sku ||
         CatalogImportField.name ||
-        CatalogImportField.priceUsd =>
+        CatalogImportField.priceUsd ||
+        CatalogImportField.stock =>
           true,
         _ => false,
       };
@@ -86,4 +87,5 @@ const catalogImportRequiredFields = [
   CatalogImportField.sku,
   CatalogImportField.name,
   CatalogImportField.priceUsd,
+  CatalogImportField.stock,
 ];

@@ -84,6 +84,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
   void _onNotificationPedidosDeepLink() {
     _prepareImporterFilterForNotificationDeepLink();
+    final search = MainShellTabController.consumeImporterPedidosSearch();
+    if (search != null && search.isNotEmpty) {
+      setState(() => _searchCtrl.text = search);
+    }
     final expanded = _tryApplyExpandFromPendingNotification();
     if (!expanded && !_loading) {
       _load(silent: true);

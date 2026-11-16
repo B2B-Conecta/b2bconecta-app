@@ -4,6 +4,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'shell/admin_shell_top_bar.dart';
 import 'shell/desktop_navigation_shell.dart';
 import 'shell/shell_destination.dart';
+import 'shell/shell_nav_badge.dart';
 
 /// Shell web/escritorio para aliados e importadores.
 class B2bDesktopShell extends StatelessWidget {
@@ -31,7 +32,11 @@ class B2bDesktopShell extends StatelessWidget {
     this.pageIndex,
     this.railSelectionActive = true,
     this.accountFooterSelected = false,
+    this.accountOpensMenu = false,
     this.breadcrumbsOverride,
+    this.navBadges,
+    this.resolveNavBadge,
+    this.onOpenGlobalSearch,
   });
 
   final int selectedIndex;
@@ -70,7 +75,14 @@ class B2bDesktopShell extends StatelessWidget {
   /// Resalta la tarjeta inferior de cuenta.
   final bool accountFooterSelected;
 
+  /// La tarjeta abre el menú de cuenta (Perfil y Configuración).
+  final bool accountOpensMenu;
+
   final List<AdminShellBreadcrumb>? breadcrumbsOverride;
+
+  final Listenable? navBadges;
+  final ShellNavBadge? Function(Object? key)? resolveNavBadge;
+  final VoidCallback? onOpenGlobalSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +109,11 @@ class B2bDesktopShell extends StatelessWidget {
       pageIndex: pageIndex,
       railSelectionActive: railSelectionActive,
       accountFooterSelected: accountFooterSelected,
+      accountOpensMenu: accountOpensMenu,
       breadcrumbsOverride: breadcrumbsOverride,
+      navBadges: navBadges,
+      resolveNavBadge: resolveNavBadge,
+      onOpenGlobalSearch: onOpenGlobalSearch,
     );
   }
 }

@@ -91,7 +91,12 @@ Future<void> showImporterAliadoKycDetailSheet(
 
 /// Directorio de aliados con KYC aprobado (importador).
 class ImporterKycApprovedAliadosPanel extends StatefulWidget {
-  const ImporterKycApprovedAliadosPanel({super.key});
+  const ImporterKycApprovedAliadosPanel({
+    super.key,
+    this.initiallyExpanded = false,
+  });
+
+  final bool initiallyExpanded;
 
   @override
   State<ImporterKycApprovedAliadosPanel> createState() =>
@@ -170,7 +175,7 @@ class _ImporterKycApprovedAliadosPanelState
     return ProfileCollapsibleSection(
       title: 'Tiendas minoristas verificados (KYC)',
       subtitle: _sectionSubtitle(),
-      initiallyExpanded: false,
+      initiallyExpanded: widget.initiallyExpanded,
       infoMessage: 'Tiendas minoristas con KYC aprobado',
       trailingActions: [
         IconButton(

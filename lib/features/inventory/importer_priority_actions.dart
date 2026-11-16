@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 class ImporterPriorityAction {
   const ImporterPriorityAction({
@@ -10,6 +11,10 @@ class ImporterPriorityAction {
     this.onTap,
     this.tooltip,
     this.iconColor,
+    this.glyph,
+    this.cta,
+    this.footnote,
+    this.attention = false,
   });
 
   final String label;
@@ -18,6 +23,12 @@ class ImporterPriorityAction {
   final VoidCallback? onTap;
   final String? tooltip;
   final Color? iconColor;
+  final LucideGlyph? glyph;
+  final String? cta;
+  final String? footnote;
+
+  /// Resalta el valor cuando hay trabajo pendiente.
+  final bool attention;
 }
 
 /// Accesos del panel del importador. El valor "—" se usa si el conteo falló.
@@ -67,96 +78,124 @@ class ImporterPriorityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final card = Semantics(
-        label: '${action.value} ${action.label}',
-        button: action.onTap != null,
-        child: Material(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: action.onTap,
-            borderRadius: BorderRadius.circular(12),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(compact ? 16 : 10),
-                child: compact
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                            Row(children: [
-                              ExcludeSemantics(
-                                  child: Icon(action.icon,
-                                      color: action.iconColor ??
-                                          AppColors.brandLink,
-                                      size: 24)),
-                              const SizedBox(width: 12),
-                              Flexible(
-                                  child: ExcludeSemantics(
-                                      child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(action.value,
-                                              style: TextStyle(
-                                                  fontSize: 26,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: AppColors
-                                                      .textPrimary))))),
-                            ]),
-                            const SizedBox(height: 6),
-                            ExcludeSemantics(
-                                child: Text(action.label,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        height: 1.3,
-                                        color: AppColors.textSecondary))),
-                          ])
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ExcludeSemantics(
-                              child: Icon(action.icon,
-                                  color:
-                                      action.iconColor ?? AppColors.brandLink,
-                                  size: 20)),
-                          const SizedBox(height: 6),
-                          ExcludeSemantics(
-                              child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    action.value,
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ))),
-                          const SizedBox(height: 4),
-                          ExcludeSemantics(
-                              child: Align(
-                                  alignment: Alignment.topLeft,
-                                  child: Text(
-                                    action.label,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textSecondary,
-                                      height: 1.2,
-                                    ),
-                                  ))),
-                        ],
-                      ),
-              ),
+    final theme = B2BThemeExtension.of(context);
+    final accent = action.iconColor ?? theme.brand;
+    final valueColor = action.attention ? theme.brand : theme.textPrimary;
+    final footnoteColor = action.footnote == 'Al día'
+        ? theme.successFg
+        : theme.textSecondary;
+    Widget glyph() {
+      final icon = action.glyph == null
+          ? Icon(action.icon, color: accent, size: compact ? 22 : 20)
+          : LucideIcon(action.glyph!, size: compact ? 20 : 18, color: accent);
+      return ExcludeSemantics(child: icon);
+    }
+
+    Widget valueText(double size) => ExcludeSemantics(
+          child: Text(
+            action.value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: size,
+              fontWeight: FontWeight.w800,
+              color: valueColor,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-        ));
+        );
+
+    final body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          glyph(),
+          const SizedBox(width: 8),
+          Flexible(child: valueText(compact ? 26 : 24)),
+          if (action.attention) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.brandContainer,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Urgente',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: theme.brand,
+                ),
+              ),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 6),
+        Text(
+          action.label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 13 : 12,
+            height: 1.25,
+            fontWeight: FontWeight.w600,
+            color: theme.textSecondary,
+          ),
+        ),
+        if (action.footnote != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            action.footnote!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: footnoteColor,
+            ),
+          ),
+        ],
+        if (action.cta != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            action.cta!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: theme.brand,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final card = Semantics(
+      label: '${action.value} ${action.label}',
+      button: action.onTap != null,
+      child: Material(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: action.onTap,
+          hoverColor: theme.brand.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.borderSubtle),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 14 : 10),
+              child: body,
+            ),
+          ),
+        ),
+      ),
+    );
     return action.tooltip == null
         ? card
         : Tooltip(message: action.tooltip!, child: card);

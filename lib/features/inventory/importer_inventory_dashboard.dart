@@ -1270,10 +1270,14 @@ class _ImporterInventoryDashboardState
       _categoryFilter = 'Todas';
       _photoFilter = ProductPhotoListFilter.all;
       _filterLowStock = false;
-      _filterActiveOnly = false;
       _filterHidden = request == 'pausados';
       _filterOutOfStock = request == 'sin_stock';
+      _filterActiveOnly = request == 'activos';
       _filterInStock = false;
+      final search = MainShellTabController.consumeImporterCatalogSearch();
+      if (search != null && search.isNotEmpty) {
+        _searchController.text = search;
+      }
     });
     _reloadInventory(refreshMetrics: false);
   }

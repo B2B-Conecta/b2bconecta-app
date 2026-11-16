@@ -4,7 +4,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "ve.com.b2bconecta.app",
-      "sha256_cert_fingerprints": []
+      "sha256_cert_fingerprints": [
+        "1E:BD:78:C8:49:6C:87:EC:77:49:F5:2F:8C:FB:C4:84:3B:49:69:CF:30:15:21:80:90:3B:C1:DC:C9:E4:A8:BC"
+      ]
     }
   }
 ]

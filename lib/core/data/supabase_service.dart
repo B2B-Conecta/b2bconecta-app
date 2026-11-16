@@ -1216,6 +1216,9 @@ class SupabaseService {
   static Future<int?> countMyPendingCommissionInvoices() =>
       InventoryService.countMyPendingCommissionInvoices();
 
+  static Future<double?> sumMyPendingCommissionUsd() =>
+      InventoryService.sumMyPendingCommissionUsd();
+
   static Future<List<AdminUserActivityRowModel>>
       listAdminUserActivityMonitoring({
     String? role,

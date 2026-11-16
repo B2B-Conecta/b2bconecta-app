@@ -188,6 +188,27 @@ class InventoryService {
     }
   }
 
+  /// Suma USD de cortes de comisión emitidos y aún sin pagar.
+  static Future<double?> sumMyPendingCommissionUsd() async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return null;
+    try {
+      final res = await SupabaseAccess.client
+          .from('commission_settlements')
+          .select('total_commission_usd')
+          .eq('importador_id', uid)
+          .eq('status', 'emitido');
+      var sum = 0.0;
+      for (final row in res as List<dynamic>) {
+        final raw = (row as Map)['total_commission_usd'];
+        if (raw is num) sum += raw.toDouble();
+      }
+      return sum;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<ImporterSalesSnapshot> fetchMySalesSnapshot({
     int days = 30,
   }) async {

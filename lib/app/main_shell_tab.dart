@@ -83,6 +83,8 @@ class MainShellTabController {
   static bool _importerPedidosPreferEnProcesoFilter = false;
   static bool _importerPedidosPreferCerradosFilter = false;
   static String? _pendingImporterPedidosExploreFilter;
+  static String? _pendingImporterPedidosSearch;
+  static String? _pendingImporterCatalogSearch;
   static String? _pendingNotificationType;
   static bool _pendingOpenOrderChat = false;
   static VoidCallback? _notificationsReload;
@@ -157,6 +159,8 @@ class MainShellTabController {
     _importerPedidosPreferEnProcesoFilter = false;
     _importerPedidosPreferCerradosFilter = false;
     _pendingImporterPedidosExploreFilter = null;
+    _pendingImporterPedidosSearch = null;
+    _pendingImporterCatalogSearch = null;
     _pendingNotificationType = null;
     _pendingOpenOrderChat = false;
     _notificationsReload = null;
@@ -226,6 +230,46 @@ class MainShellTabController {
   static void navigateToHomeTab() => _goTo?.call(_homeTabIndex);
 
   static void navigateToPedidosTab() => _goTo?.call(_b2bPedidosTabIndex);
+
+  static void notifyPedidosDeepLink() => _pedidosNotificationDeepLink?.call();
+
+  /// Abre Pedidos y prellena el buscador (tienda, folio o estado).
+  static void navigateToImporterPedidosSearch(String query) {
+    final q = query.trim();
+    _pendingImporterPedidosSearch = q.isEmpty ? null : q;
+    _goTo?.call(_b2bPedidosTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _pedidosNotificationDeepLink?.call();
+    });
+  }
+
+  static String? consumeImporterPedidosSearch() {
+    final v = _pendingImporterPedidosSearch;
+    _pendingImporterPedidosSearch = null;
+    return v;
+  }
+
+  /// Abre Inventario con el buscador de nombre o SKU.
+  static void navigateToImporterInventorySearch(String query) {
+    final q = query.trim();
+    _pendingImporterCatalogSearch = q.isEmpty ? null : q;
+    navigateToImporterInventory();
+  }
+
+  static String? consumeImporterCatalogSearch() {
+    final v = _pendingImporterCatalogSearch;
+    _pendingImporterCatalogSearch = null;
+    return v;
+  }
+
+  /// Abre el pedido en la bandeja del importador.
+  static void openImporterOrder(String requestId) {
+    setPendingNotificationRelatedId(requestId);
+    _goTo?.call(_b2bPedidosTabIndex);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _pedidosNotificationDeepLink?.call();
+    });
+  }
 
   static void navigateToAliadoFavorites() =>
       _goTo?.call(AliadoShellTabs.favoritos);

@@ -4,6 +4,8 @@ import 'promo_campaign_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'aliado_promo_campaign_widgets.dart';
 
 String _formatPromoRange(DateTime start, DateTime end) {
@@ -149,13 +151,24 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
           return const SizedBox.shrink();
         }
         final campaigns = snapshot.data ?? const <PromoCampaignModel>[];
-        if (campaigns.isEmpty) return const SizedBox.shrink();
+        final theme = B2BThemeExtension.of(context);
+        final countLabel = campaigns.isEmpty
+            ? 'Sin promociones activas'
+            : campaigns.length == 1
+                ? '1 promoción activa'
+                : '${campaigns.length} promociones activas';
+        final detail = campaigns.isEmpty
+            ? 'Cuando publique una campaña, las tiendas la verán en el catálogo.'
+            : '«${campaigns.first.promoLabel}»';
 
         return Padding(
           padding: widget.padding ?? const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Material(
-            color: AppColors.brand.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
+            color: theme.surfaceCard,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.brand.withOpacity(0.45)),
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => _showDetailSheet(context, campaigns),
@@ -164,10 +177,10 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.campaign_outlined,
-                      color: AppColors.brand,
-                      size: 22,
+                    LucideIcon(
+                      LucideGlyph.megaphone,
+                      color: theme.brand,
+                      size: 20,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -175,31 +188,55 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            campaigns.length == 1
-                                ? 'Promoción activa en catálogo tienda minorista'
-                                : '${campaigns.length} promociones activas en catálogo tienda minorista',
+                            'Promociones activas',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 13.5,
-                              color: AppColors.textPrimary,
+                              color: theme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            countLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: theme.brand,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Las tiendas minoristas pueden ver su campaña «${campaigns.first.promoLabel}». '
-                            'Los pedidos solicitados desde la promoción aparecerán marcados.',
+                            detail,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.35,
-                              color: AppColors.textPrimary,
+                              color: theme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            campaigns.isEmpty
+                                ? 'Ver promociones'
+                                : 'Editar o revisar',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: theme.brand,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right,
-                      color: AppColors.textSecondary,
+                    LucideIcon(
+                      LucideGlyph.chevronRight,
+                      size: 18,
+                      color: theme.textSecondary,
                     ),
                   ],
                 ),
@@ -215,9 +252,10 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
     BuildContext context,
     List<PromoCampaignModel> campaigns,
   ) async {
+    final theme = B2BThemeExtension.of(context);
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.dialogSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -230,22 +268,25 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Sus promociones activas',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
+                    color: theme.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Mientras estén vigentes, los pedidos que una tienda minorista solicite '
-                  'tras usar «Ver proveedor» en su campaña se marcarán como '
-                  '«Pedido bajo promoción».',
+                  campaigns.isEmpty
+                      ? 'No hay campañas vigentes. Puede publicarlas desde el panel de promociones.'
+                      : 'Mientras estén vigentes, los pedidos que una tienda minorista solicite '
+                          'tras usar «Ver proveedor» en su campaña se marcarán como '
+                          '«Pedido bajo promoción».',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.35,
-                    color: AppColors.textPrimary,
+                    color: theme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -265,8 +306,12 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                             errorBuilder: (_, __, ___) => Container(
                               width: 56,
                               height: 56,
-                              color: AppColors.fieldFill,
-                              child: const Icon(Icons.image_outlined),
+                              color: theme.inputFill,
+                              child: LucideIcon(
+                                LucideGlyph.image,
+                                size: 18,
+                                color: theme.textMuted,
+                              ),
                             ),
                           ),
                         ),
@@ -277,9 +322,10 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                             children: [
                               Text(
                                 c.promoLabel,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14,
+                                  color: theme.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -288,7 +334,7 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
                                 '${_formatPromoRange(c.startsAt, c.endsAt)}',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: theme.textSecondary,
                                 ),
                               ),
                             ],

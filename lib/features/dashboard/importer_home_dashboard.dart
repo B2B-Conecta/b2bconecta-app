@@ -1,11 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
+import 'package:motolink_pro_app/features/dashboard/importer_recent_orders_card.dart';
 import 'package:motolink_pro_app/features/inventory/importer_onboarding_checklist.dart';
 import 'package:motolink_pro_app/features/inventory/importer_onboarding_checklist_card.dart';
 import 'package:motolink_pro_app/features/inventory/importer_priority_actions.dart';
@@ -28,8 +30,7 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
   late Future<InventoryMetrics> _metrics;
   late Future<int?> _orders;
   late Future<int?> _commissions;
-  late Future<int?> _stores;
-  Timer? _storeRefresh;
+  late Future<double?> _commissionUsd;
   late Future<ImporterSalesSnapshot> _sales;
   int _days = 30;
   int _revision = 0;
@@ -38,7 +39,6 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
   void initState() {
     super.initState();
     _load();
-    _configureStoreRefresh();
     MainShellTabController.registerImporterHomeReload(_reload);
   }
 
@@ -46,30 +46,8 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
     _metrics = SupabaseService.fetchMyInventoryMetrics();
     _orders = SupabaseService.countMyNewOrders();
     _commissions = SupabaseService.countMyPendingCommissionInvoices();
-    _stores = widget.embedInDesktopShell ? Future.value(null) : _loadStores();
+    _commissionUsd = SupabaseService.sumMyPendingCommissionUsd();
     _sales = SupabaseService.fetchMySalesSnapshot(days: _days);
-  }
-
-  Future<int?> _loadStores() async =>
-      (await SupabaseService.fetchImporterDailyStoreNotice()).panelCount;
-
-  void _configureStoreRefresh() {
-    _storeRefresh?.cancel();
-    if (!widget.embedInDesktopShell) {
-      _storeRefresh = Timer.periodic(const Duration(minutes: 5), (_) {
-        final next = _loadStores();
-        setState(() => _stores = next);
-      });
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant ImporterHomeDashboard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.embedInDesktopShell != widget.embedInDesktopShell) {
-      _stores = widget.embedInDesktopShell ? Future.value(null) : _loadStores();
-      _configureStoreRefresh();
-    }
   }
 
   void _reload() => setState(() {
@@ -84,14 +62,13 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
       _metrics.then<void>((_) {}, onError: (Object _) {}),
       _orders.then<void>((_) {}, onError: (Object _) {}),
       _commissions.then<void>((_) {}, onError: (Object _) {}),
-      _stores.then<void>((_) {}, onError: (Object _) {}),
+      _commissionUsd.then<void>((_) {}, onError: (Object _) {}),
       _sales.then<void>((_) {}, onError: (Object _) {}),
     ]);
   }
 
   @override
   void dispose() {
-    _storeRefresh?.cancel();
     MainShellTabController.registerImporterHomeReload(null);
     super.dispose();
   }
@@ -105,203 +82,309 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
 
   Widget _summary(AsyncSnapshot<InventoryMetrics> metrics) =>
       FutureBuilder<int?>(
-          future: _orders,
-          builder: (context, orders) => FutureBuilder<int?>(
-              future: _commissions,
-              builder: (context, commissions) {
-                final actions = [
-                  ImporterPriorityAction(
-                      label: 'Pedidos por confirmar',
-                      value: _count(orders),
-                      icon: Icons.inbox_outlined,
-                      onTap: () => MainShellTabController
-                          .navigateToImporterPedidosExplore('nuevos')),
-                  ImporterPriorityAction(
-                      label: 'Comisiones por pagar',
-                      value: _count(commissions),
-                      icon: Icons.receipt_long_outlined,
-                      onTap: MainShellTabController
-                          .navigateToImporterPendingCommissions),
+        future: _orders,
+        builder: (context, orders) => FutureBuilder<int?>(
+          future: _commissions,
+          builder: (context, commissions) => FutureBuilder<double?>(
+            future: _commissionUsd,
+            builder: (context, usd) {
+              final pending = orders.data;
+              final invoiceCount = commissions.data;
+              final settled = commissions.connectionState ==
+                      ConnectionState.done &&
+                  !commissions.hasError &&
+                  invoiceCount == 0;
+              final amount = usd.data;
+              final actions = [
+                ImporterPriorityAction(
+                  label: 'Pedidos por confirmar',
+                  value: _count(orders),
+                  icon: Icons.inbox_outlined,
+                  glyph: LucideGlyph.shoppingCart,
+                  cta: 'Gestionar pedidos →',
+                  attention: pending != null && pending > 0,
+                  onTap: () => MainShellTabController
+                      .navigateToImporterPedidosExplore('nuevos'),
+                ),
+                ImporterPriorityAction(
+                  label: 'Comisiones por pagar',
+                  value: _count(commissions),
+                  icon: Icons.receipt_long_outlined,
+                  glyph: LucideGlyph.badgeDollarSign,
+                  footnote: settled
+                      ? 'Al día'
+                      : (amount == null
+                          ? null
+                          : 'USD ${formatRefAmount(amount)}'),
+                  cta: 'Ver comisiones →',
+                  attention: invoiceCount != null && invoiceCount > 0,
+                  onTap: MainShellTabController
+                      .navigateToImporterPendingCommissions,
+                ),
+              ];
+              final inventory = _inventorySummary(metrics);
+              return LayoutBuilder(builder: (context, constraints) {
+                final row = constraints.maxWidth >= AppBreakpoints.mobileMenu;
+                final cards = [
+                  for (final action in actions)
+                    ImporterPriorityCard(action: action, compact: row),
+                  inventory,
                 ];
-                final inventory = _inventorySummary(metrics);
-                if (widget.embedInDesktopShell) {
-                  return LayoutBuilder(builder: (context, constraints) {
-                    final cardWidth = (constraints.maxWidth - 24) / 4;
-                    return IntrinsicHeight(
-                        child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                          for (final action in actions) ...[
-                            SizedBox(
-                                width: cardWidth,
-                                child: ConstrainedBox(
-                                    constraints:
-                                        const BoxConstraints(minHeight: 112),
-                                    child: ImporterPriorityCard(
-                                        action: action, compact: true))),
-                            const SizedBox(width: 12),
-                          ],
-                          SizedBox(width: cardWidth * 2, child: inventory),
-                        ]));
-                  });
+                if (!row) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        cards[i],
+                      ],
+                    ],
+                  );
                 }
-                return FutureBuilder<int?>(
-                    future: _stores,
-                    builder: (context, stores) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ImporterPriorityActions(actions: [
-                                ...actions,
-                                ImporterPriorityAction(
-                                    label: stores.data == 1
-                                        ? 'Tienda activa'
-                                        : 'Tiendas activas',
-                                    value: _count(stores),
-                                    icon: Icons.storefront_outlined,
-                                    iconColor: AppColors.successGreen,
-                                    tooltip:
-                                        'Tiendas minoristas con verificación aprobada, '
-                                        'cuenta activa y RIF distinto.'),
-                              ]),
-                              const SizedBox(height: 16),
-                              inventory,
-                            ]));
-              }));
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < cards.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 12),
+                      Expanded(child: cards[i]),
+                    ],
+                  ],
+                );
+              });
+            },
+          ),
+        ),
+      );
 
   Widget _inventorySummary(AsyncSnapshot<InventoryMetrics> snapshot) {
+    final theme = B2BThemeExtension.of(context);
     final metrics = snapshot.data;
+    final active = metrics == null
+        ? 0
+        : (metrics.totalProducts - metrics.paused)
+            .clamp(0, metrics.totalProducts);
     Widget filterChip(String label, [String? filter]) => ActionChip(
-        label: Text(label),
-        labelStyle:
-            widget.embedInDesktopShell ? const TextStyle(fontSize: 12) : null,
-        visualDensity:
-            widget.embedInDesktopShell ? VisualDensity.compact : null,
-        materialTapTargetSize: widget.embedInDesktopShell
-            ? MaterialTapTargetSize.shrinkWrap
-            : null,
-        onPressed: () =>
-            MainShellTabController.navigateToImporterInventory(filter: filter));
-    final chips = metrics == null
-        ? <Widget>[]
-        : [
-            filterChip('${metrics.totalProducts} productos'),
-            filterChip('${metrics.outOfStock} sin stock', 'sin_stock'),
-            filterChip('${metrics.paused} pausados', 'pausados'),
-          ];
+          label: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          labelStyle: const TextStyle(fontSize: 12),
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onPressed: () => MainShellTabController.navigateToImporterInventory(
+            filter: filter,
+          ),
+        );
     return Material(
-        key: const ValueKey('importer-inventory-summary'),
-        color: AppColors.fieldFill,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      key: const ValueKey('importer-inventory-summary'),
+      color: theme.surfaceCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              LucideIcon(LucideGlyph.package, size: 18, color: theme.brand),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Salud de inventario',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: theme.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () =>
+                    MainShellTabController.navigateToImporterInventory(),
+                child: const Text('Ver productos'),
+              ),
+            ]),
+            if (snapshot.hasError)
+              TextButton(
+                onPressed: _reload,
+                child: const Text('No se pudo cargar. Reintentar'),
+              )
+            else if (metrics == null)
+              Text(
+                'Cargando productos…',
+                style: TextStyle(fontSize: 12, color: theme.textSecondary),
+              )
+            else ...[
+              Text(
+                '${metrics.totalProducts} productos',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textSecondary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
                 children: [
-                  Row(children: [
-                    const Icon(Icons.inventory_2_outlined, size: 20),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                        child: Text('Tu inventario',
-                            style: TextStyle(fontWeight: FontWeight.w700))),
-                    TextButton(
-                        style: widget.embedInDesktopShell
-                            ? TextButton.styleFrom(
-                                minimumSize: const Size(0, 36),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                textStyle: const TextStyle(fontSize: 12))
-                            : null,
-                        onPressed: () => MainShellTabController
-                            .navigateToImporterInventory(),
-                        child: const Text('Ver productos')),
-                  ]),
-                  if (snapshot.hasError)
-                    TextButton(
-                        onPressed: _reload,
-                        child: const Text('No se pudo cargar. Reintentar'))
-                  else if (metrics == null)
-                    const Text('Cargando productos…')
-                  else
-                    Wrap(spacing: 8, runSpacing: 4, children: chips),
-                ])));
+                  filterChip('$active activos', 'activos'),
+                  filterChip('${metrics.outOfStock} sin stock', 'sin_stock'),
+                  filterChip('${metrics.paused} pausados', 'pausados'),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 720;
+      final wide = constraints.maxWidth >= AppBreakpoints.mobileMenu;
+      final splitOnboarding = constraints.maxWidth >= 1024;
       return RefreshIndicator(
         onRefresh: _refresh,
+        color: theme.brand,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(wide ? 0 : 16, 12, wide ? 0 : 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            widget.embedInDesktopShell || wide ? 0 : 16,
+            12,
+            widget.embedInDesktopShell || wide ? 0 : 16,
+            24,
+          ),
           children: [
             Row(children: [
               Expanded(
-                child: Text('Tu negocio, al día',
-                    style: TextStyle(
-                        fontSize: wide ? 22 : 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary)),
+                child: Text(
+                  'Tu negocio, al día',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: wide ? 22 : 20,
+                    fontWeight: FontWeight.w800,
+                    color: theme.textPrimary,
+                  ),
+                ),
               ),
               IconButton(
-                  tooltip: 'Actualizar resumen',
-                  onPressed: _reload,
-                  icon: const Icon(Icons.refresh)),
+                tooltip: 'Actualizar resumen',
+                onPressed: _reload,
+                icon: LucideIcon(
+                  LucideGlyph.refreshCw,
+                  size: 18,
+                  color: theme.textSecondary,
+                ),
+              ),
             ]),
             const SizedBox(height: 12),
             FutureBuilder<InventoryMetrics>(
-                future: _metrics,
-                builder: (context, snapshot) {
-                  final metrics = snapshot.data;
-                  final checklist = ImporterOnboardingChecklist.evaluate(
-                      profile: widget.profile, metrics: metrics);
-                  return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _summary(snapshot),
-                        if (metrics != null && !checklist.isComplete) ...[
-                          const SizedBox(height: 16),
-                          ImporterOnboardingChecklistCard(
-                              checklist: checklist,
-                              onOpenProfile: MainShellTabController
-                                  .navigateToProfileKycDocumentation,
-                              onAddProduct: () => MainShellTabController
-                                  .navigateToImporterInventory(
-                                      filter: 'agregar')),
-                        ],
-                      ]);
-                }),
+              future: _metrics,
+              builder: (context, snapshot) {
+                final metrics = snapshot.data;
+                final checklist = ImporterOnboardingChecklist.evaluate(
+                  profile: widget.profile,
+                  metrics: metrics,
+                );
+                final onboarding = metrics != null && !checklist.isComplete
+                    ? ImporterOnboardingChecklistCard(
+                        checklist: checklist,
+                        onOpenProfile: MainShellTabController
+                            .navigateToProfileKycDocumentation,
+                        onAddProduct: () =>
+                            MainShellTabController.navigateToImporterInventory(
+                          filter: 'agregar',
+                        ),
+                      )
+                    : null;
+                final promos = ImporterActivePromoBanner(
+                  key: ValueKey('promos-$_revision'),
+                  padding: EdgeInsets.zero,
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _summary(snapshot),
+                    if (onboarding != null) ...[
+                      const SizedBox(height: 16),
+                      if (splitOnboarding)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: onboarding),
+                            const SizedBox(width: 12),
+                            Expanded(child: promos),
+                          ],
+                        )
+                      else ...[
+                        onboarding,
+                        const SizedBox(height: 12),
+                        promos,
+                      ],
+                    ] else ...[
+                      const SizedBox(height: 16),
+                      promos,
+                    ],
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 16),
-            ImporterActivePromoBanner(
-                key: ValueKey('promos-$_revision'),
-                padding: const EdgeInsets.only(bottom: 16)),
             FutureBuilder<ImporterSalesSnapshot>(
-                future: _sales,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return TextButton.icon(
-                        onPressed: _reload,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text(
-                            'No se pudieron cargar las ventas. Reintentar'));
-                  }
-                  if (!snapshot.hasData) return const LinearProgressIndicator();
-                  return ImporterSalesSnapshotCard(
-                      snapshot: snapshot.data!,
-                      selectedDays: _days,
-                      onDaysChanged: (days) => setState(() {
-                            _days = days;
-                            _sales = SupabaseService.fetchMySalesSnapshot(
-                                days: days);
-                          }));
-                }),
+              future: _sales,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return TextButton.icon(
+                    onPressed: _reload,
+                    icon: LucideIcon(
+                      LucideGlyph.refreshCw,
+                      size: 16,
+                      color: theme.brand,
+                    ),
+                    label: const Text(
+                      'No se pudieron cargar las ventas. Reintentar',
+                    ),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return LinearProgressIndicator(
+                    minHeight: 2,
+                    color: theme.brand,
+                    backgroundColor: theme.borderSubtle,
+                  );
+                }
+                return ImporterSalesSnapshotCard(
+                  snapshot: snapshot.data!,
+                  selectedDays: _days,
+                  onDaysChanged: (days) => setState(() {
+                    _days = days;
+                    _sales = SupabaseService.fetchMySalesSnapshot(days: days);
+                  }),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            ImporterRecentOrdersCard(reloadToken: _revision),
             const SizedBox(height: 16),
             ImporterThirdPartyAdsCarousel(
-                key: ValueKey('ads-$_revision'),
-                padding: const EdgeInsets.only(top: 12)),
+              key: ValueKey('ads-$_revision'),
+              padding: const EdgeInsets.only(top: 4),
+            ),
           ],
         ),
       );

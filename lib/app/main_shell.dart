@@ -43,9 +43,10 @@ import 'package:motolink_pro_app/features/reputation/admin_order_ratings_panel.d
 import 'package:motolink_pro_app/features/orders/admin/admin_orders_panel.dart';
 import 'package:motolink_pro_app/features/support/admin_support_tickets_panel.dart';
 import 'package:motolink_pro_app/core/notifications/kyc_notification_match.dart';
-import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
-import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice_banner.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
+import 'package:motolink_pro_app/features/dashboard/importer_command_palette.dart';
+import 'package:motolink_pro_app/features/dashboard/importer_shell_badges.dart';
+import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_welcome_dialog.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
@@ -100,8 +101,8 @@ class _MainShellState extends State<MainShell> {
   late ProfileModel _profile;
   late final NotificationProvider _notifications;
   AdminShellBadges? _adminShellBadges;
+  ImporterShellBadges? _importerShellBadges;
   bool _showAliadoAccessApprovedBanner = false;
-  ImporterDailyStoreNotice? _dailyStoreNotice;
   Timer? _presenceTimer;
   String _aliadoAccessApprovedMessage =
       'Su acceso a B2B Conecta está habilitado. Ya puede operar en la plataforma.';
@@ -172,14 +173,16 @@ class _MainShellState extends State<MainShell> {
       unawaited(SupabaseService.touchMyPresence());
     });
     if (widget.homeRole == AppHomeRole.importador) {
-      unawaited(_loadDailyStoreNotice());
+      _importerShellBadges = ImporterShellBadges();
+      unawaited(_importerShellBadges!.start());
+      unawaited(_ackDailyStoreNotice());
     }
   }
 
-  Future<void> _loadDailyStoreNotice() async {
+  /// Registra la vista del aviso diario sin mostrarlo: el conteo vive en el rail.
+  Future<void> _ackDailyStoreNotice() async {
     final notice = await SupabaseService.fetchImporterDailyStoreNotice();
     if (!mounted || notice.message == null) return;
-    setState(() => _dailyStoreNotice = notice);
     unawaited(SupabaseService.ackImporterDailyStoreNotice());
   }
 
@@ -195,6 +198,7 @@ class _MainShellState extends State<MainShell> {
     PushNotificationService.instance.unregisterTapHandler();
     _notifications.removeListener(_onNotificationsChanged);
     _adminShellBadges?.dispose();
+    _importerShellBadges?.dispose();
     _notifications.dispose();
     MainShellTabController.registerAdminSettingsOpen(null);
     MainShellTabController.unregister();
@@ -359,10 +363,38 @@ class _MainShellState extends State<MainShell> {
     _openAccountSettings(initialTab: AdminSettingsTab.notificaciones);
   }
 
+  void _openImporterProfile() {
+    setState(() {
+      _tabIndex = ImporterShellTabs.perfil;
+      _visitedImporterTabs.add(ImporterShellTabs.perfil);
+    });
+    unawaited(_refreshProfile());
+  }
+
+  void _openImporterCommandPalette() {
+    showImporterCommandPalette(context);
+  }
+
+  void _syncImporterView() {
+    unawaited(_importerShellBadges?.refresh());
+    if (_tabIndex == ImporterShellTabs.inicio) {
+      MainShellTabController.notifyImporterHomeReload();
+    } else if (_tabIndex == ImporterShellTabs.pedidos) {
+      MainShellTabController.notifyPedidosReload();
+    } else if (_tabIndex == ImporterShellTabs.perfil ||
+        _tabIndex == ImporterShellTabs.reputacion) {
+      unawaited(_refreshProfile());
+    }
+  }
+
   void _handleShellUserMenuAction(ShellUserMenuAction action) {
     switch (action) {
       case ShellUserMenuAction.profile:
-        _openAdminProfile();
+        if (widget.homeRole == AppHomeRole.importador) {
+          _openImporterProfile();
+        } else {
+          _openAdminProfile();
+        }
       case ShellUserMenuAction.accountSettings:
         _openAccountSettings();
       case ShellUserMenuAction.notificationPrefs:
@@ -564,17 +596,20 @@ class _MainShellState extends State<MainShell> {
     _aliadoProfileDestination,
   ];
 
-  static const _importadorDestinations = <ShellDestination>[
+  static const _importadorRailDestinations = <ShellDestination>[
     ShellDestination(
-        icon: Icons.home_outlined,
-        selectedIcon: Icons.home_rounded,
-        label: 'Inicio',
-        title: 'Inicio',
-        subtitle: 'Resumen de tu negocio',
-        bottomContentPadding: 8),
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      lucideIcon: LucideGlyph.layoutDashboard,
+      label: 'Inicio',
+      title: 'Inicio',
+      subtitle: 'Resumen de tu negocio',
+      bottomContentPadding: 8,
+    ),
     ShellDestination(
       icon: Icons.inventory_2_outlined,
       selectedIcon: Icons.inventory_2,
+      lucideIcon: LucideGlyph.package,
       label: 'Inventario',
       title: 'Inventario',
       subtitle: 'Productos · stock · precios',
@@ -584,27 +619,32 @@ class _MainShellState extends State<MainShell> {
     ShellDestination(
       icon: Icons.shopping_cart_outlined,
       selectedIcon: Icons.shopping_cart,
+      lucideIcon: LucideGlyph.shoppingCart,
+      badgeKey: ImporterShellBadgeKey.pedidos,
       label: 'Pedidos',
       title: 'Pedidos',
-      subtitle: 'En curso · historial',
+      subtitle: 'Por confirmar · en curso',
       bottomContentPadding: 8,
       compactHeaderOnScroll: true,
     ),
     ShellDestination(
       icon: Icons.star_outline,
       selectedIcon: Icons.star,
+      lucideIcon: LucideGlyph.star,
       label: 'Reputación',
       title: 'Reputación',
       subtitle: 'Métricas · comentarios',
     ),
-    ShellDestination(
-      icon: Icons.person_outline,
-      selectedIcon: Icons.person,
-      label: 'Perfil',
-      title: 'Perfil',
-      subtitle: 'Datos · cuenta',
-    ),
   ];
+
+  static const _importadorProfileDestination = ShellDestination(
+    icon: Icons.person_outline,
+    selectedIcon: Icons.person,
+    lucideIcon: LucideGlyph.userRound,
+    label: 'Perfil',
+    title: 'Perfil',
+    subtitle: 'Datos · cuenta',
+  );
 
   List<Widget> _adminPanelWidgets() {
     return [
@@ -977,7 +1017,17 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     if (i == ImporterShellTabs.pedidos && role == AppHomeRole.importador) {
+      final pending = _importerShellBadges?.pendingOrders ?? 0;
+      if (pending > 0) {
+        MainShellTabController.setImporterPedidosPreferNuevosFilter(true);
+      }
       MainShellTabController.notifyPedidosReload();
+      if (pending > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          MainShellTabController.notifyPedidosDeepLink();
+        });
+      }
     }
     if (i == ImporterShellTabs.inicio) {
       MainShellTabController.notifyImporterHomeReload();
@@ -994,11 +1044,11 @@ class _MainShellState extends State<MainShell> {
     if (role == AppHomeRole.aliado) {
       return _aliadoPages(desktop: desktop);
     }
-    final embedded = desktop;
+    final embedded = desktop || role == AppHomeRole.importador;
     return [
       Scaffold(
         backgroundColor: AppColors.background,
-        appBar: desktop
+        appBar: embedded
             ? null
             : MotolinkAppBar(
                 currentUserProfile: _profile,
@@ -1007,7 +1057,7 @@ class _MainShellState extends State<MainShell> {
                 onMessagesTap: _openMessagesInbox,
                 unreadMessages: _notifications.unreadChatCount),
         body: ImporterHomeDashboard(
-            profile: _profile, embedInDesktopShell: desktop),
+            profile: _profile, embedInDesktopShell: embedded),
       ),
       if (_visitedImporterTabs.contains(ImporterShellTabs.inventario))
         HomeScreen(
@@ -1152,6 +1202,10 @@ class _MainShellState extends State<MainShell> {
     bool showGlobalSearch = false,
     bool showBcvFooter = false,
     VoidCallback? onOpenProfile,
+    VoidCallback? onOpenGlobalSearch,
+    Listenable? navBadges,
+    ShellNavBadge? Function(Object? key)? resolveNavBadge,
+    bool accountOpensMenu = false,
     int? pageIndex,
     bool railSelectionActive = true,
     bool accountFooterSelected = false,
@@ -1173,11 +1227,6 @@ class _MainShellState extends State<MainShell> {
                 message: _aliadoAccessApprovedMessage,
                 onDismiss: _dismissAliadoAccessApprovedBanner,
                 compact: true,
-              ),
-            if (role == AppHomeRole.importador && _dailyStoreNotice != null)
-              ImporterDailyStoreNoticeBanner(
-                notice: _dailyStoreNotice!,
-                onDismiss: () => setState(() => _dailyStoreNotice = null),
               ),
             Expanded(
               child: B2bDesktopShell(
@@ -1207,6 +1256,10 @@ class _MainShellState extends State<MainShell> {
                 chrome: chrome,
                 showGlobalSearch: showGlobalSearch,
                 showBcvFooter: showBcvFooter,
+                onOpenGlobalSearch: onOpenGlobalSearch,
+                navBadges: navBadges,
+                resolveNavBadge: resolveNavBadge,
+                accountOpensMenu: accountOpensMenu,
               ),
             ),
           ],
@@ -1232,9 +1285,21 @@ class _MainShellState extends State<MainShell> {
           drawer: AdminShellDrawer(
             profile: _profile,
             destinations: destinations,
-            selectedIndex: _tabIndex.clamp(0, destinations.length - 1),
+            selectedIndex: _tabIndex >= 0 && _tabIndex < destinations.length
+                ? _tabIndex
+                : -1,
             onDestinationSelected: (i) => _onB2bTabSelected(i, role),
             onAction: _handleShellUserMenuAction,
+            navBadges: role == AppHomeRole.importador
+                ? _importerShellBadges
+                : null,
+            resolveNavBadge: role == AppHomeRole.importador
+                ? _importerShellBadges?.badgeFor
+                : null,
+            accountOpensMenu: role == AppHomeRole.importador,
+            footer: role == AppHomeRole.importador
+                ? const ImporterStoreCountCard(extended: true, inline: true)
+                : null,
             subtitle: role == AppHomeRole.importador
                 ? 'Portal mayorista'
                 : (_profile.isEntrepreneurRetailer
@@ -1251,10 +1316,31 @@ class _MainShellState extends State<MainShell> {
                   onDismiss: _dismissAliadoAccessApprovedBanner,
                   compact: true,
                 ),
-              if (role == AppHomeRole.importador && _dailyStoreNotice != null)
-                ImporterDailyStoreNoticeBanner(
-                  notice: _dailyStoreNotice!,
-                  onDismiss: () => setState(() => _dailyStoreNotice = null),
+              if (role == AppHomeRole.importador)
+                AdminShellTopBar(
+                  breadcrumbs: _importerMobileBreadcrumbs(),
+                  profile: _profile,
+                  unreadNotifications: _notifications.unreadCount,
+                  onNotificationTap: _openNotificationCenter,
+                  onMessagesTap: _openMessagesInbox,
+                  unreadMessages: _notifications.unreadChatCount,
+                  onOpenDrawer: () =>
+                      _b2bMobileScaffoldKey.currentState?.openDrawer(),
+                  onOpenGlobalSearch: _openImporterCommandPalette,
+                  showGlobalSearch: true,
+                  trailingActions: [
+                    const BcvRateBadge(),
+                    if (MediaQuery.sizeOf(context).width >= 640)
+                      IconButton(
+                        tooltip: 'Sincronizar',
+                        onPressed: _syncImporterView,
+                        icon: LucideIcon(
+                          LucideGlyph.refreshCw,
+                          size: 18,
+                          color: theme.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
               Expanded(
                 child: IndexedStack(
@@ -1269,7 +1355,9 @@ class _MainShellState extends State<MainShell> {
                   currentIndex: _tabIndex,
                   onTap: (i) => _onB2bTabSelected(i, role),
                 )
-              : DecoratedBox(
+              : role == AppHomeRole.importador
+                  ? _importerMobileNav(theme)
+                  : DecoratedBox(
                   decoration: BoxDecoration(
                     color: theme.surfaceCard,
                     boxShadow: [
@@ -1358,48 +1446,161 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  /// Importador: Inicio, Inventario, Pedidos, Reputación y Perfil.
+  List<AdminShellBreadcrumb> _importerMobileBreadcrumbs() {
+    final onProfile = _tabIndex == ImporterShellTabs.perfil;
+    AdminShellBreadcrumb inicio() => AdminShellBreadcrumb(
+          label: 'Inicio',
+          onTap: onProfile || _tabIndex != ImporterShellTabs.inicio
+              ? () => _onB2bTabSelected(
+                    ImporterShellTabs.inicio,
+                    AppHomeRole.importador,
+                  )
+              : null,
+        );
+    if (onProfile) {
+      return [
+        inicio(),
+        AdminShellBreadcrumb(label: _importadorProfileDestination.title),
+      ];
+    }
+    final index = _tabIndex.clamp(0, _importadorRailDestinations.length - 1);
+    final current = _importadorRailDestinations[index];
+    if (index == ImporterShellTabs.inicio) {
+      return [AdminShellBreadcrumb(label: current.title)];
+    }
+    return [
+      inicio(),
+      AdminShellBreadcrumb(label: current.title),
+    ];
+  }
+
+  Widget _importerMobileNav(B2BThemeExtension theme) {
+    const items = <(int, LucideGlyph, String)>[
+      (ImporterShellTabs.inicio, LucideGlyph.layoutDashboard, 'Inicio'),
+      (ImporterShellTabs.inventario, LucideGlyph.package, 'Inventario'),
+      (ImporterShellTabs.pedidos, LucideGlyph.shoppingCart, 'Pedidos'),
+      (ImporterShellTabs.reputacion, LucideGlyph.star, 'Reputación'),
+    ];
+    Widget item(int index, LucideGlyph glyph, String label) {
+      final selected = _tabIndex == index;
+      final color = selected ? theme.brand : theme.textSecondary;
+      final icon = LucideIcon(glyph, size: 20, color: color);
+      return Expanded(
+        child: InkWell(
+          onTap: () => _onB2bTabSelected(index, AppHomeRole.importador),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (index == ImporterShellTabs.pedidos &&
+                  _importerShellBadges != null)
+                ListenableBuilder(
+                  listenable: _importerShellBadges!,
+                  builder: (context, _) => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      icon,
+                      Positioned(
+                        right: -10,
+                        top: -6,
+                        child: ShellNavBadgeView(
+                          badge: _importerShellBadges!.badgeFor(
+                            ImporterShellBadgeKey.pedidos,
+                          ),
+                          compact: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                icon,
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        border: Border(top: BorderSide(color: theme.borderSubtle)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: AppBreakpoints.minTouchTarget + 8,
+          child: Row(
+            children: [
+              for (final entry in items) item(entry.$1, entry.$2, entry.$3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Importador: Inicio, Inventario, Pedidos y Reputación. Perfil vive en la cuenta.
   Widget _buildImportadorShell() {
+    final onProfile = _tabIndex == ImporterShellTabs.perfil;
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= AppBreakpoints.mobileMenu) {
           return _buildB2bDesktopShell(
             role: AppHomeRole.importador,
-            destinations: _importadorDestinations,
+            destinations: _importadorRailDestinations,
             railBadgeLabel: 'Panel importador',
+            chrome: DesktopShellChrome.darkCorporate,
+            showGlobalSearch: true,
+            showBcvFooter: true,
+            onOpenProfile: _openImporterProfile,
+            onOpenGlobalSearch: _openImporterCommandPalette,
+            navBadges: _importerShellBadges,
+            resolveNavBadge: _importerShellBadges?.badgeFor,
+            accountOpensMenu: true,
+            pageIndex: _tabIndex,
+            railSelectionActive: !onProfile,
+            accountFooterSelected: onProfile,
+            breadcrumbsOverride: onProfile
+                ? [
+                    AdminShellBreadcrumb(
+                      label: 'Inicio',
+                      onTap: () => _onB2bTabSelected(
+                        ImporterShellTabs.inicio,
+                        AppHomeRole.importador,
+                      ),
+                    ),
+                    AdminShellBreadcrumb(
+                      label: _importadorProfileDestination.title,
+                    ),
+                  ]
+                : null,
+            trailingActions: [
+              const BcvRateBadge(),
+              IconButton(
+                tooltip: 'Sincronizar',
+                onPressed: _syncImporterView,
+                icon: const LucideIcon(LucideGlyph.refreshCw, size: 18),
+              ),
+            ],
             railStatusBuilder: (extended) =>
                 ImporterStoreCountCard(extended: extended),
           );
         }
         return _buildB2bMobileShell(
           role: AppHomeRole.importador,
-          destinations: _importadorDestinations,
-          navItems: const [
-            BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home_rounded),
-                label: 'Inicio'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              activeIcon: Icon(Icons.inventory_2),
-              label: 'Inventario',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_outlined),
-              activeIcon: Icon(Icons.shopping_cart),
-              label: 'Pedidos',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.star_outline),
-              activeIcon: Icon(Icons.star),
-              label: 'Reputación',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
-            ),
-          ],
+          destinations: _importadorRailDestinations,
+          navItems: const [],
         );
       },
     );

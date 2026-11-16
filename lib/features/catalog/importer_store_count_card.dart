@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
 
 /// Conteo fijo de tiendas activas. No es el aviso del día: ese se cierra con
 /// «Entendido». Se mantiene al pie del menú de escritorio del importador.
@@ -53,8 +55,24 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
     });
   }
 
+  Future<void> _openStores() async {
+    final theme = B2BThemeExtension.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: theme.dialogSurface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
+          child: const ImporterKycApprovedAliadosPanel(initiallyExpanded: true),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final count = _count;
     if (!_ready || count == null) return const SizedBox.shrink();
     final label = count == 1 ? 'tienda activa' : 'tiendas activas';
@@ -67,28 +85,33 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
         child: Tooltip(
           message: tooltip,
           child: Material(
-            color: AppColors.card,
+            color: theme.surfaceSubtle,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.borderSubtle),
+              side: BorderSide(color: theme.borderSubtle),
             ),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const _StoreCountIcon(size: 18),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+            child: InkWell(
+              onTap: _openStores,
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _StoreCountIcon(size: 18, color: theme.successFg),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -103,39 +126,49 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
       child: Tooltip(
         message: tooltip,
         child: Material(
-          color: AppColors.card,
+          color: theme.surfaceSubtle,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppColors.borderSubtle),
+            side: BorderSide(color: theme.borderSubtle),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                const _StoreCountIcon(),
-                const SizedBox(width: 8),
-                Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          child: InkWell(
+            onTap: _openStores,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  _StoreCountIcon(color: theme.successFg),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$count',
                     style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textPrimary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  ),
+                  LucideIcon(
+                    LucideGlyph.chevronRight,
+                    size: 14,
+                    color: theme.textMuted,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -145,9 +178,10 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
 }
 
 class _StoreCountIcon extends StatelessWidget {
-  const _StoreCountIcon({this.size = 28});
+  const _StoreCountIcon({this.size = 28, required this.color});
 
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -156,13 +190,13 @@ class _StoreCountIcon extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.successGreen.withOpacity(0.12),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(
-        Icons.storefront_outlined,
+      child: LucideIcon(
+        LucideGlyph.store,
         size: size * 0.57,
-        color: AppColors.successGreen,
+        color: color,
       ),
     );
   }

@@ -58,6 +58,7 @@ class DesktopNavigationShell extends StatefulWidget {
     this.pageIndex,
     this.railSelectionActive = true,
     this.accountFooterSelected = false,
+    this.accountOpensMenu = false,
   });
 
   /// Bloque opcional sobre la tarjeta de cuenta; recibe si el rail está expandido.
@@ -121,6 +122,10 @@ class DesktopNavigationShell extends StatefulWidget {
 
   /// Resalta la tarjeta de cuenta del footer (perfil/ajustes activo).
   final bool accountFooterSelected;
+
+  /// La tarjeta de cuenta abre el menú (Perfil y Configuración) en lugar de
+  /// entrar directo a ajustes.
+  final bool accountOpensMenu;
 
   @override
   State<DesktopNavigationShell> createState() => _DesktopNavigationShellState();
@@ -227,6 +232,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
               navBadges: widget.navBadges,
               resolveNavBadge: widget.resolveNavBadge,
               accountFooterSelected: widget.accountFooterSelected,
+              accountOpensMenu: widget.accountOpensMenu,
             ),
           ),
           Expanded(
@@ -507,6 +513,7 @@ class _DesktopSideRail extends StatefulWidget {
     this.navBadges,
     this.resolveNavBadge,
     this.accountFooterSelected = false,
+    this.accountOpensMenu = false,
   });
 
   final DesktopShellChrome chrome;
@@ -530,6 +537,7 @@ class _DesktopSideRail extends StatefulWidget {
   final Listenable? navBadges;
   final ShellNavBadge? Function(Object? key)? resolveNavBadge;
   final bool accountFooterSelected;
+  final bool accountOpensMenu;
 
   @override
   State<_DesktopSideRail> createState() => _DesktopSideRailState();
@@ -861,9 +869,9 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
               profile: widget.profile,
               signingOut: widget.signingOut,
               selected: widget.accountFooterSelected,
-              openSettingsOnTap:
-                  widget.chrome == DesktopShellChrome.darkCorporate ||
-                      widget.onOpenProfile != null,
+              openSettingsOnTap: !widget.accountOpensMenu &&
+                  (widget.chrome == DesktopShellChrome.darkCorporate ||
+                      widget.onOpenProfile != null),
               onAction: (action) {
                 switch (action) {
                   case ShellUserMenuAction.profile:

@@ -140,8 +140,13 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
                       if (widget.showGlobalSearch) ...[
                         if (showSearch) ...[
                           const SizedBox(width: 12),
-                          _GlobalSearchField(
-                            onOpen: _openGlobalSearch,
+                          Flexible(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: _GlobalSearchField(
+                                onOpen: _openGlobalSearch,
+                              ),
+                            ),
                           ),
                         ] else ...[
                           IconButton(
@@ -422,7 +427,7 @@ class _GlobalSearchField extends StatelessWidget {
     final theme = B2BThemeExtension.of(context);
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 320, minWidth: 180),
+      constraints: const BoxConstraints(maxWidth: 320),
       child: Material(
         color: theme.inputFill,
         borderRadius: BorderRadius.circular(10),

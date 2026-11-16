@@ -23,21 +23,24 @@ flutter pub get
 
 echo "==> Building the Excel / PDF catalog reader"
 # tools/catalog-reader exige Node >=22 y pnpm@11.25.0 (lockfileVersion 9).
-# Vercel: fijar Node 22 vía package.json engines / .nvmrc (no usar Node 18/20).
+# Vercel trae un `pnpm` global viejo (p. ej. 6.x) delante en PATH: tras
+# `npm i -g pnpm@11` el comando `pnpm` sigue resolviendo a 6.x y ignora el
+# lockfile → "Headless installation requires a pnpm-lock.yaml".
+# Usar siempre `npx -y pnpm@PIN` para no depender del PATH.
 PNPM_VERSION="${PNPM_VERSION:-11.25.0}"
 NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]")"
+echo "Node $(node -v); PATH pnpm (si existe): $(command -v pnpm || echo none)"
 if [[ "${NODE_MAJOR}" -lt 22 ]]; then
   echo "ERROR: Node ${NODE_MAJOR} detectado; catalog-reader/pnpm@${PNPM_VERSION} requiere Node >= 22."
-  echo "En Vercel → Project Settings → Node.js Version → 22.x (o engines en package.json)."
+  echo "En Vercel → Project Settings → Node.js Version → 22.x (package.json engines / .nvmrc)."
   exit 1
 fi
-# Instalar el pin siempre (Vercel puede traer un pnpm viejo que ignora el lockfile).
-# Evitar corepack en este paso: en Node 20/shims rota con ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING.
-npm install --global "pnpm@${PNPM_VERSION}" --force
-hash -r 2>/dev/null || true
-pnpm --version
-pnpm --dir tools/catalog-reader install --frozen-lockfile --ignore-scripts
-pnpm --dir tools/catalog-reader run build
+run_pnpm() {
+  npx --yes "pnpm@${PNPM_VERSION}" "$@"
+}
+run_pnpm --version
+run_pnpm --dir tools/catalog-reader install --frozen-lockfile --ignore-scripts
+run_pnpm --dir tools/catalog-reader run build
 
 echo "==> Building Flutter web (release)"
 # Flutter 3.24 CanvasKit can leave decoded Chromium VideoFrames unclosed.

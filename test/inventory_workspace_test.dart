@@ -258,6 +258,52 @@ void main() {
     MainShellTabController.unregister();
   });
 
+  for (final mobileLayout in [true, false]) {
+    testWidgets(
+        'narrow Inicio keeps the expected layout (mobile layout: $mobileLayout)',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var searches = 0;
+      var refreshes = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ImporterHomeDashboard(
+            profile: const ProfileModel(id: 'supplier', role: 'importador'),
+            embedInDesktopShell: !mobileLayout,
+            mobileLayout: mobileLayout,
+            onSearch: mobileLayout ? () => searches++ : null,
+            onRefreshSummary: mobileLayout ? () => refreshes++ : null,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final title = find.text(mobileLayout ? 'Tu negocio, al día' : 'Resumen');
+      expect(tester.getTopLeft(title).dx, mobileLayout ? 16 : 0);
+      final actions = find.byType(ImporterPriorityCard);
+      final first = tester.getTopLeft(actions.at(0));
+      final second = tester.getTopLeft(actions.at(1));
+      final search = find.byTooltip('Buscar en el panel');
+      if (mobileLayout) {
+        expect(first.dy, second.dy);
+        expect(find.text('tiendas activas'), findsOneWidget);
+        await tester.tap(search);
+        await tester.tap(find.byTooltip('Actualizar resumen'));
+        expect(searches, 1);
+        expect(refreshes, 1);
+      } else {
+        expect(first.dy, lessThan(second.dy));
+        expect(find.text('tiendas activas'), findsNothing);
+        expect(search, findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   for (final layout in [(320.0, 1.0), (390.0, 1.0), (1100.0, 1.0)]) {
     testWidgets('Inicio summary fits ${layout.$1} with text scale ${layout.$2}',
         (tester) async {
@@ -291,8 +337,8 @@ void main() {
       expect(find.text('Tiendas activas'), findsNothing);
       expect(find.text('Salud de inventario'), findsOneWidget);
       if (layout.$1 >= 768) {
-        expect(tester.getTopLeft(cards.first).dy,
-            tester.getTopLeft(inventory).dy);
+        expect(
+            tester.getTopLeft(cards.first).dy, tester.getTopLeft(inventory).dy);
       } else {
         expect(tester.getTopLeft(inventory).dy,
             greaterThan(tester.getTopLeft(cards.first).dy));

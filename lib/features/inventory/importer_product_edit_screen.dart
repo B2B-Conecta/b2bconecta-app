@@ -17,6 +17,7 @@ import 'product_custom_fields_section.dart';
 import 'product_delete_outcome_sheet.dart';
 import 'product_image_gallery_editor.dart';
 import 'importer_product_price_preview.dart';
+import 'inventory_qr_label.dart';
 
 /// Crear o editar un producto del inventario (importador).
 class ImporterProductEditScreen extends StatefulWidget {
@@ -48,10 +49,26 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   bool _isActive = true;
   bool _hasWarranty = false;
   bool _saving = false;
+  bool _exportingLabel = false;
   bool _pagoSoloDivisas = false;
   Map<String, dynamic> _customFields = const {};
 
   bool get _isEdit => widget.initial != null && widget.initial!.id.isNotEmpty;
+
+  Future<void> _downloadQrLabel() async {
+    setState(() => _exportingLabel = true);
+    try {
+      await InventoryQrLabel.download([widget.initial!]);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo descargar la etiqueta QR.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportingLabel = false);
+    }
+  }
 
   String? get _selectedCategory {
     final family = _categoryFamily;
@@ -882,6 +899,12 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         title: Text(_isEdit ? 'Editar producto' : 'Añadir producto'),
         actions: [
           if (_isEdit && !wide)
+            IconButton(
+              tooltip: 'Descargar etiqueta QR de inventario',
+              onPressed: _saving || _exportingLabel ? null : _downloadQrLabel,
+              icon: const Icon(Icons.qr_code_2),
+            ),
+          if (_isEdit)
             IconButton(
               tooltip: 'Compartir producto',
               onPressed: () => showProductShareSheet(

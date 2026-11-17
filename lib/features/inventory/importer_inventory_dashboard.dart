@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/catalog/product_share_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'importer_product_edit_screen.dart';
+import 'inventory_qr_screen.dart';
 import 'catalog_document_reader.dart';
 import 'excel_catalog_service.dart';
 import 'flexible_catalog_import_service.dart';
@@ -1506,6 +1507,14 @@ class _ImporterInventoryDashboardState
               _startBulkImport();
             case 'photos':
               _startBulkPhotos();
+            case 'labels':
+              Navigator.of(context).push<void>(MaterialPageRoute(
+                builder: (_) => InventoryQrScreen(
+                  onInventoryChanged: () {
+                    if (mounted) _reload();
+                  },
+                ),
+              ));
             case 'template':
               _downloadImportTemplate();
             case 'export':
@@ -1564,6 +1573,7 @@ class _ImporterInventoryDashboardState
             ),
             const PopupMenuDivider(),
             header('Varios'),
+            const PopupMenuItem(value: 'labels', child: Text('Etiquetas QR')),
             const PopupMenuItem(
               value: 'select',
               child: Text('Publicar o pausar varios'),

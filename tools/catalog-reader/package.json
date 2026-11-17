@@ -14,7 +14,8 @@
     "onnxruntime-web": "1.22.0",
     "pdfjs-dist": "5.4.624",
     "tesseract.js": "6.0.1",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zxing-wasm": "3.1.7"
   },
   "devDependencies": {
     "vite": "6.4.1"

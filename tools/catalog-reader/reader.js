@@ -76,3 +76,7 @@ export async function read(bytes, name, progress) {
   }
 }
 export async function preparePhoto(bytes) { return (await import('./photo.js')).segment(bytes); }
+
+export async function readPhotoQrs(bytes) {
+  return (await import('./qr-photo.js')).readPhotoQrs(bytes);
+}

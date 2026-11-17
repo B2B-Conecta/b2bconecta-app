@@ -116,7 +116,8 @@ class _CatalogImportPhotoReviewState extends State<CatalogImportPhotoReview> {
     });
   }
 
-  int _sourceRow(int index) => _drafts[index].workbookPhoto?.sourceRow ?? 1 << 20;
+  int _sourceRow(int index) =>
+      _drafts[index].workbookPhoto?.sourceRow ?? 1 << 20;
 
   Future<void> _openZoom(int position) {
     final errors = CatalogPhotoDraft.assignmentErrors(_drafts, widget.targets);
@@ -167,9 +168,8 @@ class _CatalogImportPhotoReviewState extends State<CatalogImportPhotoReview> {
     final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     final errors = CatalogPhotoDraft.assignmentErrors(_drafts, widget.targets);
     final approved = _drafts.where((draft) => draft.approved).length;
-    final readyToInclude = _drafts
-        .where((draft) => !draft.approved && _hasValidSku(draft))
-        .length;
+    final readyToInclude =
+        _drafts.where((draft) => !draft.approved && _hasValidSku(draft)).length;
     final batch = [
       for (var i = 0; i < _drafts.length; i++)
         if (_drafts[i].approved && _drafts[i].edited == null) i,
@@ -353,7 +353,8 @@ class _CatalogImportPhotoReviewState extends State<CatalogImportPhotoReview> {
                                 border: Border.all(color: theme.borderSubtle),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 10, 12, 10),
                                 child: _photoCard(visible[index], errors),
                               ),
                             );
@@ -374,7 +375,8 @@ class _CatalogImportPhotoReviewState extends State<CatalogImportPhotoReview> {
                                 border: Border.all(color: theme.borderSubtle),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 10, 12, 10),
                                 child: _photoCard(visible[index], errors),
                               ),
                             );
@@ -452,7 +454,8 @@ class _PhotoAssignmentState extends State<_PhotoAssignment> {
   @override
   void didUpdateWidget(covariant _PhotoAssignment oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.draft.sku != _sku.text && widget.draft.sku != oldWidget.draft.sku) {
+    if (widget.draft.sku != _sku.text &&
+        widget.draft.sku != oldWidget.draft.sku) {
       _sku.text = widget.draft.sku;
     }
   }
@@ -585,6 +588,8 @@ class _PhotoAssignmentState extends State<_PhotoAssignment> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (draft.assignmentNote case final note?)
+                    Text(note, style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 4),
                   TextFormField(
                     controller: _sku,
@@ -599,7 +604,7 @@ class _PhotoAssignmentState extends State<_PhotoAssignment> {
                       suffixIcon: IconButton(
                         tooltip: 'Buscar en el archivo',
                         visualDensity: VisualDensity.compact,
-                        onPressed: widget.onChanged == null
+                        onPressed: widget.onChanged == null || draft.lockSku
                             ? null
                             : () => _pickSku(context),
                         icon: Icon(Icons.search, size: 18, color: theme.brand),
@@ -609,7 +614,7 @@ class _PhotoAssignmentState extends State<_PhotoAssignment> {
                         minHeight: 32,
                       ),
                     ),
-                    enabled: widget.onChanged != null,
+                    enabled: widget.onChanged != null && !draft.lockSku,
                     onChanged: (value) => widget.onChanged?.call(
                       draft.copyWith(sku: value, approved: draft.approved),
                     ),
@@ -791,7 +796,8 @@ class _IncludeButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
-      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+      padding:
+          const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),

@@ -1,6 +1,9 @@
 import 'dart:async' show Timer, unawaited;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 
 import 'package:motolink_pro_app/app/aliado_shell_tabs.dart';
 import 'importer_shell_tabs.dart';
@@ -48,7 +51,6 @@ import 'package:motolink_pro_app/core/notifications/kyc_notification_match.dart'
 import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_command_palette.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_shell_badges.dart';
-import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_welcome_dialog.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
@@ -1067,11 +1069,13 @@ class _MainShellState extends State<MainShell> {
   List<Widget> _b2bPages({
     required AppHomeRole role,
     required bool desktop,
+    bool importerMobileLayout = false,
   }) {
     if (role == AppHomeRole.aliado) {
       return _aliadoPages(desktop: desktop);
     }
-    final embedded = desktop || role == AppHomeRole.importador;
+    final embedded =
+        desktop || (role == AppHomeRole.importador && !importerMobileLayout);
     return [
       Scaffold(
         backgroundColor: AppColors.background,
@@ -1084,7 +1088,12 @@ class _MainShellState extends State<MainShell> {
                 onMessagesTap: _openMessagesInbox,
                 unreadMessages: _notifications.unreadChatCount),
         body: ImporterHomeDashboard(
-            profile: _profile, embedInDesktopShell: embedded),
+          profile: _profile,
+          embedInDesktopShell: embedded,
+          mobileLayout: importerMobileLayout,
+          onSearch: importerMobileLayout ? _openImporterCommandPalette : null,
+          onRefreshSummary: importerMobileLayout ? _syncImporterView : null,
+        ),
       ),
       if (_visitedImporterTabs.contains(ImporterShellTabs.inventario))
         ShellBodyNavigator(
@@ -1326,21 +1335,9 @@ class _MainShellState extends State<MainShell> {
                 : -1,
             onDestinationSelected: (i) => _onB2bTabSelected(i, role),
             onAction: _handleShellUserMenuAction,
-            navBadges: role == AppHomeRole.importador
-                ? _importerShellBadges
-                : null,
-            resolveNavBadge: role == AppHomeRole.importador
-                ? _importerShellBadges?.badgeFor
-                : null,
-            importerAccountMenu: role == AppHomeRole.importador,
-            footer: role == AppHomeRole.importador
-                ? const ImporterStoreCountCard(extended: true, inline: true)
-                : null,
-            subtitle: role == AppHomeRole.importador
-                ? 'Portal mayorista'
-                : (_profile.isEntrepreneurRetailer
-                    ? 'Portal Minorista-Emprendedor'
-                    : 'Portal tienda'),
+            subtitle: _profile.isEntrepreneurRetailer
+                ? 'Portal Minorista-Emprendedor'
+                : 'Portal tienda',
           ),
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1351,33 +1348,6 @@ class _MainShellState extends State<MainShell> {
                   message: _aliadoAccessApprovedMessage,
                   onDismiss: _dismissAliadoAccessApprovedBanner,
                   compact: true,
-                ),
-              if (role == AppHomeRole.importador)
-                AdminShellTopBar(
-                  breadcrumbs: _importerMobileBreadcrumbs(),
-                  profile: _profile,
-                  unreadNotifications: _notifications.unreadCount,
-                  onNotificationTap: _openNotificationCenter,
-                  onMessagesTap: _openMessagesInbox,
-                  unreadMessages: _notifications.unreadChatCount,
-                  onOpenDrawer: () =>
-                      _b2bMobileScaffoldKey.currentState?.openDrawer(),
-                  onOpenGlobalSearch: _openImporterCommandPalette,
-                  searchHint: 'Buscar pedidos, SKU o tiendas…',
-                  showGlobalSearch: true,
-                  trailingActions: [
-                    const BcvRateBadge(),
-                    if (MediaQuery.sizeOf(context).width >= 640)
-                      IconButton(
-                        tooltip: 'Sincronizar',
-                        onPressed: _syncImporterView,
-                        icon: LucideIcon(
-                          LucideGlyph.refreshCw,
-                          size: 18,
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                  ],
                 ),
               Expanded(
                 child: IndexedStack(
@@ -1392,9 +1362,7 @@ class _MainShellState extends State<MainShell> {
                   currentIndex: _tabIndex,
                   onTap: (i) => _onB2bTabSelected(i, role),
                 )
-              : role == AppHomeRole.importador
-                  ? _importerMobileNav(theme)
-                  : DecoratedBox(
+              : DecoratedBox(
                   decoration: BoxDecoration(
                     color: theme.surfaceCard,
                     boxShadow: [
@@ -1483,112 +1451,118 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  List<AdminShellBreadcrumb> _importerMobileBreadcrumbs() {
-    final onProfile = _tabIndex == ImporterShellTabs.perfil;
-    AdminShellBreadcrumb inicio() => AdminShellBreadcrumb(
-          label: 'Inicio',
-          onTap: onProfile || _tabIndex != ImporterShellTabs.inicio
-              ? () => _onB2bTabSelected(
-                    ImporterShellTabs.inicio,
-                    AppHomeRole.importador,
-                  )
-              : null,
-        );
-    if (onProfile) {
-      return [
-        inicio(),
-        AdminShellBreadcrumb(label: _importadorProfileDestination.title),
-      ];
-    }
-    final index = _tabIndex.clamp(0, _importadorRailDestinations.length - 1);
-    final current = _importadorRailDestinations[index];
-    if (index == ImporterShellTabs.inicio) {
-      return [AdminShellBreadcrumb(label: current.title)];
-    }
-    return [
-      inicio(),
-      AdminShellBreadcrumb(label: current.title),
+  Widget _buildImporterMobileShell() {
+    const role = AppHomeRole.importador;
+    final destinations = [
+      ..._importadorRailDestinations,
+      _importadorProfileDestination,
     ];
-  }
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        AppColors.brightness = ThemeController.instance.effectiveBrightness;
+        final theme = B2BThemeExtension.of(context);
+        final badges = _importerShellBadges;
 
-  Widget _importerMobileNav(B2BThemeExtension theme) {
-    const items = <(int, LucideGlyph, String)>[
-      (ImporterShellTabs.inicio, LucideGlyph.layoutDashboard, 'Inicio'),
-      (ImporterShellTabs.inventario, LucideGlyph.package, 'Inventario'),
-      (ImporterShellTabs.pedidos, LucideGlyph.shoppingCart, 'Pedidos'),
-      (ImporterShellTabs.reputacion, LucideGlyph.star, 'Reputación'),
-    ];
-    Widget item(int index, LucideGlyph glyph, String label) {
-      final selected = _tabIndex == index;
-      final color = selected ? theme.brand : theme.textSecondary;
-      final icon = LucideIcon(glyph, size: 20, color: color);
-      return Expanded(
-        child: InkWell(
-          onTap: () => _onB2bTabSelected(index, AppHomeRole.importador),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (index == ImporterShellTabs.pedidos &&
-                  _importerShellBadges != null)
-                ListenableBuilder(
-                  listenable: _importerShellBadges!,
-                  builder: (context, _) => Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      icon,
-                      Positioned(
-                        right: -10,
-                        top: -6,
-                        child: ShellNavBadgeView(
-                          badge: _importerShellBadges!.badgeFor(
-                            ImporterShellBadgeKey.pedidos,
-                          ),
-                          compact: true,
-                        ),
-                      ),
-                    ],
+        Widget destinationIcon(int index, IconData icon) {
+          if (index != ImporterShellTabs.pedidos || badges == null) {
+            return Icon(icon);
+          }
+          return ListenableBuilder(
+            listenable: badges,
+            builder: (_, __) => Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon),
+                Positioned(
+                  right: -10,
+                  top: -6,
+                  child: ShellNavBadgeView(
+                    badge: badges.badgeFor(ImporterShellBadgeKey.pedidos),
+                    compact: true,
                   ),
-                )
-              else
-                icon,
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: color,
+                ),
+              ],
+            ),
+          );
+        }
+
+        final shell = Scaffold(
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (kIsWeb) const WebPushEnableBanner(),
+              Expanded(
+                child: IndexedStack(
+                  index: _tabIndex,
+                  children: _b2bPages(
+                    role: role,
+                    desktop: false,
+                    importerMobileLayout: true,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.surfaceCard,
-        border: Border(top: BorderSide(color: theme.borderSubtle)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: AppBreakpoints.minTouchTarget + 8,
-          child: Row(
-            children: [
-              for (final entry in items) item(entry.$1, entry.$2, entry.$3),
-            ],
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.surfaceCard,
+              boxShadow: [
+                BoxShadow(
+                  color: theme.textPrimary.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: AppBreakpoints.minTouchTarget + 12,
+                child: BottomNavigationBar(
+                  currentIndex: _tabIndex,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: theme.surfaceCard,
+                  selectedItemColor: theme.brand,
+                  unselectedItemColor: theme.textSecondary,
+                  selectedFontSize: 12,
+                  unselectedFontSize: 11,
+                  onTap: (index) => _onB2bTabSelected(index, role),
+                  items: [
+                    for (final (index, destination) in destinations.indexed)
+                      BottomNavigationBarItem(
+                        icon: destinationIcon(index, destination.icon),
+                        activeIcon:
+                            destinationIcon(index, destination.selectedIcon),
+                        label: destination.label,
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+        return kIsWeb
+            ? CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+                      _openImporterCommandPalette,
+                  const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+                      _openImporterCommandPalette,
+                },
+                child: Focus(autofocus: true, child: shell),
+              )
+            : shell;
+      },
     );
   }
 
-  /// Importador: Inicio, Inventario, Pedidos y Reputación. Perfil vive en la cuenta.
   Widget _buildImportadorShell() {
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return _buildImporterMobileShell();
+    }
     final onProfile = _tabIndex == ImporterShellTabs.perfil;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1633,11 +1607,7 @@ class _MainShellState extends State<MainShell> {
                 ImporterStoreCountCard(extended: extended),
           );
         }
-        return _buildB2bMobileShell(
-          role: AppHomeRole.importador,
-          destinations: _importadorRailDestinations,
-          navItems: const [],
-        );
+        return _buildImporterMobileShell();
       },
     );
   }

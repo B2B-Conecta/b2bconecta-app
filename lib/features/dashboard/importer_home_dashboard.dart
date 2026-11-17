@@ -7,6 +7,7 @@ import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_recent_orders_card.dart';
 import 'package:motolink_pro_app/features/inventory/importer_onboarding_checklist.dart';
 import 'package:motolink_pro_app/features/inventory/importer_onboarding_checklist_card.dart';
@@ -16,11 +17,20 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 /// Resumen del negocio. La edición de productos vive en Inventario.
 class ImporterHomeDashboard extends StatefulWidget {
-  const ImporterHomeDashboard(
-      {super.key, required this.profile, this.embedInDesktopShell = false});
+  const ImporterHomeDashboard({
+    super.key,
+    required this.profile,
+    this.embedInDesktopShell = false,
+    this.mobileLayout = false,
+    this.onSearch,
+    this.onRefreshSummary,
+  });
 
   final ProfileModel profile;
   final bool embedInDesktopShell;
+  final bool mobileLayout;
+  final VoidCallback? onSearch;
+  final VoidCallback? onRefreshSummary;
 
   @override
   State<ImporterHomeDashboard> createState() => _ImporterHomeDashboardState();
@@ -90,10 +100,10 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
             builder: (context, usd) {
               final pending = orders.data;
               final invoiceCount = commissions.data;
-              final settled = commissions.connectionState ==
-                      ConnectionState.done &&
-                  !commissions.hasError &&
-                  invoiceCount == 0;
+              final settled =
+                  commissions.connectionState == ConnectionState.done &&
+                      !commissions.hasError &&
+                      invoiceCount == 0;
               final amount = usd.data;
               final actions = [
                 ImporterPriorityAction(
@@ -103,8 +113,9 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   glyph: LucideGlyph.shoppingCart,
                   cta: 'Gestionar pedidos →',
                   attention: pending != null && pending > 0,
-                  onTap: () => MainShellTabController
-                      .navigateToImporterPedidosExplore('nuevos'),
+                  onTap: () =>
+                      MainShellTabController.navigateToImporterPedidosExplore(
+                          'nuevos'),
                 ),
                 ImporterPriorityAction(
                   label: 'Comisiones por pagar',
@@ -123,6 +134,23 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                 ),
               ];
               final inventory = _inventorySummary(metrics);
+              if (widget.mobileLayout) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ImporterPriorityActions(actions: actions),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: ImporterStoreCountCard(
+                        key: ValueKey('mobile-stores-$_revision'),
+                        extended: true,
+                        inline: true,
+                      ),
+                    ),
+                    inventory,
+                  ],
+                );
+              }
               return LayoutBuilder(builder: (context, constraints) {
                 final row = constraints.maxWidth >= AppBreakpoints.mobileMenu;
                 final cards = [
@@ -257,22 +285,26 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth >= AppBreakpoints.mobileMenu;
       final splitOnboarding = constraints.maxWidth >= 1024;
+      final horizontalPadding =
+          widget.mobileLayout || (!widget.embedInDesktopShell && !wide)
+              ? 16.0
+              : 0.0;
       return RefreshIndicator(
         onRefresh: _refresh,
         color: theme.brand,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
-            widget.embedInDesktopShell || wide ? 0 : 16,
+            horizontalPadding,
             12,
-            widget.embedInDesktopShell || wide ? 0 : 16,
+            horizontalPadding,
             24,
           ),
           children: [
             Row(children: [
               Expanded(
                 child: Text(
-                  'Resumen',
+                  widget.mobileLayout ? 'Tu negocio, al día' : 'Resumen',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -282,9 +314,15 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   ),
                 ),
               ),
+              if (widget.onSearch case final onSearch?)
+                IconButton(
+                  tooltip: 'Buscar en el panel',
+                  onPressed: onSearch,
+                  icon: const Icon(Icons.search),
+                ),
               IconButton(
                 tooltip: 'Actualizar resumen',
-                onPressed: _reload,
+                onPressed: widget.onRefreshSummary ?? _reload,
                 icon: LucideIcon(
                   LucideGlyph.refreshCw,
                   size: 18,

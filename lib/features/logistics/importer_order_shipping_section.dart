@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -13,10 +15,14 @@ class ImporterOrderShippingSection extends StatefulWidget {
     super.key,
     required this.lines,
     this.onChanged,
+    this.embedded = false,
   });
 
   final List<TransactionRequestModel> lines;
   final VoidCallback? onChanged;
+
+  /// Dentro de una tarjeta de detalle web: sin segundo contenedor ni título.
+  final bool embedded;
 
   @override
   State<ImporterOrderShippingSection> createState() =>
@@ -108,6 +114,9 @@ class _ImporterOrderShippingSectionState
     final previewUsd = !_included ? parseVesOrEnDecimal(_costCtrl.text) : null;
     final previewBs =
         (previewUsd != null && rate != null && rate > 0) ? previewUsd * rate : null;
+    if (MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu) {
+      return _webBody(context, rate: rate, previewBs: previewBs);
+    }
 
     return Material(
       color: AppColors.card,
@@ -229,5 +238,95 @@ class _ImporterOrderShippingSectionState
         ),
       ),
     );
+  }
+
+  Widget _webBody(
+    BuildContext context, {
+    required double? rate,
+    required double? previewBs,
+  }) {
+    final theme = B2BThemeExtension.of(context);
+    final locked = !_editable;
+    final help = locked
+        ? 'Pedido cerrado. El flete ya no se puede cambiar.'
+        : 'Indica si el flete va incluido o el monto adicional. El equivalente en Bs usa la tasa del pedido.';
+    final status = _included ? 'Envío incluido' : 'Flete adicional';
+    final detail = _included
+        ? 'No se suma al pedido.'
+        : 'Se cobra aparte del pedido.';
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(help,
+            style: TextStyle(
+                fontSize: 12.5, height: 1.35, color: theme.textSecondary)),
+        const SizedBox(height: 8),
+        if (locked)
+          Text('$status. $detail',
+              style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: theme.textPrimary))
+        else
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text(status,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: theme.textPrimary,
+                    fontSize: 13.5)),
+            subtitle: Text(detail,
+                style: TextStyle(fontSize: 12, color: theme.textSecondary)),
+            value: _included,
+            onChanged: _saving
+                ? null
+                : (value) => setState(() {
+                      _included = value;
+                      if (value) _costCtrl.clear();
+                    }),
+          ),
+        if (!_included && !locked) ...[
+          const SizedBox(height: 4),
+          TextField(
+            controller: _costCtrl,
+            enabled: !_saving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+            ],
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Costo de envío (USD)',
+              hintText: '0.00',
+              prefixText: '\$ ',
+              isDense: true,
+            ),
+          ),
+          if (previewBs != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Equivale a ${formatBsLabel(previewBs)}'
+              '${rate != null ? ' (BCV ${formatTasaBcvDisplay(rate)})' : ''}',
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textSecondary),
+            ),
+          ],
+        ],
+        if (_editable) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _saving ? null : _save,
+              child: Text(_saving ? 'Guardando…' : 'Guardar flete'),
+            ),
+          ),
+        ],
+      ],
+    );
+    return column;
   }
 }

@@ -247,7 +247,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Pedidos por confirmar'), findsOneWidget);
     expect(find.text('Comisiones por pagar'), findsOneWidget);
-    expect(find.text('Tu inventario'), findsOneWidget);
+    expect(find.text('Salud de inventario'), findsOneWidget);
     expect(find.byType(InventoryProductTile), findsNothing);
     await tester.tap(find.text('Ver productos'));
     await tester.pump();
@@ -257,6 +257,52 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     MainShellTabController.unregister();
   });
+
+  for (final mobileLayout in [true, false]) {
+    testWidgets(
+        'narrow Inicio keeps the expected layout (mobile layout: $mobileLayout)',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var searches = 0;
+      var refreshes = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ImporterHomeDashboard(
+            profile: const ProfileModel(id: 'supplier', role: 'importador'),
+            embedInDesktopShell: !mobileLayout,
+            mobileLayout: mobileLayout,
+            onSearch: mobileLayout ? () => searches++ : null,
+            onRefreshSummary: mobileLayout ? () => refreshes++ : null,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final title = find.text(mobileLayout ? 'Tu negocio, al día' : 'Resumen');
+      expect(tester.getTopLeft(title).dx, mobileLayout ? 16 : 0);
+      final actions = find.byType(ImporterPriorityCard);
+      final first = tester.getTopLeft(actions.at(0));
+      final second = tester.getTopLeft(actions.at(1));
+      final search = find.byTooltip('Buscar en el panel');
+      if (mobileLayout) {
+        expect(first.dy, second.dy);
+        expect(find.text('tiendas activas'), findsOneWidget);
+        await tester.tap(search);
+        await tester.tap(find.byTooltip('Actualizar resumen'));
+        expect(searches, 1);
+        expect(refreshes, 1);
+      } else {
+        expect(first.dy, lessThan(second.dy));
+        expect(find.text('tiendas activas'), findsNothing);
+        expect(search, findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   for (final layout in [(320.0, 1.0), (390.0, 1.0), (1100.0, 1.0)]) {
     testWidgets('Inicio summary fits ${layout.$1} with text scale ${layout.$2}',
@@ -284,16 +330,22 @@ void main() {
                           ProfileModel(id: 'supplier', role: 'importador'))))));
       await tester.pumpAndSettle();
       final cards = find.byType(ImporterPriorityCard);
-      expect(cards, findsNWidgets(3));
-      expect(find.text('Tiendas activas'), findsOneWidget);
-      expect(find.descendant(of: cards.at(2), matching: find.text('4')),
-          findsOneWidget);
-      expect(
-          tester.getTopLeft(cards.at(0)).dy, tester.getTopLeft(cards.at(2)).dy);
-      expect(tester.getRect(cards.at(2)).right, lessThanOrEqualTo(layout.$1));
-      if (layout.$1 >= 390) {
-        expect(tester.getSize(cards.first).height,
-            lessThanOrEqualTo(tester.getSize(cards.first).width * 1.3));
+      final inventory =
+          find.byKey(const ValueKey('importer-inventory-summary'));
+      expect(cards, findsNWidgets(2));
+      expect(inventory, findsOneWidget);
+      expect(find.text('Tiendas activas'), findsNothing);
+      expect(find.text('Salud de inventario'), findsOneWidget);
+      if (layout.$1 >= 768) {
+        expect(
+            tester.getTopLeft(cards.first).dy, tester.getTopLeft(inventory).dy);
+      } else {
+        expect(tester.getTopLeft(inventory).dy,
+            greaterThan(tester.getTopLeft(cards.first).dy));
+      }
+      expect(tester.getRect(inventory).right, lessThanOrEqualTo(layout.$1));
+      if (layout.$1 >= 1100) {
+        expect(tester.getSize(cards.first).height, lessThan(180));
       }
       await tester.tap(find.text('Pedidos por confirmar'));
       await tester.pump();
@@ -305,16 +357,8 @@ void main() {
       expect(selected, ImporterShellTabs.perfil);
       expect(MainShellTabController.consumeImporterCommissionPreferPendiente(),
           isTrue);
-      storeCount = 9;
       await tester.tap(find.byTooltip('Actualizar resumen'));
       await tester.pumpAndSettle();
-      expect(find.descendant(of: cards.at(2), matching: find.text('9')),
-          findsOneWidget);
-      storeCount = null;
-      await tester.tap(find.byTooltip('Actualizar resumen'));
-      await tester.pumpAndSettle();
-      expect(find.descendant(of: cards.at(2), matching: find.text('—')),
-          findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -351,7 +395,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final width in [720.0, 1100.0, 1440.0]) {
+  for (final width in [768.0, 1100.0, 1440.0]) {
     testWidgets('desktop summary combines inventory in one row at $width',
         (tester) async {
       tester.view.physicalSize = Size(width, 900);

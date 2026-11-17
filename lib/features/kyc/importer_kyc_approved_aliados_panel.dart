@@ -5,87 +5,216 @@ import 'kyc_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
-import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_section_help.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_counterparty_profile_section.dart';
+
+/// Ficha de una tienda activa: nombre, RIF, ubicación y contacto.
+/// El sello «Activa» vive en el listado, no se repite aquí.
+Future<void> showImporterActiveStoreSheet(
+  BuildContext context, {
+  required KycApprovedAliadoModel aliado,
+}) async {
+  final theme = B2BThemeExtension.of(context);
+  final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+  Widget body(BuildContext ctx) {
+    final sheet = B2BThemeExtension.of(ctx);
+    final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+    final lines = <(String, String)>[
+      if ((aliado.rif ?? '').trim().isNotEmpty) ('RIF', aliado.rif!.trim()),
+      if (aliado.locationLine.isNotEmpty) ('Ubicación', aliado.locationLine),
+      if ((aliado.direccion ?? '').trim().isNotEmpty)
+        ('Dirección', aliado.direccion!.trim()),
+      if ((aliado.phone ?? '').trim().isNotEmpty)
+        ('Contacto', aliado.phone!.trim()),
+    ];
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  aliado.displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: sheet.textPrimary,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Cerrar',
+                onPressed: () => Navigator.pop(ctx),
+                icon: Icon(Icons.close, color: sheet.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final line in lines) ...[
+            Text(
+              line.$1,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: sheet.textMuted,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              line.$2,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: sheet.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+
+  if (wide) {
+    await showDialog<void>(
+      context: context,
+      barrierColor: theme.textPrimary.withOpacity(0.45),
+      builder: (ctx) => Dialog(
+        backgroundColor: theme.dialogSurface,
+        surfaceTintColor: theme.dialogSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.borderSubtle),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: body(ctx),
+        ),
+      ),
+    );
+    return;
+  }
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: theme.dialogSurface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: body,
+  );
+}
 
 Future<void> showImporterAliadoKycDetailSheet(
   BuildContext context, {
   required KycApprovedAliadoModel aliado,
 }) async {
+  final theme = B2BThemeExtension.of(context);
+  final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  Widget body(BuildContext ctx) {
+    final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+    final sheet = B2BThemeExtension.of(ctx);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Expediente KYC',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: sheet.textPrimary,
+                    ),
+                  ),
+                ),
+                const ProfileInfoIcon(
+                  title: 'Expediente KYC',
+                  message: OrderSectionHelp.aliadoKycCredit,
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: Icon(Icons.close, color: sheet.textPrimary),
+                ),
+              ],
+            ),
+            if (aliado.ratingAsPayerAvgRolling100 != null &&
+                (aliado.ratingAsPayerCountRolling100 ?? 0) > 0) ...[
+              Text(
+                'Reputación como pagador: '
+                '${aliado.ratingAsPayerAvgRolling100!.toStringAsFixed(1)} / 5 '
+                '(${aliado.ratingAsPayerCountRolling100} valoraciones)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: sheet.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            TransactionRequestCounterpartyProfileSection(
+              profileId: aliado.id,
+              partyLabel: 'Tienda minorista',
+              businessName: aliado.businessName,
+              rif: aliado.rif,
+              phone: aliado.phone,
+              estado: aliado.estado,
+              ciudad: aliado.ciudad,
+              direccion: aliado.direccion,
+              fiscalMapsUrl: aliado.fiscalMapsUrl,
+              logoStoragePath: aliado.logoStoragePath,
+              kycStatus: aliado.kycStatus ?? KycStatus.aprobado,
+              loadApprovedDocuments: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  if (wide) {
+    await showDialog<void>(
+      context: context,
+      barrierColor: theme.textPrimary.withOpacity(0.45),
+      builder: (ctx) => Dialog(
+        backgroundColor: theme.dialogSurface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 560,
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.82,
+          ),
+          child: body(ctx),
+        ),
+      ),
+    );
+    return;
+  }
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: B2BThemeExtension.of(context).dialogSurface,
+    backgroundColor: theme.dialogSurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (ctx) {
-      final bottom = MediaQuery.of(ctx).viewInsets.bottom;
-      final sheet = B2BThemeExtension.of(ctx);
-      return Padding(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 20),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Expediente KYC',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        color: sheet.textPrimary,
-                      ),
-                    ),
-                  ),
-                  const ProfileInfoIcon(
-                    title: 'Expediente KYC',
-                    message: OrderSectionHelp.aliadoKycCredit,
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: Icon(Icons.close, color: sheet.textPrimary),
-                  ),
-                ],
-              ),
-              if (aliado.ratingAsPayerAvgRolling100 != null &&
-                  (aliado.ratingAsPayerCountRolling100 ?? 0) > 0) ...[
-                Text(
-                  'Reputación como pagador: '
-                  '${aliado.ratingAsPayerAvgRolling100!.toStringAsFixed(1)} / 5 '
-                  '(${aliado.ratingAsPayerCountRolling100} valoraciones)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: sheet.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              TransactionRequestCounterpartyProfileSection(
-                profileId: aliado.id,
-                partyLabel: 'Tienda minorista',
-                businessName: aliado.businessName,
-                rif: aliado.rif,
-                phone: aliado.phone,
-                estado: aliado.estado,
-                ciudad: aliado.ciudad,
-                direccion: aliado.direccion,
-                fiscalMapsUrl: aliado.fiscalMapsUrl,
-                logoStoragePath: aliado.logoStoragePath,
-                kycStatus: aliado.kycStatus ?? KycStatus.aprobado,
-                loadApprovedDocuments: true,
-              ),
-            ],
-          ),
-        ),
-      );
-    },
+    builder: body,
   );
 }
 
@@ -157,9 +286,9 @@ class _ImporterKycApprovedAliadosPanelState
     if (_loading) return 'Cargando…';
     if (_error != null) return 'Error al cargar';
     final n = _rows.length;
-    if (n == 0) return 'Ninguna tienda minorista verificado';
-    if (n == 1) return '1 tienda minorista verificado';
-    return '$n tiendas minoristas verificados';
+    if (n == 0) return 'Ninguna tienda minorista';
+    if (n == 1) return '1 tienda minorista';
+    return '$n tiendas minoristas';
   }
 
   @override
@@ -167,20 +296,63 @@ class _ImporterKycApprovedAliadosPanelState
     final filtered = _filtered;
     final theme = B2BThemeExtension.of(context);
 
-    return ProfileCollapsibleSection(
-      title: 'Tiendas minoristas verificados (KYC)',
-      subtitle: _sectionSubtitle(),
-      initiallyExpanded: false,
-      infoMessage: 'Tiendas minoristas con KYC aprobado',
-      trailingActions: [
-        IconButton(
-          onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh, size: 18),
-          tooltip: 'Actualizar',
-          visualDensity: VisualDensity.compact,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tiendas activas',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _sectionSubtitle(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const ProfileInfoIcon(
+                title: 'Tiendas activas',
+                message: 'Nombre, RIF, ubicación y contacto de cada tienda.',
+              ),
+              IconButton(
+                onPressed: _loading ? null : _load,
+                icon: Icon(Icons.refresh, size: 18, color: theme.textSecondary),
+                tooltip: 'Actualizar',
+                visualDensity: VisualDensity.compact,
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: Icon(Icons.close, size: 18, color: theme.textSecondary),
+                tooltip: 'Cerrar',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
         ),
-      ],
-      child: Column(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_loading)
@@ -213,7 +385,11 @@ class _ImporterKycApprovedAliadosPanelState
                 fillColor: theme.inputFill,
                 border: OutlineInputBorder(
                   borderRadius: AppDecorations.radius12,
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: theme.borderSubtle),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppDecorations.radius12,
+                  borderSide: BorderSide(color: theme.borderSubtle),
                 ),
               ),
             ),
@@ -235,7 +411,7 @@ class _ImporterKycApprovedAliadosPanelState
                 separator: 8,
                 itemBuilder: (a) => _AliadoKycListTile(
                   aliado: a,
-                  onTap: () => showImporterAliadoKycDetailSheet(
+                  onTap: () => showImporterActiveStoreSheet(
                     context,
                     aliado: a,
                   ),
@@ -244,6 +420,8 @@ class _ImporterKycApprovedAliadosPanelState
           ],
         ],
       ),
+        ),
+      ],
     );
   }
 }
@@ -260,15 +438,18 @@ class _AliadoKycListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = aliado.locationLine;
-    final rating = aliado.ratingAsPayerAvgRolling100;
-    final ratingCount = aliado.ratingAsPayerCountRolling100 ?? 0;
+    final rif = aliado.rif?.trim() ?? '';
+    final phone = aliado.phone?.trim() ?? '';
     final theme = B2BThemeExtension.of(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: theme.brandContainer,
-        borderRadius: AppDecorations.radius12,
+        color: theme.surfaceCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppDecorations.radius12,
+          side: BorderSide(color: theme.borderSubtle),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -276,47 +457,111 @@ class _AliadoKycListTile extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
             child: Row(
               children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.brandContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Center(
+                      child: LucideIcon(
+                        LucideGlyph.store,
+                        size: 18,
+                        color: theme.brand,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        aliado.displayName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13.5,
-                          color: theme.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              aliado.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13.5,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: theme.successBg,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              child: Text(
+                                'Activa',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.successFg,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (rif.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          rif,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ],
                       if (loc.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
                           loc,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11.5,
                             color: theme.textSecondary,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 4),
-                      Text(
-                        '${aliado.approvedDocumentCount} doc. aprobados'
-                        '${rating != null && ratingCount > 0 ? ' · Pago ${rating.toStringAsFixed(1)}/5' : ''}',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: theme.successFg,
+                      if (phone.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          phone,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: theme.textSecondary,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.verified_user_outlined,
-                  color: theme.brand,
-                  size: 20,
+                const SizedBox(width: 4),
+                LucideIcon(
+                  LucideGlyph.chevronRight,
+                  size: 16,
+                  color: theme.textMuted,
                 ),
-                Icon(Icons.chevron_right, color: theme.textSecondary),
               ],
             ),
           ),

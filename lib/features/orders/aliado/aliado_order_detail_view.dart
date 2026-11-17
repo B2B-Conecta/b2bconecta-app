@@ -1,6 +1,10 @@
 import '../shared/order_detail_layout.dart';
 export '../shared/order_detail_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
+import 'package:motolink_pro_app/features/catalog/importer_store_profile_screen.dart';
+import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/payments/motolink_volume_discount.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -47,10 +51,16 @@ class AliadoOrderDetailView extends StatefulWidget {
     required this.lines,
     required this.summary,
     required this.sectionsBuilder,
+    this.compact = false,
+    this.viewerProfile,
+    this.onMessageProvider,
   });
   final List<TransactionRequestModel> lines;
   final Widget summary;
   final AliadoDetailSectionsBuilder sectionsBuilder;
+  final bool compact;
+  final ProfileModel? viewerProfile;
+  final ValueChanged<List<TransactionRequestModel>>? onMessageProvider;
 
   @override
   State<AliadoOrderDetailView> createState() => _AliadoOrderDetailViewState();
@@ -71,14 +81,48 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
     final sameShipping = checkoutGroupMismoEstadoEnvio(chunk);
     final colors = OrderListColors.of(context);
     final volumeDiscount = computeVolumeDiscountForLines(chunk);
+    final compact = widget.compact;
+    final gap = compact ? 10.0 : 16.0;
 
+    final history = Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: PageStorageKey('history-${request.id}'),
+        dense: compact,
+        tilePadding: compact
+            ? const EdgeInsets.symmetric(horizontal: 10)
+            : EdgeInsets.zero,
+        childrenPadding:
+            EdgeInsets.fromLTRB(compact ? 10 : 0, 4, compact ? 10 : 0, 6),
+        leading: compact ? const Icon(Icons.schedule_outlined, size: 19) : null,
+        title: Text(compact ? 'Historial del pedido' : 'Historial del envío',
+            style: TextStyle(
+                fontSize: 13, fontWeight: compact ? FontWeight.w700 : null)),
+        children: [
+          for (final line in sameShipping ? [request] : chunk)
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (!sameShipping) ...[
+                Text(line.etiquetaProductoAliado,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                AliadoTransitEtaBanner(request: line),
+              ],
+              CourierTimelineWidget(
+                  request: line,
+                  compact: true,
+                  viewerRole: AppHomeRole.aliado,
+                  showHeading: false,
+                  embedded: true),
+            ]),
+        ],
+      ),
+    );
     final tracking = OrderDetailSection(
       title: 'Seguimiento',
       icon: Icons.local_shipping_outlined,
       tonal: true,
+      compact: compact,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        OrderDeliveryStepper(lines: chunk),
-        const SizedBox(height: 8),
+        OrderDeliveryStepper(lines: chunk, horizontalCompact: compact),
         if (sameShipping && AliadoTransitEtaBanner.shouldShow(request))
           AliadoTransitEtaBanner(request: request),
         if (sections.receipt != null) sections.receipt!,
@@ -88,47 +132,20 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
             expanded: true,
             aliadoViewer: true,
           ),
-        Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            key: PageStorageKey('history-${request.id}'),
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(top: 8),
-            title: const Text('Historial del envío',
-                style: TextStyle(fontSize: 13)),
-            children: [
-              for (final line in sameShipping ? [request] : chunk)
-                Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (!sameShipping) ...[
-                        Text(line.etiquetaProductoAliado,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600)),
-                        AliadoTransitEtaBanner(request: line),
-                      ],
-                      CourierTimelineWidget(
-                        request: line,
-                        compact: true,
-                        viewerRole: AppHomeRole.aliado,
-                        showHeading: false,
-                        embedded: true,
-                      ),
-                    ]),
-            ],
-          ),
-        ),
+        if (!compact) history,
       ]),
     );
     final products = OrderDetailSection(
       title: 'Productos',
+      compact: compact,
       icon: Icons.shopping_bag_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TransactionRequestProductosDesgloseSection(
             lines: chunk,
-            compact: false,
+            compact: compact,
+            retailerDetail: compact,
             viewer: PedidoDesgloseViewer.aliado,
             hideSectionTitle: true,
             showPrecioHelp: false,
@@ -144,71 +161,132 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
         ],
       ),
     );
+    final deliveryLabel = request.destinoEntregaUsaPerfil
+        ? 'Dirección de tu tienda'
+        : 'Dirección alterna';
+    final deliveryAddress = request.destinoEntregaUsaPerfil
+        ? request.aliadoDireccionFiscalMultilineaEs ??
+            'Dirección de la tienda aún no disponible.'
+        : request.destinoEntregaTexto?.trim().isNotEmpty == true
+            ? request.destinoEntregaTexto!.trim()
+            : 'Otro destino (sin texto guardado)';
     final delivery = OrderDetailSection(
       title: 'Entrega',
+      compact: compact,
       icon: Icons.location_on_outlined,
       flat: true,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(
-            request.destinoEntregaUsaPerfil
-                ? 'Dirección de tu tienda'
-                : 'Dirección alterna',
-            style: TextStyle(fontSize: 12, color: colors.secondary)),
-        const SizedBox(height: 6),
-        Text(
-            request.destinoEntregaUsaPerfil
-                ? request.aliadoDireccionFiscalMultilineaEs ??
-                    'Dirección de la tienda aún no disponible.'
-                : request.destinoEntregaTexto?.trim().isNotEmpty == true
-                    ? request.destinoEntregaTexto!.trim()
-                    : 'Otro destino (sin texto guardado)',
-            style: TextStyle(fontSize: 13, height: 1.5, color: colors.ink)),
+        if (compact)
+          _DetailInset(
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: colors.accent.withOpacity(.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.location_on_outlined,
+                    size: 22, color: colors.accent),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(deliveryLabel,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: colors.ink)),
+                  const SizedBox(height: 2),
+                  Text(deliveryAddress,
+                      style: TextStyle(
+                          fontSize: 12, height: 1.25, color: colors.secondary)),
+                ],
+              )),
+            ]),
+          )
+        else ...[
+          Text(deliveryLabel,
+              style: TextStyle(fontSize: 12, color: colors.secondary)),
+          const SizedBox(height: 6),
+          Text(deliveryAddress,
+              style: TextStyle(fontSize: 13, height: 1.5, color: colors.ink)),
+        ],
         if (sections.deliveryActions != null) ...[
           const SizedBox(height: 12),
           sections.deliveryActions!,
         ],
       ]),
     );
-    final payment = OrderDetailSection(
-      title: 'Pago y factura',
-      icon: Icons.account_balance_wallet_outlined,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(sections.paymentStatus,
-            style:
-                TextStyle(fontSize: 13, height: 1.4, color: colors.secondary)),
-        Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            key: PageStorageKey('payment-${request.id}'),
-            initiallyExpanded: sections.paymentOpen,
-            maintainState: true,
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(top: 8),
-            title: const Text('Ver factura y opciones',
-                style: TextStyle(fontSize: 13)),
-            children: [sections.payment],
-          ),
-        ),
-      ]),
-    );
+    final payment = compact
+        ? _DetailTile(
+            child: ExpansionTile(
+              key: PageStorageKey('payment-${request.id}'),
+              initiallyExpanded: sections.paymentOpen,
+              maintainState: true,
+              dense: true,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+              childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              leading: const Icon(Icons.receipt_long_outlined, size: 19),
+              title: Text('Pago y factura',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800, color: colors.ink)),
+              subtitle: Text(sections.paymentStatus,
+                  style: TextStyle(fontSize: 12, color: colors.secondary)),
+              children: [sections.payment],
+            ),
+          )
+        : OrderDetailSection(
+            title: 'Pago y factura',
+            icon: Icons.account_balance_wallet_outlined,
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(sections.paymentStatus,
+                      style: TextStyle(
+                          fontSize: 13, height: 1.4, color: colors.secondary)),
+                  Theme(
+                    data: Theme.of(context)
+                        .copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      key: PageStorageKey('payment-${request.id}'),
+                      initiallyExpanded: sections.paymentOpen,
+                      maintainState: true,
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(top: 8),
+                      title: const Text('Ver factura y opciones',
+                          style: TextStyle(fontSize: 13)),
+                      children: [sections.payment],
+                    ),
+                  ),
+                ]),
+          );
     final supplier = OrderDetailSection(
-      title: 'Contacto',
+      title: compact ? 'Contacto del proveedor' : 'Contacto',
+      compact: compact,
       icon: Icons.storefront_outlined,
       flat: true,
-      child: _SupplierContact(request: request),
+      child: _SupplierContact(
+          request: request,
+          compact: compact,
+          viewerProfile: widget.viewerProfile,
+          onMessage: widget.onMessageProvider == null
+              ? null
+              : () => widget.onMessageProvider!(chunk)),
     );
     final primary = [tracking, products, payment];
     final secondary = [delivery, supplier];
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       widget.summary,
-      const SizedBox(height: 16),
+      SizedBox(height: gap),
       if (providers.length > 1) ...[
         _ProviderSelector(
             providers: providers,
             selectedOwner: request.ownerId,
             onSelected: (owner) => setState(() => _owner = owner)),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
       ],
       // Remount supplier-specific forms on selection; an ordinary data refresh
       // keeps their state because this key remains stable.
@@ -223,7 +301,15 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
           OrderDetailColumns(
               primary: primary,
               secondary: secondary,
-              mobileOrder: [tracking, products, delivery, payment, supplier]),
+              compact: compact,
+              mobileOrder: [
+                tracking,
+                if (compact) _DetailTile(child: history),
+                products,
+                delivery,
+                payment,
+                supplier,
+              ]),
           if (sections.afterSales != null) ...[
             const SizedBox(height: 16),
             OrderDetailSection(
@@ -320,9 +406,146 @@ class _ProviderSelector extends StatelessWidget {
   }
 }
 
+class _DetailTile extends StatelessWidget {
+  const _DetailTile({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: OrderListColors.of(context).detailSurface,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: child,
+        ),
+      );
+}
+
+class _DetailInset extends StatelessWidget {
+  const _DetailInset({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: child,
+      );
+}
+
 class _SupplierContact extends StatelessWidget {
-  const _SupplierContact({required this.request});
+  const _SupplierContact({
+    required this.request,
+    required this.compact,
+    this.viewerProfile,
+    this.onMessage,
+  });
   final TransactionRequestModel request;
+  final bool compact;
+  final ProfileModel? viewerProfile;
+  final VoidCallback? onMessage;
+
+  Future<void> _launch(BuildContext context, Uri uri, String error) async {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  Widget _compactContact(BuildContext context, String address, Uri? map) {
+    final colors = OrderListColors.of(context);
+    final name = request.ownerBusinessName?.trim();
+    final rif = request.ownerRif?.trim() ?? '';
+    final phone = request.ownerPhone?.trim() ?? '';
+    final profile = viewerProfile;
+    final meta = TextStyle(fontSize: 12, color: colors.secondary);
+    Widget detail(IconData icon, Widget value) => Column(children: [
+          Divider(height: 12, color: colors.border),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 17, color: colors.ink),
+            const SizedBox(width: 9),
+            Expanded(child: value),
+          ]),
+        ]);
+    return _DetailInset(
+        child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          ClipOval(
+              child: ImporterCatalogLogo(
+                  storagePath: request.ownerLogoStoragePath, size: 54)),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name == null || name.isEmpty ? 'Proveedor' : name,
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: colors.ink)),
+              if (name != null && name.isNotEmpty)
+                Text('Proveedor', style: meta),
+            ],
+          )),
+        ]),
+        if (rif.isNotEmpty)
+          detail(Icons.badge_outlined, Text('RIF · $rif', style: meta)),
+        if (phone.isNotEmpty)
+          detail(Icons.phone_outlined, SelectableText(phone, style: meta)),
+        if (address.isNotEmpty)
+          detail(
+              Icons.location_on_outlined,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Dirección fiscal',
+                      style: meta.copyWith(fontWeight: FontWeight.w700)),
+                  Text(address, style: meta),
+                ],
+              )),
+        if (onMessage != null || map != null) ...[
+          const SizedBox(height: 7),
+          Wrap(spacing: 7, runSpacing: 4, children: [
+            if (onMessage != null)
+              OutlinedButton.icon(
+                onPressed: onMessage,
+                icon: const LucideIcon(LucideGlyph.messageCircle, size: 17),
+                label: const Text('Mensaje'),
+              ),
+            if (map != null)
+              TextButton.icon(
+                onPressed: () =>
+                    _launch(context, map, 'No se pudo abrir la ubicación.'),
+                icon: const Icon(Icons.location_on_outlined, size: 16),
+                label: const Text('Ver ubicación'),
+              ),
+          ]),
+        ],
+        if (profile != null && request.ownerId.trim().isNotEmpty) ...[
+          Divider(height: 10, color: colors.border),
+          Center(
+              child: TextButton(
+            onPressed: () => Navigator.of(context).push<void>(MaterialPageRoute(
+              builder: (_) => ImporterStoreProfileScreen(
+                  importerId: request.ownerId, viewer: profile),
+            )),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('Ver tienda'),
+              SizedBox(width: 5),
+              Icon(Icons.arrow_forward, size: 16),
+            ]),
+          )),
+        ],
+      ],
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -337,6 +560,12 @@ class _SupplierContact extends StatelessWidget {
         .where((v) => v.isNotEmpty)
         .join(', ');
     final map = Uri.tryParse(request.ownerFiscalMapsUrl?.trim() ?? '');
+    if (compact) {
+      final validMap = map != null &&
+          (map.scheme == 'http' || map.scheme == 'https') &&
+          map.hasAuthority;
+      return _compactContact(context, address, validMap ? map : null);
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(
           request.ownerBusinessName?.trim().isNotEmpty == true

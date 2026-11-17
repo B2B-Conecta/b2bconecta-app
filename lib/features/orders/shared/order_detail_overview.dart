@@ -1,7 +1,11 @@
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'order_list_colors.dart';
 import 'order_list_entry.dart';
 import 'order_list_row.dart';
 import 'transaction_request_model.dart';
@@ -15,6 +19,7 @@ class OrderDetailOverview extends StatelessWidget {
       required this.chatAction,
       this.viewerRole = AppHomeRole.aliado,
       this.actionsInHeader = false,
+      this.compactRetailer = false,
       this.cancelAction});
   final List<TransactionRequestModel> lines;
   final String nextStep;
@@ -22,11 +27,13 @@ class OrderDetailOverview extends StatelessWidget {
   final Widget? cancelAction;
   final AppHomeRole viewerRole;
   final bool actionsInHeader;
+  final bool compactRetailer;
 
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
     final entry = OrderListEntry(lines, viewerRole: viewerRole);
+    if (compactRetailer) return _retailerSummary(context, entry, OrderListColors.of(context));
     final count = entry.products.length;
     final identity =
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -73,21 +80,8 @@ class OrderDetailOverview extends StatelessWidget {
               height: 1.15,
               letterSpacing: -.3,
               color: theme.textPrimary)),
-      if (entry.bolivares != null) ...[
-        const SizedBox(height: 4),
-        Text(entry.bolivares!,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: theme.textSecondary)),
-      ] else ...[
-        const SizedBox(height: 4),
-        Text('Bs —',
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: theme.textMuted)),
-      ],
+      const SizedBox(height: 4),
+      _OrderBolivarLabel(lines: lines, theme: theme),
     ]);
     final note = nextStep.isEmpty
         ? const SizedBox.shrink()
@@ -189,5 +183,181 @@ class OrderDetailOverview extends StatelessWidget {
             ]);
       }),
     );
+  }
+
+  Widget _retailerSummary(
+    BuildContext context,
+    OrderListEntry entry,
+    OrderListColors colors,
+  ) {
+    final meta = TextStyle(fontSize: 12, color: colors.secondary, height: 1.25);
+    final count = entry.products.length;
+    final title = count > 1 ? '${entry.title} y ${count - 1} más' : entry.title;
+    final quantity =
+        '${entry.quantity} ${entry.quantity == 1 ? 'unidad' : 'unidades'}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+              color: colors.detailSurface,
+              borderRadius: BorderRadius.circular(15)),
+          padding: const EdgeInsets.fromLTRB(9, 2, 9, 9),
+          child: Column(
+            children: [
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                chatAction,
+                if (cancelAction != null) cancelAction!,
+              ]),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                OrderThumbnail(entry: entry, size: 60),
+                const SizedBox(width: 9),
+                Expanded(
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 14,
+                            height: 1.15,
+                            fontWeight: FontWeight.w800,
+                            color: colors.ink)),
+                    const SizedBox(height: 2),
+                    Text('$quantity · ${entry.date}', style: meta),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.spaceBetween,
+                      children: [
+                        OrderStatusTag(entry: entry, compact: true),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(entry.amount,
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.ink)),
+                            if (entry.bolivares case final amount?)
+                              Text(amount, style: meta),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                )),
+              ]),
+            ],
+          ),
+        ),
+        if (nextStep.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 7, 4, 0),
+            child: Text(nextStep,
+                style: meta.copyWith(
+                    color: entry.needsAttention
+                        ? Theme.of(context).colorScheme.error
+                        : colors.secondary)),
+          ),
+      ],
+    );
+  }
+}
+
+/// Equivalente en Bs del total REF. En escritorio usa la tasa del pedido
+/// o, si no está congelada, la tasa de referencia activa.
+class _OrderBolivarLabel extends StatefulWidget {
+  const _OrderBolivarLabel({required this.lines, required this.theme});
+
+  final List<TransactionRequestModel> lines;
+  final B2BThemeExtension theme;
+
+  @override
+  State<_OrderBolivarLabel> createState() => _OrderBolivarLabelState();
+}
+
+class _OrderBolivarLabelState extends State<_OrderBolivarLabel> {
+  double? _liveRate;
+  bool _loading = false;
+
+  bool get _web =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+  bool get _ref => orderAmountCurrency(widget.lines) == 'REF';
+
+  double? get _frozen {
+    if (!_ref || !widget.lines.every((line) => line.precioTotalBsUi != null)) {
+      return null;
+    }
+    return widget.lines.fold<double>(
+        0, (sum, line) => sum + line.precioTotalBsUi!);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _prime();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderBolivarLabel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lines != widget.lines) _prime();
+  }
+
+  void _prime() {
+    if (_frozen != null || !_ref) return;
+    final cached = BcvBasePrice.cachedRate;
+    if (cached != null && cached > 0) {
+      _liveRate = cached;
+      _loading = false;
+      return;
+    }
+    _loading = true;
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final rate = await BcvBasePrice.currentRate();
+      if (!mounted) return;
+      setState(() {
+        _liveRate = rate;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final frozen = _frozen;
+    final style = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: widget.theme.textSecondary,
+    );
+    if (frozen != null) return Text(formatBsLabel(frozen), style: style);
+    if (!_web || !_ref) {
+      return Text('Bs —',
+          style: style.copyWith(
+              fontWeight: FontWeight.w500, color: widget.theme.textMuted));
+    }
+    final rate = _liveRate;
+    if (rate == null || rate <= 0) {
+      return Text(_loading ? 'Bs …' : 'Sin tasa vigente',
+          style: style.copyWith(
+              fontWeight: FontWeight.w500, color: widget.theme.textMuted));
+    }
+    final total = widget.lines.fold<double>(0, (sum, line) {
+      return sum + (line.precioTotalBsUi ?? line.precioTotal * rate);
+    });
+    return Text(formatBsLabel(total), style: style);
   }
 }

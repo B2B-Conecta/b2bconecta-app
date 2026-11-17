@@ -22,6 +22,7 @@ class OrderListColors {
   /// Foreground on filled accent chips.
   Color get onAccent => theme.surfaceCard;
 
+  Color get detailSurface => dark ? soft : const Color(0xFFEEF1F6);
   Color get pendingAccent =>
       dark ? AppColors.warningAmberOnDark : AppColors.warningAmber;
   Color get pendingSurface =>

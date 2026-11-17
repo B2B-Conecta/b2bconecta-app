@@ -209,7 +209,7 @@ void main() {
                     ],
                     profile: profile,
                     unreadNotifications: 0,
-                    onNotificationTap: () {},
+                    onNotificationTap: (_) {},
                     onOpenSettings: () => settingsOpened++,
                     onSignOut: () {
                       signOutCalls++;

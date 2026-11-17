@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'importer_sales_explore.dart';
 import 'importer_sales_product_sheet.dart';
 
@@ -10,11 +12,13 @@ class ImporterSalesProductStat {
     required this.productId,
     required this.name,
     required this.units,
+    this.sku = '',
     this.revenue = 0,
   });
 
   final String productId;
   final String name;
+  final String sku;
   final int units;
   final double revenue;
 
@@ -24,6 +28,7 @@ class ImporterSalesProductStat {
       name: (json['name']?.toString().trim().isNotEmpty == true)
           ? json['name'].toString().trim()
           : 'Producto',
+      sku: json['sku']?.toString().trim() ?? '',
       units: _asInt(json['units']),
       revenue: _asDouble(json['revenue']),
     );
@@ -193,12 +198,21 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
       (m, p) => p.units > m ? p.units : m,
     );
 
+    final theme = B2BThemeExtension.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderSubtle),
-        boxShadow: AppDecorations.cardShadow,
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: theme.textPrimary.withOpacity(
+              Theme.of(context).brightness == Brightness.dark ? 0.28 : 0.06,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -206,89 +220,117 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.brandBlue,
-                  Color.lerp(AppColors.brandBlue, AppColors.brandAccent, 0.55)!,
-                ],
-              ),
+              color: theme.surfaceSubtle,
+              border: Border(bottom: BorderSide(color: theme.borderSubtle)),
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(15)),
+                  const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.16),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.auto_graph_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
+                LayoutBuilder(
+                  builder: (context, header) {
+                    final stackPeriods = header.maxWidth < 520;
+                    final title = Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Desempeño de ventas',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white,
+                              color: theme.textPrimary,
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
                             ),
                           ),
                           Text(
                             'Pedidos, facturación y rotación de SKUs',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: theme.textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    if (onDaysChanged != null)
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            for (final d in daysOptions)
-                              _PeriodChip(
-                                label: d == 7 ? '7 días' : '30 días',
-                                selected: _days == d,
-                                onTap: () => onDaysChanged!(d),
-                              ),
-                          ],
-                        ),
+                    );
+                    final icon = Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: theme.brandContainer,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                  ],
+                      child: LucideIcon(
+                        LucideGlyph.barChart3,
+                        color: theme.brand,
+                        size: 18,
+                      ),
+                    );
+                    final periods = onDaysChanged == null
+                        ? null
+                        : Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: theme.brandContainer,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (final d in daysOptions)
+                                  _PeriodChip(
+                                    label: d == 7 ? '7 días' : '30 días',
+                                    selected: _days == d,
+                                    onTap: () => onDaysChanged!(d),
+                                  ),
+                              ],
+                            ),
+                          );
+                    if (stackPeriods) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            icon,
+                            const SizedBox(width: 10),
+                            title,
+                          ]),
+                          if (periods != null) ...[
+                            const SizedBox(height: 8),
+                            periods,
+                          ],
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        icon,
+                        const SizedBox(width: 10),
+                        title,
+                        if (periods != null) ...[
+                          const SizedBox(width: 8),
+                          periods,
+                        ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 10),
                 Text(
                   snapshot.ordersCount == 0
                       ? 'Aún no hay movimiento en los últimos $_days días. Toque una métrica cuando haya pedidos.'
                       : '${snapshot.ordersEntregados} entregados · ${snapshot.ordersActive} en curso · ticket ${formatRefAmount(snapshot.averageTicketRef)} REF',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.textSecondary,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     height: 1.3,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
@@ -304,7 +346,7 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                     final twoCol = c.maxWidth < 560;
                     final tiles = [
                       _MetricTile(
-                        icon: Icons.local_shipping_outlined,
+                        glyph: LucideGlyph.truck,
                         label: 'En curso',
                         value: '${snapshot.ordersActive}',
                         hint: 'Ver detalle',
@@ -315,7 +357,7 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                         ),
                       ),
                       _MetricTile(
-                        icon: Icons.verified_outlined,
+                        glyph: LucideGlyph.circleCheck,
                         label: 'Entregados',
                         value: '${snapshot.ordersEntregados}',
                         hint: 'Ver detalle',
@@ -327,7 +369,7 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                         ),
                       ),
                       _MetricTile(
-                        icon: Icons.inventory_2_outlined,
+                        glyph: LucideGlyph.package,
                         label: 'Unidades',
                         value: '${snapshot.unitsSold}',
                         hint: 'Ver ranking',
@@ -338,7 +380,7 @@ class ImporterSalesSnapshotCard extends StatelessWidget {
                         ),
                       ),
                       _MetricTile(
-                        icon: Icons.payments_outlined,
+                        glyph: LucideGlyph.badgeDollarSign,
                         label: 'Facturado',
                         value: formatRefAmount(snapshot.revenueRef),
                         hint: 'Ver desglose',
@@ -514,8 +556,9 @@ class _PeriodChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return Material(
-      color: selected ? Colors.white : Colors.transparent,
+      color: selected ? theme.surfaceCard : Colors.transparent,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -527,7 +570,7 @@ class _PeriodChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
-              color: selected ? AppColors.brandBlue : Colors.white,
+              color: selected ? theme.brand : theme.textSecondary,
             ),
           ),
         ),
@@ -538,7 +581,7 @@ class _PeriodChip extends StatelessWidget {
 
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
-    required this.icon,
+    required this.glyph,
     required this.label,
     required this.value,
     required this.hint,
@@ -547,7 +590,7 @@ class _MetricTile extends StatelessWidget {
     this.onTap,
   });
 
-  final IconData icon;
+  final LucideGlyph glyph;
   final String label;
   final String value;
   final String hint;
@@ -557,34 +600,36 @@ class _MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final accent = success
-        ? AppColors.successGreen
+        ? theme.successFg
         : emphasize
-            ? AppColors.brandAccent
-            : AppColors.brandBlue;
+            ? theme.brand
+            : theme.textSecondary;
     return Material(
-      color: Color.lerp(AppColors.card, accent, 0.06),
+      color: theme.surfaceSubtle,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
+        hoverColor: theme.brand.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: accent.withOpacity(0.18)),
+            border: Border.all(color: theme.borderSubtle),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(icon, size: 18, color: accent),
+                  LucideIcon(glyph, size: 18, color: accent),
                   const Spacer(),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: accent.withOpacity(0.8),
+                  LucideIcon(
+                    LucideGlyph.chevronRight,
+                    size: 16,
+                    color: theme.textMuted,
                   ),
                 ],
               ),
@@ -595,12 +640,15 @@ class _MetricTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  color: theme.textPrimary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -609,10 +657,12 @@ class _MetricTile extends StatelessWidget {
               ),
               Text(
                 hint,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  color: theme.textSecondary,
                 ),
               ),
             ],
@@ -827,14 +877,30 @@ class _RankedProductLine extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              product.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (product.sku.trim().isNotEmpty)
+                                  Text(
+                                    'SKU ${product.sku.trim()}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 6),

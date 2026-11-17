@@ -141,6 +141,11 @@ class _OrderChatWidgetState extends State<OrderChatWidget> {
     return parts.join(' · ');
   }
 
+  bool get _canReply =>
+      widget.allowReplyAsAliado ||
+      widget.allowReplyAsAdmin ||
+      widget.allowReplyAsImportador;
+
   List<String> get _relatedIds {
     final merged = widget.mergedThreadRequestIds;
     if (merged != null && merged.isNotEmpty) return merged;
@@ -195,8 +200,14 @@ class _OrderChatWidgetState extends State<OrderChatWidget> {
                         suppressBuiltinTitle: true,
                         suppressInlineHelp: true,
                         expandMessages: true,
-                        emptyHint:
-                            '¿Tienes una duda sobre este pedido? Escribe aquí para iniciar la conversación',
+                        emptyHint: _canReply
+                            ? '¿Tienes una duda sobre este pedido? Escribe aquí para iniciar la conversación'
+                            : null,
+                        closedEmptyTitle:
+                            _canReply ? null : 'Conversación finalizada',
+                        closedEmptyDescription: _canReply
+                            ? null
+                            : 'Este pedido está cerrado y no tiene mensajes.',
                       ),
                     ),
             ),

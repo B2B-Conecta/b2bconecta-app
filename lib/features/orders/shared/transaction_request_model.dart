@@ -1086,8 +1086,14 @@ class TransactionRequestModel {
     String? productSku;
     List<String> productImageUrls = const <String>[];
     Map<String, dynamic>? productDiscountRules;
+    Map<String, dynamic>? productMap;
     if (products is Map) {
-      final pm = Map<String, dynamic>.from(products);
+      productMap = Map<String, dynamic>.from(products);
+    } else if (products is List && products.isNotEmpty && products.first is Map) {
+      productMap = Map<String, dynamic>.from(products.first as Map);
+    }
+    if (productMap != null) {
+      final pm = productMap;
       productName = pm['name']?.toString();
       final s = pm['sku']?.toString().trim();
       productSku = (s != null && s.isNotEmpty) ? s : null;

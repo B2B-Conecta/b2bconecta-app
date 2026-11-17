@@ -844,73 +844,18 @@ extension on _AliadoHomeDashboardState {
         openFilters: openFilters,
       );
 
-  Widget _mobileSearch(
-      {bool autofocus = false,
-      VoidCallback? onSearch,
-      VoidCallback? onFilters}) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final muted =
-        dark ? theme.colorScheme.onSurfaceVariant : const Color(0xFF64748B);
-    final submit = onSearch ?? _searchCatalog;
-    final outline = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(20),
-      borderSide: BorderSide.none,
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 14),
-      child: TextField(
+  Widget _mobileSearch({
+    bool autofocus = false,
+    VoidCallback? onSearch,
+    VoidCallback? onFilters,
+  }) =>
+      AliadoHeaderSearch(
         controller: _search,
+        hint: 'Buscar repuestos, bujías, cauchos…',
         autofocus: autofocus,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => submit(),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          hintText: 'Buscar repuestos, bujías, cauchos…',
-          hintStyle: TextStyle(color: muted, fontSize: 14),
-          prefixIcon: IconButton(
-            tooltip: 'Buscar en el catálogo',
-            onPressed: submit,
-            icon: LucideIcon(LucideGlyph.search, size: 19, color: muted),
-          ),
-          suffixIcon: Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: IconButton(
-              tooltip: 'Filtros del catálogo',
-              onPressed: onFilters ?? () => _searchCatalogWithFilters(true),
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(44),
-                padding: EdgeInsets.zero,
-                foregroundColor: const Color(0xFF245DE6),
-              ),
-              icon: const SizedBox.square(
-                dimension: 32,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Color(0xFF245DE6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: LucideIcon(LucideGlyph.slidersHorizontal,
-                        size: 17, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 9),
-          filled: true,
-          fillColor: dark ? theme.colorScheme.surface : Colors.white,
-          border: outline,
-          enabledBorder: outline,
-          focusedBorder: outline.copyWith(
-            borderSide: BorderSide(color: theme.colorScheme.primary),
-          ),
-        ),
-      ),
-    );
-  }
+        onSearch: onSearch ?? _searchCatalog,
+        onFilters: onFilters ?? () => _searchCatalogWithFilters(true),
+      );
 
   Widget _block(Widget child, {double top = 18, bool fullWidth = false}) {
     final inset = fullWidth ? 0.0 : _homeSectionInset;
@@ -1456,9 +1401,9 @@ extension on _AliadoHomeDashboardState {
                     _price(part),
                     const SizedBox(height: 3),
                     if (part.hasSupplierMinOrderQty)
-                    Text(part.minOrderQtyLabelEs,
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
+                      Text(part.minOrderQtyLabelEs,
+                          style: TextStyle(
+                              fontSize: 11, color: AppColors.textSecondary)),
                   ]),
             ),
           )),
@@ -1508,9 +1453,9 @@ extension on _AliadoHomeDashboardState {
                       const SizedBox(height: 4),
                       _price(part),
                       if (part.hasSupplierMinOrderQty)
-                    Text(part.minOrderQtyLabelEs,
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
+                        Text(part.minOrderQtyLabelEs,
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary)),
                     ]),
               )),
             ])),

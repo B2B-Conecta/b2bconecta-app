@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth_link_utils.dart';
 import 'auth_recovery_storage.dart';
 import 'package:motolink_pro_app/app/config/auth_redirect_config.dart';
 import 'package:motolink_pro_app/core/notifications/push_notification_service.dart';
@@ -111,8 +112,23 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Reenvía el correo de confirmación de registro (OTP signup).
+  static Future<void> resendSignupConfirmation(String email) {
+    return _auth.resend(
+      type: OtpType.signup,
+      email: email.trim(),
+      emailRedirectTo: authRedirectUrl,
+    );
+  }
+
   /// Mensajes legibles para [AuthException.message] y respuestas genéricas.
-  static String mapAuthErrorMessage(String? raw) {
+  ///
+  /// [kind] evita mostrar copy de «recuperación» en confirmación de registro.
+  static String mapAuthErrorMessage(
+    String? raw, {
+    AuthCallbackKind kind = AuthCallbackKind.other,
+    bool pendingPasswordRecovery = false,
+  }) {
     final m = raw?.toLowerCase() ?? '';
     if (m.contains('invalid') && m.contains('credential')) {
       return 'Correo o contraseña incorrectos.';
@@ -136,8 +152,24 @@ class AuthService {
       return 'El registro está deshabilitado en este momento.';
     }
     if (m.contains('code verifier')) {
-      return 'Abre el enlace en el mismo navegador donde solicitaste '
-          'la recuperación de contraseña.';
+      final effective = pendingPasswordRecovery ||
+              kind == AuthCallbackKind.recovery
+          ? AuthCallbackKind.recovery
+          : kind == AuthCallbackKind.signup
+              ? AuthCallbackKind.signup
+              : AuthCallbackKind.other;
+      return switch (effective) {
+        AuthCallbackKind.recovery =>
+          'Abre el enlace en el mismo navegador (y sitio) donde solicitaste '
+              'la recuperación de contraseña.',
+        AuthCallbackKind.signup =>
+          'Abre el enlace de confirmación en el mismo navegador o app donde '
+              'te registraste. Si te registraste en Android, ábrelo desde la app; '
+              'si fue en esta web, usa este mismo sitio e inicia sesión tras confirmar.',
+        AuthCallbackKind.other =>
+          'Abre el enlace en el mismo navegador o app donde lo solicitaste. '
+              'Si ya confirmaste el correo, inicia sesión aquí.',
+      };
     }
     if (m.contains('provider') && m.contains('not') && m.contains('enable')) {
       return 'El ingreso con Google aún no está habilitado en este entorno.';

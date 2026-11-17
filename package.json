@@ -1,0 +1,8 @@
+{
+  "name": "b2bconecta-app",
+  "private": true,
+  "description": "Root engines for Vercel (catalog-reader / pnpm). Flutter deps live in pubspec.yaml.",
+  "engines": {
+    "node": "22.x"
+  }
+}

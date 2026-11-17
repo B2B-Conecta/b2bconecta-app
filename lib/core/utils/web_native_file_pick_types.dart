@@ -16,4 +16,4 @@ const kWebAcceptImagesOnly = 'image/*';
 
 /// Spreadsheet import (Excel + CSV).
 const kWebAcceptSpreadsheet =
-    '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv';
+    '.xlsx,.xlsm,.xls,.csv,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.ms-excel,text/csv,application/pdf';

@@ -1912,6 +1912,8 @@ class _ProfileIdentityCard extends StatelessWidget {
                   children: [
                     Text(
                       businessName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -1922,6 +1924,8 @@ class _ProfileIdentityCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       email,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13.5,
                         color: theme.textSecondary,

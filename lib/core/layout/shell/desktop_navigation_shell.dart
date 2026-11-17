@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import 'package:motolink_pro_app/features/orders/importador/importer_order_detail_chrome.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
@@ -16,6 +18,10 @@ import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import 'shell_destination.dart';
 import 'shell_nav_badge.dart';
 import 'shell_user_menu.dart';
+
+class _OpenGlobalSearchIntent extends Intent {
+  const _OpenGlobalSearchIntent();
+}
 
 /// Layout escritorio: rail lateral (ocultable), barra superior y contenido.
 class DesktopNavigationShell extends StatefulWidget {
@@ -53,6 +59,9 @@ class DesktopNavigationShell extends StatefulWidget {
     this.pageIndex,
     this.railSelectionActive = true,
     this.accountFooterSelected = false,
+    this.accountOpensMenu = false,
+    this.importerAccountMenu = false,
+    this.searchHint,
   });
 
   /// Bloque opcional sobre la tarjeta de cuenta; recibe si el rail está expandido.
@@ -117,6 +126,16 @@ class DesktopNavigationShell extends StatefulWidget {
   /// Resalta la tarjeta de cuenta del footer (perfil/ajustes activo).
   final bool accountFooterSelected;
 
+  /// La tarjeta de cuenta abre el menú (Perfil y Configuración) en lugar de
+  /// entrar directo a ajustes.
+  final bool accountOpensMenu;
+
+  /// Menú de cuenta del importador: pestañas de Perfil, sin Ajustes de admin.
+  final bool importerAccountMenu;
+
+  /// Texto del buscador del header. Null usa el hint de admin.
+  final String? searchHint;
+
   @override
   State<DesktopNavigationShell> createState() => _DesktopNavigationShellState();
 }
@@ -162,6 +181,35 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
     await DesktopNavRailPreference.setExpanded(expanded);
   }
 
+  ImporterOrderDetailChrome? _openImporterOrder(String parentLabel) {
+    final chrome = ImporterOrderDetailChrome.instance;
+    if (!chrome.active || parentLabel != 'Pedidos') return null;
+    return chrome;
+  }
+
+  List<AdminShellBreadcrumb> _desktopBreadcrumbs({
+    required String parentLabel,
+    required int railIdx,
+  }) {
+    if (widget.breadcrumbsOverride != null) return widget.breadcrumbsOverride!;
+    final crumbs = adminShellBreadcrumbsFor(
+      destinations: widget.destinations,
+      selectedIndex: railIdx < 0 ? 0 : railIdx,
+      nestedId: widget.selectedNestedId,
+      onHome: () => widget.onDestinationSelected(0),
+      onSelectParent: (i) => widget.onDestinationSelected(i),
+    );
+    final order = _openImporterOrder(parentLabel);
+    if (order == null) return crumbs;
+    return [
+      for (final crumb in crumbs)
+        crumb.label == 'Pedidos'
+            ? AdminShellBreadcrumb(label: crumb.label, onTap: order.close)
+            : crumb,
+      AdminShellBreadcrumb(label: order.reference!),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     // Engancha al Theme: al cambiar claro/oscuro el rail y el scaffold se redibujan.
@@ -192,7 +240,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
           )
         : parent;
 
-    return Scaffold(
+    Widget scaffold = Scaffold(
       backgroundColor: AppColors.background,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -222,6 +270,8 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
               navBadges: widget.navBadges,
               resolveNavBadge: widget.resolveNavBadge,
               accountFooterSelected: widget.accountFooterSelected,
+              accountOpensMenu: widget.accountOpensMenu,
+              importerAccountMenu: widget.importerAccountMenu,
             ),
           ),
           Expanded(
@@ -232,17 +282,13 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (widget.chrome == DesktopShellChrome.darkCorporate)
-                          AdminShellTopBar(
-                            breadcrumbs: widget.breadcrumbsOverride ??
-                                adminShellBreadcrumbsFor(
-                                  destinations: widget.destinations,
-                                  selectedIndex: railIdx < 0 ? 0 : railIdx,
-                                  nestedId: widget.selectedNestedId,
-                                  onHome: () =>
-                                      widget.onDestinationSelected(0),
-                                  onSelectParent: (i) =>
-                                      widget.onDestinationSelected(i),
-                                ),
+                          ListenableBuilder(
+                            listenable: ImporterOrderDetailChrome.instance,
+                            builder: (context, _) => AdminShellTopBar(
+                            breadcrumbs: _desktopBreadcrumbs(
+                              parentLabel: parent.label,
+                              railIdx: railIdx,
+                            ),
                             onBreadcrumbBack: widget.onBreadcrumbBack,
                             profile: widget.profile,
                             unreadNotifications: widget.unreadNotifications,
@@ -250,6 +296,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                             onOpenDrawer: widget.onOpenDrawer,
                             onSearchSubmitted: widget.onSearchSubmitted,
                             onOpenGlobalSearch: widget.onOpenGlobalSearch,
+                            searchHint: widget.searchHint,
                             showGlobalSearch: widget.showGlobalSearch,
                             onMessagesTap: widget.onMessagesTap,
                             unreadMessages: widget.unreadMessages,
@@ -270,6 +317,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                                   _signOut();
                               }
                             },
+                          ),
                           )
                         else
                           DesktopShellTopBar(
@@ -281,11 +329,21 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                             trailingActions: widget.trailingActions,
                           ),
                         if (widget.contentOverride == null)
-                          _DesktopPageHeading(
-                              destination: dest,
-                              compact: compact,
-                              hidden:
-                                  ScrollCompactState.hideHeadingOf(context)),
+                          ListenableBuilder(
+                            listenable: ImporterOrderDetailChrome.instance,
+                            builder: (context, _) {
+                              final order = _openImporterOrder(parent.label);
+                              return _DesktopPageHeading(
+                                destination: dest,
+                                compact: compact,
+                                hidden: ScrollCompactState.hideHeadingOf(
+                                    context),
+                                subtitleOverride: order == null
+                                    ? null
+                                    : (order.statusLabel ?? ''),
+                              );
+                            },
+                          ),
                         if (widget.contentOverride != null)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(28, 18, 28, 8),
@@ -322,6 +380,35 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
         ],
       ),
     );
+
+    final openSearch = widget.onOpenGlobalSearch;
+    if (openSearch == null || !widget.showGlobalSearch) return scaffold;
+
+    // Atajo global del shell (no solo cuando el top bar tiene foco).
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            _OpenGlobalSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            _OpenGlobalSearchIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _OpenGlobalSearchIntent: CallbackAction<_OpenGlobalSearchIntent>(
+            onInvoke: (_) {
+              openSearch();
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: false,
+          canRequestFocus: false,
+          skipTraversal: true,
+          child: scaffold,
+        ),
+      ),
+    );
   }
 }
 
@@ -341,14 +428,19 @@ class _DesktopPageHeading extends StatelessWidget {
     required this.destination,
     required this.compact,
     required this.hidden,
+    this.subtitleOverride,
   });
 
   final ShellDestination destination;
   final bool compact;
   final bool hidden;
 
+  /// Sustituye el subtítulo del destino. Cadena vacía lo oculta.
+  final String? subtitleOverride;
+
   @override
   Widget build(BuildContext context) {
+    final subtitle = subtitleOverride ?? destination.subtitle;
     final heading = hidden
         ? const SizedBox(key: ValueKey('desktop-page-heading'), height: 0)
         : Padding(
@@ -365,11 +457,11 @@ class _DesktopPageHeading extends StatelessWidget {
                         color: AppColors.textPrimary,
                         letterSpacing: -0.4,
                         height: 1.15)),
-                if (!compact && destination.subtitle?.isNotEmpty == true) ...[
+                if (!compact && subtitle?.isNotEmpty == true) ...[
                   const SizedBox(height: 8),
                   ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 720),
-                      child: Text(destination.subtitle!,
+                      child: Text(subtitle!,
                           style: TextStyle(
                               fontSize: 14.5,
                               height: 1.45,
@@ -473,6 +565,8 @@ class _DesktopSideRail extends StatefulWidget {
     this.navBadges,
     this.resolveNavBadge,
     this.accountFooterSelected = false,
+    this.accountOpensMenu = false,
+    this.importerAccountMenu = false,
   });
 
   final DesktopShellChrome chrome;
@@ -496,6 +590,8 @@ class _DesktopSideRail extends StatefulWidget {
   final Listenable? navBadges;
   final ShellNavBadge? Function(Object? key)? resolveNavBadge;
   final bool accountFooterSelected;
+  final bool accountOpensMenu;
+  final bool importerAccountMenu;
 
   @override
   State<_DesktopSideRail> createState() => _DesktopSideRailState();
@@ -827,9 +923,13 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
               profile: widget.profile,
               signingOut: widget.signingOut,
               selected: widget.accountFooterSelected,
-              openSettingsOnTap:
-                  widget.chrome == DesktopShellChrome.darkCorporate ||
-                      widget.onOpenProfile != null,
+              importerAccountMenu: widget.importerAccountMenu,
+              openProfileOnTap:
+                  widget.importerAccountMenu && !widget.accountOpensMenu,
+              openSettingsOnTap: !widget.importerAccountMenu &&
+                  !widget.accountOpensMenu &&
+                  widget.chrome != DesktopShellChrome.darkCorporate &&
+                  widget.onOpenProfile != null,
               onAction: (action) {
                 switch (action) {
                   case ShellUserMenuAction.profile:

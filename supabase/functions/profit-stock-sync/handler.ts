@@ -1,4 +1,5 @@
-import { expectedProjectRef, maxBodyBytes, StockBatch, validateBatch } from "./contract.ts";
+import { allowedProjectRefs, maxBodyBytes, validateBatch } from "./contract.ts";
+import type { StockBatch } from "./contract.ts";
 
 export interface RpcReply { data?: Record<string, unknown>; error?: { code?: string; message?: string } }
 export interface Dependencies {
@@ -36,10 +37,10 @@ async function boundedJson(request: Request): Promise<unknown> {
 export function createHandler(deps: Dependencies): (request: Request) => Promise<Response> {
   return async (request) => {
     if (request.method !== "POST") return reply(405, { error: "METHOD_NOT_ALLOWED" });
-    // Primera entrega limitada a DEV. Un despliegue accidental en MAIN no escribe.
+    // Solo DEV y el sandbox dedicado. MAIN sigue sin admitir escrituras.
     let url: URL;
     try { url = new URL(deps.projectUrl); } catch { return reply(503, { error: "SYNC_ENVIRONMENT_NOT_CONFIGURED" }); }
-    if (url.origin !== `https://${expectedProjectRef}.supabase.co` || url.pathname !== "/" ||
+    if (!allowedProjectRefs.some(ref => url.origin === `https://${ref}.supabase.co`) || url.pathname !== "/" ||
       url.username || url.password || url.search || url.hash) {
       return reply(403, { error: "SYNC_ENVIRONMENT_MISMATCH" });
     }

@@ -6,14 +6,22 @@ import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 /// A quiet, consistent entry point for the three order workspaces.
 class OrdersListHeading extends StatelessWidget {
   const OrdersListHeading(
-      {super.key, required this.count, this.description = ''});
+      {super.key,
+      required this.count,
+      this.description = '',
+      this.mobileTitle});
   final int count;
   final String description;
+  final String? mobileTitle;
 
   @override
   Widget build(BuildContext context) {
     final compact = ScrollCompactState.of(context);
-    if (ScrollCompactState.hideHeadingOf(context)) {
+    final progress = ScrollCompactState.progressOf(context);
+    final useScrollFade = mobileTitle != null &&
+        progress != null &&
+        MediaQuery.sizeOf(context).width < AppBreakpoints.b2bDesktop;
+    if (!useScrollFade && ScrollCompactState.hideHeadingOf(context)) {
       return const SizedBox.shrink();
     }
     final countLabel = Text('$count ${count == 1 ? 'pedido' : 'pedidos'}',
@@ -22,6 +30,31 @@ class OrdersListHeading extends StatelessWidget {
     if (MediaQuery.sizeOf(context).width >= AppBreakpoints.b2bDesktop) {
       return Padding(
           padding: const EdgeInsets.only(bottom: 8), child: countLabel);
+    }
+    if (mobileTitle case final title?) {
+      final heading = Padding(
+        padding: const EdgeInsets.only(top: 2, bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(
+              header: true,
+              child: Text(title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700, letterSpacing: -0.5)),
+            ),
+            const SizedBox(height: 2),
+            countLabel,
+          ],
+        ),
+      );
+      if (progress == null) return heading;
+      return ValueListenableBuilder<double>(
+        valueListenable: progress,
+        child: heading,
+        builder: (context, value, child) =>
+            ScrollFadeHeading(progress: value, child: child),
+      );
     }
     return Padding(
       padding: EdgeInsets.fromLTRB(0, compact ? 2 : 14, 0, compact ? 6 : 12),

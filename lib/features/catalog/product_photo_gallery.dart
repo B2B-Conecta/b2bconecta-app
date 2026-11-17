@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/product_photo_lightbox.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 
 /// Product photos remain uncropped; inspection happens in a separate viewer.
@@ -67,17 +67,13 @@ class ProductPhotoGalleryState extends State<ProductPhotoGallery> {
   }
 
   Future<void> _open(int index) async {
-    final selected = await Navigator.of(context).push<int>(
-      MaterialPageRoute<int>(
-        fullscreenDialog: true,
-        builder: (_) => _PhotoViewer(
-          images: _urls.map(_provider).toList(),
-          productName: widget.productName,
-          initialIndex: index,
-        ),
-      ),
+    final selected = await showProductPhotoLightbox(
+      context,
+      images: _urls.map(_provider).toList(),
+      productName: widget.productName,
+      initialIndex: index,
     );
-    if (mounted && selected != null) _go(selected);
+    if (mounted) _go(selected);
   }
 
   Widget _hero(Widget child) => widget.heroTag == null
@@ -298,168 +294,4 @@ class _PhotoStatus extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PhotoViewer extends StatefulWidget {
-  const _PhotoViewer({
-    required this.images,
-    required this.productName,
-    required this.initialIndex,
-  });
-  final List<ImageProvider<Object>> images;
-  final String productName;
-  final int initialIndex;
-
-  @override
-  State<_PhotoViewer> createState() => _PhotoViewerState();
-}
-
-class _PhotoViewerState extends State<_PhotoViewer> {
-  final _transform = TransformationController();
-  late int _index;
-  double _scale = 1;
-  Size _photoSize = Size.zero;
-  Offset _doubleTapPosition = Offset.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _index = widget.initialIndex;
-    _transform.addListener(_onTransform);
-  }
-
-  void _onTransform() {
-    final scale = _transform.value.getMaxScaleOnAxis();
-    if ((scale - _scale).abs() > 0.01) setState(() => _scale = scale);
-  }
-
-  void _zoom(double value, {Offset? focalPoint}) {
-    final scale = value.clamp(1.0, 4.0).toDouble();
-    final center = focalPoint ?? _photoSize.center(Offset.zero);
-    _transform.value = Matrix4.identity()
-      ..translate(center.dx * (1 - scale), center.dy * (1 - scale))
-      ..scale(scale);
-  }
-
-  void _go(int index) {
-    if (index < 0 || index >= widget.images.length) return;
-    _zoom(1);
-    setState(() => _index = index);
-  }
-
-  void _close() => Navigator.of(context).pop(_index);
-
-  @override
-  void dispose() {
-    _transform.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): _close,
-          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-              _go(_index - 1),
-          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-              _go(_index + 1),
-        },
-        child: Focus(
-          autofocus: true,
-          child: Scaffold(
-            backgroundColor: AppColors.background,
-            appBar: AppBar(
-              leading: IconButton(
-                tooltip: 'Cerrar fotos',
-                onPressed: _close,
-                icon: const Icon(Icons.close_rounded),
-              ),
-              title: Tooltip(
-                  message: widget.productName,
-                  excludeFromSemantics: true,
-                  child: Text(widget.productName,
-                      maxLines: 1, overflow: TextOverflow.ellipsis)),
-            ),
-            body: Column(children: [
-              Expanded(
-                child: LayoutBuilder(builder: (_, constraints) {
-                  _photoSize = constraints.biggest;
-                  return ClipRect(
-                    child: GestureDetector(
-                      onDoubleTapDown: (details) =>
-                          _doubleTapPosition = details.localPosition,
-                      onDoubleTap: () => _zoom(_scale > 1.01 ? 1 : 2.5,
-                          focalPoint: _doubleTapPosition),
-                      child: InteractiveViewer(
-                        transformationController: _transform,
-                        minScale: 1,
-                        maxScale: 4,
-                        child: SizedBox.expand(
-                          child: _ProductPhoto(
-                            key: ValueKey(_index),
-                            image: widget.images[_index],
-                            label:
-                                'Foto ${_index + 1} de ${widget.images.length}: ${widget.productName}',
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              SafeArea(
-                top: false,
-                child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
-                    children: [
-                      if (widget.images.length > 1)
-                        Row(mainAxisSize: MainAxisSize.min, children: [
-                          IconButton(
-                            tooltip: 'Foto anterior',
-                            onPressed:
-                                _index > 0 ? () => _go(_index - 1) : null,
-                            icon: const Icon(Icons.chevron_left_rounded),
-                            constraints: const BoxConstraints(
-                                minWidth: 48, minHeight: 48),
-                          ),
-                          Text('${_index + 1} / ${widget.images.length}'),
-                          IconButton(
-                            tooltip: 'Foto siguiente',
-                            onPressed: _index < widget.images.length - 1
-                                ? () => _go(_index + 1)
-                                : null,
-                            icon: const Icon(Icons.chevron_right_rounded),
-                            constraints: const BoxConstraints(
-                                minWidth: 48, minHeight: 48),
-                          ),
-                        ]),
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(
-                          tooltip: 'Alejar foto',
-                          onPressed:
-                              _scale > 1.01 ? () => _zoom(_scale - 0.5) : null,
-                          icon: const Icon(Icons.remove_rounded),
-                          constraints:
-                              const BoxConstraints(minWidth: 48, minHeight: 48),
-                        ),
-                        Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('${(_scale * 100).round()}%',
-                                textAlign: TextAlign.center)),
-                        IconButton(
-                          tooltip: 'Acercar foto',
-                          onPressed:
-                              _scale < 3.99 ? () => _zoom(_scale + 0.5) : null,
-                          icon: const Icon(Icons.add_rounded),
-                          constraints:
-                              const BoxConstraints(minWidth: 48, minHeight: 48),
-                        ),
-                      ]),
-                    ]),
-              ),
-            ]),
-          ),
-        ),
-      );
 }

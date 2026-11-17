@@ -26,6 +26,9 @@ class AliadoBrandedHeader extends StatelessWidget {
     this.unreadMessages = 0,
     this.unreadNotifications = 0,
     this.footer,
+    this.onSearchTap,
+    this.searchActionLabel = 'Abrir búsqueda',
+    this.searchCollapseProgress = 0,
     this.showCart = true,
     this.showBcv = true,
   });
@@ -38,6 +41,9 @@ class AliadoBrandedHeader extends StatelessWidget {
 
   /// Contenido bajo la fila de identidad (búsqueda en Catálogo; null en otras).
   final Widget? footer;
+  final VoidCallback? onSearchTap;
+  final String searchActionLabel;
+  final double searchCollapseProgress;
 
   final bool showCart;
   final bool showBcv;
@@ -53,7 +59,13 @@ class AliadoBrandedHeader extends StatelessWidget {
     // viewPadding sobrevive a SafeArea anidados; asegura hueco para notch / status bar.
     final top = MediaQuery.viewPaddingOf(context).top;
     final color = dark ? blueDark : blue;
-    final bottomPad = footer == null ? 14.0 : 0.0;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final compact = searchCollapseProgress > .3;
+    final progress =
+        reduceMotion ? (compact ? 1.0 : 0.0) : searchCollapseProgress;
+    final footerOpacity =
+        1 - Curves.easeOut.transform((progress / .7).clamp(0.0, 1.0));
+    final bottomPad = footer == null || onSearchTap != null ? 14.0 : 0.0;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -72,6 +84,15 @@ class AliadoBrandedHeader extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(child: _Identity(profile: profile)),
+                  if (onSearchTap != null && compact)
+                    Opacity(
+                      opacity: ((progress - .3) / .7).clamp(0.0, 1.0),
+                      child: _ToolbarIcon(
+                        label: searchActionLabel,
+                        icon: LucideGlyph.search,
+                        onTap: onSearchTap!,
+                      ),
+                    ),
                   if (showCart)
                     ListenableBuilder(
                       listenable: CartService.instance,
@@ -101,8 +122,7 @@ class AliadoBrandedHeader extends StatelessWidget {
                     _ToolbarIcon(
                       label: 'Bandeja',
                       icon: LucideGlyph.inbox,
-                      unread:
-                          unreadNotifications > 0 || unreadMessages > 0,
+                      unread: unreadNotifications > 0 || unreadMessages > 0,
                       onTap: () => showBandejaSheet(
                         context: context,
                         onMessagesTap: onMessagesTap,
@@ -114,7 +134,31 @@ class AliadoBrandedHeader extends StatelessWidget {
                 ],
               ),
             ),
-            if (footer != null) footer!,
+            if (footer != null && progress < 1)
+              ClipRect(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: 1 - progress,
+                  child: ExcludeFocus(
+                    excluding: compact,
+                    child: ExcludeSemantics(
+                      excluding: compact,
+                      child: IgnorePointer(
+                        ignoring: compact,
+                        child: Opacity(
+                          opacity: footerOpacity,
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              bottom: onSearchTap == null ? 0 : 10,
+                            ),
+                            child: footer,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

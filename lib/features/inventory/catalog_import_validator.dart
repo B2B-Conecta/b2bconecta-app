@@ -111,15 +111,17 @@ class CatalogImportValidator {
   CatalogImportValidator._();
 
   static const maxErrorsPerBatch = 200;
+  static final _skuControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
 
   /// Valida filas ya mapeadas y detecta SKU duplicados dentro del lote.
   static CatalogImportParseBatch validateBatch(
     List<CatalogImportNormalizedRow> rows, {
     int maxErrors = maxErrorsPerBatch,
+    Set<String>? fileSkus,
   }) {
     final valid = <CatalogImportNormalizedRow>[];
     final errors = <CatalogImportRowError>[];
-    final seenSkus = <String>{};
+    final seenSkus = fileSkus ?? <String>{};
 
     for (final row in rows) {
       if (errors.length >= maxErrors) break;
@@ -130,6 +132,15 @@ class CatalogImportValidator {
           rowIndex: row.rowIndex,
           code: 'REQUIRED_SKU',
           message: 'SKU obligatorio',
+        ));
+        continue;
+      }
+      if (_skuControlCharacters.hasMatch(sku)) {
+        errors.add(CatalogImportRowError(
+          rowIndex: row.rowIndex,
+          sku: sku,
+          code: 'INVALID_SKU',
+          message: 'El SKU contiene caracteres de control.',
         ));
         continue;
       }
@@ -156,7 +167,7 @@ class CatalogImportValidator {
         continue;
       }
 
-      if (row.priceUsd.isNaN || row.priceUsd < 0) {
+      if (!row.priceUsd.isFinite || row.priceUsd < 0) {
         errors.add(CatalogImportRowError(
           rowIndex: row.rowIndex,
           sku: sku,
@@ -270,7 +281,7 @@ class CatalogImportValidator {
     }
 
     final sku = readField(CatalogImportField.sku.key)?.trim() ?? '';
-    if (sku.isEmpty) return null;
+    if (sku.isEmpty) throw const FormatException('SKU obligatorio');
     if (mapping.options.skipExampleRows &&
         sku.toUpperCase().startsWith('EJEMPLO')) {
       return null;
@@ -283,8 +294,14 @@ class CatalogImportValidator {
     final stockRaw = readUntransformed(CatalogImportField.stock.key);
     final minQtyRaw = readUntransformed(CatalogImportField.minOrderQty.key);
 
-    final price = parseImportNumber(priceRaw);
-    final stock = _parseStock(stockRaw);
+    var price = parseImportNumber(priceRaw);
+    if (price == null && mapping.options.emptyPriceFill != null) {
+      price = mapping.options.emptyPriceFill;
+    }
+    final stock = _parseStock(
+      stockRaw,
+      emptyFill: mapping.options.emptyStockFill,
+    );
     final minOrderQty = _parseMinOrderQty(minQtyRaw);
 
     final saleRaw = readUntransformed(CatalogImportField.salePriceUsd.key);
@@ -446,11 +463,22 @@ class CatalogImportValidator {
     return double.tryParse(t);
   }
 
-  static int _parseStock(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return 0;
+  static int _parseStock(String? raw, {int? emptyFill}) {
+    if (raw == null || raw.trim().isEmpty) {
+      if (emptyFill != null) return emptyFill;
+      throw const FormatException(
+          'Stock vacío. Indica 0 si no hay existencias.');
+    }
     final n = parseImportNumber(raw);
-    if (n == null || n.isNaN) return -1;
-    return n.round();
+    if (n == null ||
+        !n.isFinite ||
+        n < 0 ||
+        n > 2147483647 ||
+        n != n.truncateToDouble()) {
+      throw const FormatException(
+          'Stock inválido. Usa un número entero no negativo.');
+    }
+    return n.toInt();
   }
 
   static int? _parseMinOrderQty(String? raw) {

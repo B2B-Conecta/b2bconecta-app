@@ -536,7 +536,7 @@ class SupabaseService {
 
   static Future<Map<String, ProductSkuImageIndexEntry>>
       fetchMyInventorySkuImageIndex({
-    int limit = 5000,
+    int? limit,
   }) =>
           InventoryService.fetchMyInventorySkuImageIndex(limit: limit);
 
@@ -1215,6 +1215,9 @@ class SupabaseService {
 
   static Future<int?> countMyPendingCommissionInvoices() =>
       InventoryService.countMyPendingCommissionInvoices();
+
+  static Future<double?> sumMyPendingCommissionUsd() =>
+      InventoryService.sumMyPendingCommissionUsd();
 
   static Future<List<AdminUserActivityRowModel>>
       listAdminUserActivityMonitoring({

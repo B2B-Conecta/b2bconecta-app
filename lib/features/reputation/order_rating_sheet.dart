@@ -5,6 +5,8 @@ import 'rating_questionnaire_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'aliado_experience_utils.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_actions_flow_copy.dart';
 import 'order_rating_eligibility.dart';
@@ -62,6 +64,36 @@ Future<void> showImporterOrderRatingSheet(
   bool readOnly = false,
   String? cancellationReason,
 }) {
+  final title = readOnly
+      ? 'Valoración registrada'
+      : (cancellationReason != null && cancellationReason.trim().isNotEmpty)
+          ? 'Valorar tras cancelación'
+          : 'Valorar tienda minorista';
+  final subtitle = request.aliadoBusinessName?.trim().isNotEmpty == true
+      ? request.aliadoBusinessName!.trim()
+      : 'Tienda minorista en este pedido';
+  final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  final body = _ImporterOrderRatingSheetBody(
+    request: request,
+    onSubmitted: onSubmitted,
+    bundleCheckoutGroupId: bundleCheckoutGroupId,
+    bundleAliadoId: bundleAliadoId,
+    readOnly: readOnly,
+    cancellationReason: cancellationReason,
+    neutralCopy: wide,
+  );
+  if (wide) {
+    final barrier = B2BThemeExtension.of(context).textPrimary.withOpacity(0.35);
+    return showDialog<void>(
+      context: context,
+      barrierColor: barrier,
+      builder: (ctx) => _ImporterRatingWebDialog(
+        title: title,
+        subtitle: subtitle,
+        child: body,
+      ),
+    );
+  }
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -69,25 +101,97 @@ Future<void> showImporterOrderRatingSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => _OrderRatingSheetScaffold(
       accentColor: AppColors.brandBlue,
-      headerTitle: readOnly
-          ? 'Valoración registrada'
-          : (cancellationReason != null &&
-                  cancellationReason.trim().isNotEmpty)
-              ? 'Valorar tras cancelación'
-              : 'Valorar tienda minorista',
-      headerSubtitle: request.aliadoBusinessName?.trim().isNotEmpty == true
-          ? request.aliadoBusinessName!.trim()
-          : 'Tienda minorista en este pedido',
-      child: _ImporterOrderRatingSheetBody(
-        request: request,
-        onSubmitted: onSubmitted,
-        bundleCheckoutGroupId: bundleCheckoutGroupId,
-        bundleAliadoId: bundleAliadoId,
-        readOnly: readOnly,
-        cancellationReason: cancellationReason,
-      ),
+      headerTitle: title,
+      headerSubtitle: subtitle,
+      child: body,
     ),
   );
+}
+
+class _ImporterRatingWebDialog extends StatelessWidget {
+  const _ImporterRatingWebDialog({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final height = MediaQuery.sizeOf(context).height;
+    return Dialog(
+      insetPadding: EdgeInsets.fromLTRB(
+        28,
+        40,
+        28,
+        40 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      backgroundColor: theme.dialogSurface,
+      surfaceTintColor: theme.dialogSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.borderSubtle),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 560, maxHeight: height * 0.86),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.star_rounded, color: theme.brand, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close, color: theme.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _OrderRatingSheetScaffold extends StatelessWidget {
@@ -377,6 +481,7 @@ class _ImporterOrderRatingSheetBody extends StatefulWidget {
     this.bundleAliadoId,
     this.readOnly = false,
     this.cancellationReason,
+    this.neutralCopy = false,
   });
 
   final TransactionRequestModel request;
@@ -385,6 +490,7 @@ class _ImporterOrderRatingSheetBody extends StatefulWidget {
   final String? bundleAliadoId;
   final bool readOnly;
   final String? cancellationReason;
+  final bool neutralCopy;
 
   @override
   State<_ImporterOrderRatingSheetBody> createState() =>
@@ -522,7 +628,13 @@ class _ImporterOrderRatingSheetBodyState extends State<_ImporterOrderRatingSheet
     return OrderRatingForm(
       title: esCancelacion
           ? 'Valorar tras la cancelación'
-          : 'Calificá la experiencia con la tienda minorista',
+          : widget.neutralCopy
+              ? 'Califica la experiencia con la tienda minorista'
+              : 'Calificá la experiencia con la tienda minorista',
+      guidance: widget.neutralCopy
+          ? 'Ajusta cada categoría con el control deslizante. '
+              'La valoración general se calcula automáticamente.'
+          : null,
       subtitle: esCancelacion
           ? 'Su motivo quedó registrado. Califique a la tienda minorista; puede ampliar el comentario.'
           : 'Comunicación y Pagos (escala 1–5). La tienda minorista no verá su nombre en su panel de reputación.',

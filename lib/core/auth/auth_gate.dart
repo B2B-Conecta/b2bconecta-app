@@ -14,6 +14,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
+import 'auth_callback_status_screen.dart';
 import 'auth_incoming_uri.dart';
 import 'auth_link_utils.dart';
 import 'auth_recovery_storage.dart';
@@ -69,6 +70,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   /// Mensaje de enlace inválido; no se limpia con setState para no recrear [LoginScreen].
   String? _initialLinkError;
+
+  /// Tipo de callback Auth en curso (signup vs recovery) para copy de errores.
+  AuthCallbackKind _callbackKind = AuthCallbackKind.other;
+
+  /// Ofrece reenviar confirmación en [LoginScreen] tras fallo de signup.
+  bool _offerResendSignup = false;
 
   bool _bootstrapResolved = false;
 
@@ -130,7 +137,12 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         await AuthRecoveryStorage.peekPendingPasswordRecovery();
     final hasIncomingCallback = hasAuthCallbackInUri(uri);
 
+    _callbackKind = link.kind;
+    if (pendingRecoveryRequest && link.kind == AuthCallbackKind.other) {
+      _callbackKind = AuthCallbackKind.recovery;
+    }
     _initialLinkError = link.errorMessage;
+    _offerResendSignup = link.isSignupConfirmation && link.errorMessage != null;
     _awaitingPasswordRecovery =
         link.isPasswordRecovery || pendingRecoveryRequest;
 
@@ -224,8 +236,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (!hasAuthCallbackInUri(uri)) return;
 
     final link = parseAuthUriFragment(uri);
+    _callbackKind = link.kind;
     if (link.errorMessage != null) {
       _initialLinkError = link.errorMessage;
+      _offerResendSignup = link.isSignupConfirmation;
       unawaited(_signOutAfterLinkError());
       if (mounted) {
         setState(() {
@@ -239,6 +253,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     if (link.isPasswordRecovery) {
       _awaitingPasswordRecovery = true;
+      _callbackKind = AuthCallbackKind.recovery;
     }
 
     if (!_resolvingAuthCallback) {
@@ -270,6 +285,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   Future<void> _resolveAuthCallback(Uri uri, AuthLinkParseResult link) async {
     try {
+      _callbackKind = link.kind;
       // Deja que supabase_flutter detectSessionInUri termine el primer canje PKCE.
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
@@ -278,6 +294,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       final hadCode = uri.queryParameters.containsKey('code');
       final pendingFlag =
           await AuthRecoveryStorage.peekPendingPasswordRecovery();
+      if (pendingFlag && _callbackKind == AuthCallbackKind.other) {
+        _callbackKind = AuthCallbackKind.recovery;
+      }
 
       if (hadCode && session == null) {
         // Solo canjear si initialize no estableció sesión (evita 2º exchange
@@ -287,16 +306,31 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
               await Supabase.instance.client.auth.getSessionFromUrl(uri);
           session = response.session;
           redirectType = response.redirectType ?? redirectType;
+          final rt = (response.redirectType ?? '').toLowerCase();
+          if (rt.contains('recovery') || rt.contains('password')) {
+            _callbackKind = AuthCallbackKind.recovery;
+          } else if (rt.contains('signup') || rt == 'email') {
+            _callbackKind = AuthCallbackKind.signup;
+          }
         } on AuthException catch (e) {
-          _initialLinkError = AuthService.mapAuthErrorMessage(e.message);
+          _initialLinkError = AuthService.mapAuthErrorMessage(
+            e.message,
+            kind: _callbackKind,
+            pendingPasswordRecovery: pendingFlag,
+          );
+          _offerResendSignup = _callbackKind == AuthCallbackKind.signup ||
+              (!pendingFlag && _callbackKind != AuthCallbackKind.recovery);
           session = Supabase.instance.client.auth.currentSession;
           if (session == null) {
             await _signOutAfterLinkError();
           }
         } catch (e) {
           debugPrint('getSessionFromUrl failed: $e');
-          _initialLinkError ??=
-              'No se pudo completar la autenticación desde el enlace.';
+          _initialLinkError ??= AuthService.mapAuthErrorMessage(
+            e.toString(),
+            kind: _callbackKind,
+            pendingPasswordRecovery: pendingFlag,
+          );
           session = Supabase.instance.client.auth.currentSession;
           if (session == null) {
             await _signOutAfterLinkError();
@@ -320,8 +354,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
       if (session == null) {
         if (_initialLinkError == null && hadCode) {
-          _initialLinkError =
-              'No se pudo abrir el enlace. Solicita uno nuevo desde esta misma web.';
+          _initialLinkError = _callbackKind == AuthCallbackKind.signup
+              ? 'No se pudo confirmar el correo. Reenvía el enlace o inicia sesión si ya lo confirmaste.'
+              : 'No se pudo abrir el enlace. Solicita uno nuevo desde esta misma web o app.';
+          _offerResendSignup = _callbackKind != AuthCallbackKind.recovery;
         }
         if (!mounted) return;
         setState(() {
@@ -336,6 +372,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       } else {
         await AuthRecoveryStorage.clearPendingPasswordRecovery();
         _awaitingPasswordRecovery = false;
+        _offerResendSignup = false;
+        _initialLinkError = null;
       }
 
       if (!mounted) return;
@@ -349,8 +387,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       });
     } catch (e) {
       debugPrint('_resolveAuthCallback error: $e');
-      _initialLinkError ??=
-          'No se pudo completar la autenticación desde el enlace.';
+      _initialLinkError ??= AuthService.mapAuthErrorMessage(
+        e.toString(),
+        kind: _callbackKind,
+      );
       clearAuthUriCallback();
       await _signOutAfterLinkError();
     } finally {
@@ -516,6 +556,11 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           awaitingPasswordRecovery: _awaitingPasswordRecovery,
           pendingPasswordRecovery: false,
         );
+    if (_resolvingAuthCallback || _awaitingInitialAuthEvent) {
+      return _callbackKind == AuthCallbackKind.signup
+          ? const AuthCallbackStatusScreen.verifyingSignup()
+          : const AuthCallbackStatusScreen.verifyingLink();
+    }
     if (waiting || (!_startupDisplayElapsed && (session == null || recovery))) {
       return const BrandLoadingScreen();
     }
@@ -566,6 +611,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         (_startInRegister || _registerAfterGuest) ? 'register' : 'login',
       ),
       initialErrorMessage: _initialLinkError,
+      offerResendSignupConfirmation: _offerResendSignup,
+      authCallbackKind: _callbackKind,
       startInRegister: _startInRegister || _registerAfterGuest,
     );
   }

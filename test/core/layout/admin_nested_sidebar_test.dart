@@ -89,7 +89,7 @@ void main() {
               businessName: 'B2B Conecta Ops',
             ),
             unreadNotifications: 0,
-            onNotificationTap: () {},
+            onNotificationTap: (_) {},
             onOpenSettings: () {},
           ),
         ),

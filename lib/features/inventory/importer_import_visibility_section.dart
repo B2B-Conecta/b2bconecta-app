@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 
 /// Visibilidad de productos **nuevos** al importar (no afecta códigos ya registrados).
 enum ImporterNewProductsVisibility {
@@ -17,12 +18,8 @@ extension ImporterNewProductsVisibilityX on ImporterNewProductsVisibility {
       };
 
   String get subtitle => switch (this) {
-        ImporterNewProductsVisibility.paused =>
-          'Los códigos nuevos quedan ocultos para tiendas minoristas. Revísalos y actívalos '
-          'cuando quieras publicarlos.',
-        ImporterNewProductsVisibility.active =>
-          'Los códigos nuevos se publican de inmediato para tiendas minoristas. '
-          'Úsalo si ya validaste el archivo.',
+        ImporterNewProductsVisibility.paused => 'Ocultos hasta que los publiques.',
+        ImporterNewProductsVisibility.active => 'Visibles de inmediato.',
       };
 
   IconData get icon => switch (this) {
@@ -39,12 +36,16 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
     required this.onChanged,
     this.enabled = true,
     this.compact = false,
+    this.horizontal = false,
   });
 
   final ImporterNewProductsVisibility value;
   final ValueChanged<ImporterNewProductsVisibility>? onChanged;
   final bool enabled;
   final bool compact;
+
+  /// En escritorio, las dos opciones quedan en la misma fila.
+  final bool horizontal;
 
   @override
   Widget build(BuildContext context) {
@@ -77,12 +78,9 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: ImporterNewProductsVisibility.values.map((option) {
-        final selected = value == option;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Material(
+    final tiles = ImporterNewProductsVisibility.values.map((option) {
+      final selected = value == option;
+      return Material(
             color: selected
                 ? AppColors.brand.withOpacity(0.08)
                 : AppColors.fieldFill,
@@ -109,7 +107,7 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.75),
+                        color: B2BThemeExtension.of(context).inputFill,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -158,9 +156,29 @@ class ImporterNewProductsVisibilitySection extends StatelessWidget {
                 ),
               ),
             ),
+          );
+    }).toList();
+
+    if (horizontal) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < tiles.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            Expanded(child: tiles[i]),
+          ],
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        for (final tile in tiles)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: tile,
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 }

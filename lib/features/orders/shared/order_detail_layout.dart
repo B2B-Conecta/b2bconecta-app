@@ -9,6 +9,7 @@ class OrderDetailColumns extends StatelessWidget {
     required this.primary,
     required this.secondary,
     this.mobileOrder,
+    this.compact = false,
     this.breakpoint = 720,
     this.gap = 10,
   });
@@ -16,6 +17,7 @@ class OrderDetailColumns extends StatelessWidget {
   final List<Widget> primary;
   final List<Widget> secondary;
   final List<Widget>? mobileOrder;
+  final bool compact;
 
   /// Ancho mínimo para 2 columnas (detalle admin suele vivir en panel estrecho).
   final double breakpoint;
@@ -25,7 +27,7 @@ class OrderDetailColumns extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) SizedBox(height: gap),
+            if (i > 0) SizedBox(height: compact ? 10 : gap),
             children[i],
           ],
         ],
@@ -85,9 +87,7 @@ class OrderDetailSection extends StatelessWidget {
       padding: EdgeInsets.all(pad),
       decoration: BoxDecoration(
         color: tonal ? theme.surfaceSubtle : theme.surfaceCard,
-        border: flat || tonal
-            ? null
-            : Border.all(color: theme.borderSubtle),
+        border: flat || tonal ? null : Border.all(color: theme.borderSubtle),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -111,7 +111,7 @@ class OrderDetailSection extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: gapAfterTitle),
+          SizedBox(height: compact ? 10 : gapAfterTitle),
           child,
         ],
       ),

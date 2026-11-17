@@ -1,6 +1,7 @@
 import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
@@ -37,6 +38,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     this.ratingBar,
     this.onChatChanged,
     this.workspaceDetail = false,
+    this.compactDetail = false,
+    this.viewerProfile,
     this.detailSectionsBuilder,
   });
 
@@ -46,6 +49,8 @@ class AliadoExpandableOrderCard extends StatelessWidget {
   final List<TransactionRequestModel>? checkoutGroupLines;
   final bool expanded;
   final bool workspaceDetail;
+  final bool compactDetail;
+  final ProfileModel? viewerProfile;
   final AliadoDetailSectionsBuilder? detailSectionsBuilder;
   final VoidCallback onToggle;
   final String statusLabel;
@@ -92,6 +97,25 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     final porImportador = useMultiImporterTabs
         ? groupCheckoutLinesByImportador(lines)
         : const <List<TransactionRequestModel>>[];
+    void openChat(List<TransactionRequestModel> chatLines) {
+      final counterpart = chatLines.first.ownerBusinessName?.trim();
+      showOrderChatSheet(
+        context: context,
+        transactionRequestId: chatLines.first.id,
+        mergedThreadRequestIds: chatLines.length > 1
+            ? chatLines.map((line) => line.id).toList()
+            : null,
+        orderLines: chatLines,
+        allowReplyAsAliado: orderLinesAllowChatReply(chatLines),
+        allowReplyAsAdmin: false,
+        deliveryGrace: orderLinesChatDeliveryGrace(chatLines),
+        title: (counterpart != null && counterpart.isNotEmpty)
+            ? 'Chat · $counterpart'
+            : 'Chat del pedido',
+        onThreadChanged: onChatChanged,
+      );
+    }
+
     final summary = OrderSummaryHeader(
       lines: lines,
       viewerRole: AppHomeRole.aliado,
@@ -101,6 +125,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       showToggle: !workspaceDetail,
       detailSummary: workspaceDetail,
       actionsInHeader: workspaceDetail,
+      compactDetail: compactDetail,
       onCancel: onCancelarSolicitudPendiente != null &&
               lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)
           ? onCancelarSolicitudPendiente
@@ -108,23 +133,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       cancelBusy: cancelarSolicitudPendienteBusy,
       chatAction: OrderChatIconButton(
         relatedOrderIds: lines.map((e) => e.id).toList(),
-        onOpen: () {
-          final counterpart = lines.first.ownerBusinessName?.trim();
-          showOrderChatSheet(
-            context: context,
-            transactionRequestId: lines.first.id,
-            mergedThreadRequestIds:
-                isCheckoutGroup ? lines.map((e) => e.id).toList() : null,
-            orderLines: lines,
-            allowReplyAsAliado: orderLinesAllowChatReply(lines),
-            allowReplyAsAdmin: false,
-            deliveryGrace: orderLinesChatDeliveryGrace(lines),
-            title: (counterpart != null && counterpart.isNotEmpty)
-                ? 'Chat · $counterpart'
-                : 'Chat del pedido',
-            onThreadChanged: onChatChanged,
-          );
-        },
+        onOpen: () => openChat(lines),
       ),
     );
     if (workspaceDetail && detailSectionsBuilder != null) {
@@ -134,6 +143,9 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           key: ValueKey(checkoutGroupExpandKey(lines)),
           lines: lines,
           summary: summary,
+          compact: compactDetail,
+          viewerProfile: viewerProfile,
+          onMessageProvider: openChat,
           sectionsBuilder: detailSectionsBuilder!,
         ),
       );

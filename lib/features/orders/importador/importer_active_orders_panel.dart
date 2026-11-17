@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import '../shared/order_priority_controls.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
@@ -84,6 +85,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
 
   void _onNotificationPedidosDeepLink() {
     _prepareImporterFilterForNotificationDeepLink();
+    final search = MainShellTabController.consumeImporterPedidosSearch();
+    if (search != null && search.isNotEmpty) {
+      setState(() => _searchCtrl.text = search);
+    }
     final expanded = _tryApplyExpandFromPendingNotification();
     if (!expanded && !_loading) {
       _load(silent: true);
@@ -879,6 +884,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         children: [
           ImporterOrderShippingSection(
             lines: g,
+            embedded:
+                MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu,
             onChanged: () => _load(silent: true),
           ),
         ],

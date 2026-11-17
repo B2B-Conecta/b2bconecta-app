@@ -1,4 +1,5 @@
-import { StockBatch, validateBatch } from "./contract.ts";
+import { validateBatch } from "./contract.ts";
+import type { StockBatch } from "./contract.ts";
 import { createHandler } from "./handler.ts";
 
 function assert(value: unknown, message = "assertion failed"): asserts value { if (!value) throw new Error(message); }
@@ -27,6 +28,20 @@ Deno.test("unauthenticated request never reaches RPC", async () => {
 Deno.test("other Supabase project cannot write", async () => {
   const handler = createHandler({ projectUrl: "https://fzugzjcwdzcwfxgviltw.supabase.co", apply: () => { throw new Error("must not run"); } });
   assert((await handler(request())).status === 403);
+});
+Deno.test("sandbox accepts a batch through the same authenticated contract", async () => {
+  const handler = createHandler({ projectUrl: "https://czswojzpekcsisudgfsg.supabase.co", apply: success });
+  assert((await handler(request())).status === 200);
+});
+Deno.test("sandbox without connector credentials cannot reach RPC", async () => {
+  const handler = createHandler({ projectUrl: "https://czswojzpekcsisudgfsg.supabase.co", apply: () => { throw new Error("must not run"); } });
+  assert((await handler(request(batch(), ""))).status === 401);
+});
+Deno.test("lookalike project origins cannot reach RPC", async () => {
+  for (const project of ["https://czswojzpekcsisudgfsg.supabase.co.evil.test", "http://czswojzpekcsisudgfsg.supabase.co", "https://unknown.supabase.co"]) {
+    const handler = createHandler({ projectUrl: project, apply: () => { throw new Error("must not run"); } });
+    assert((await handler(request())).status === 403);
+  }
 });
 Deno.test("price, owner and incoming fields rejected", () => {
   for (const extra of [{ price_usd: 3 }, { owner_id: "fake" }, { stock_lle: 60 }]) {

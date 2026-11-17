@@ -36,7 +36,9 @@ Widget pedidoProductoLineCard(
   PedidoProductoLineUi p,
   bool compact, {
   String currencyLabel = 'REF',
+  bool retailerDetail = false,
 }) {
+  if (retailerDetail) return _retailerProductRow(context, p, currencyLabel);
   final theme = B2BThemeExtension.of(context);
   final density = B2bOrderCardDensityScope.of(context);
   final webCompact = density.isDesktop && compact;
@@ -46,8 +48,7 @@ Widget pedidoProductoLineCard(
   final nameSize = compact ? (webCompact ? 12.0 : 13.0) : 15.5;
   final metaSize = compact ? (webCompact ? 10.5 : 11.5) : 13.0;
   final amountSize = compact ? (webCompact ? 12.0 : 13.0) : 16.5;
-  final qtyLabel =
-      '${p.cantidad} ${p.cantidad == 1 ? 'unidad' : 'unidades'}';
+  final qtyLabel = '${p.cantidad} ${p.cantidad == 1 ? 'unidad' : 'unidades'}';
   final amountLabel = '${formatRefAmount(p.precioRef)} $currencyLabel';
 
   final info = Column(
@@ -149,6 +150,59 @@ Widget pedidoProductoLineCard(
   );
 }
 
+Widget _retailerProductRow(
+  BuildContext context,
+  PedidoProductoLineUi line,
+  String currency,
+) {
+  final theme = Theme.of(context);
+  final colors = theme.colorScheme;
+  final unit = line.cantidad > 0 ? line.precioRef / line.cantidad : 0.0;
+  return Container(
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        OrderProductThumb(size: 51, url: line.imageUrl),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(line.nombre,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onSurface)),
+            const SizedBox(height: 2),
+            Text(
+                '${line.cantidad} ${line.cantidad == 1 ? 'unidad' : 'unidades'} × ${formatRefAmount(unit)} $currency',
+                style:
+                    TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant)),
+            if (MediaQuery.textScalerOf(context).scale(13) > 17)
+              Text('${formatRefAmount(line.precioRef)} $currency',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800)),
+          ],
+        )),
+        if (MediaQuery.textScalerOf(context).scale(13) <= 17) ...[
+          const SizedBox(width: 7),
+          Flexible(
+              child: Text('${formatRefAmount(line.precioRef)} $currency',
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: colors.onSurface))),
+        ],
+      ],
+    ),
+  );
+}
+
 /// Desglose de productos para una o varias filas de pedido (detalle expandido, ficha admin, etc.).
 class TransactionRequestProductosDesgloseSection extends StatelessWidget {
   const TransactionRequestProductosDesgloseSection({
@@ -160,6 +214,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
     this.sectionTitle,
     this.showImporterGroupHeaders = true,
     this.hideSectionTitle = false,
+    this.retailerDetail = false,
   });
 
   final List<TransactionRequestModel> lines;
@@ -175,6 +230,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
 
   /// Dentro de [OrderCardCollapsibleSection]: el título va en el encabezado colapsable.
   final bool hideSectionTitle;
+  final bool retailerDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +296,7 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
             if (li > 0) SizedBox(height: compact ? 8 : 10),
             _LineDesgloseBlock(
               line: chunks[ci][li],
+              retailerDetail: retailerDetail,
               viewer: viewer,
               compact: compact,
             ),
@@ -253,11 +310,13 @@ class TransactionRequestProductosDesgloseSection extends StatelessWidget {
 class _LineDesgloseBlock extends StatelessWidget {
   const _LineDesgloseBlock({
     required this.line,
+    required this.retailerDetail,
     required this.viewer,
     required this.compact,
   });
 
   final TransactionRequestModel line;
+  final bool retailerDetail;
   final PedidoDesgloseViewer viewer;
   final bool compact;
 
@@ -276,7 +335,8 @@ class _LineDesgloseBlock extends StatelessWidget {
                     child: Divider(height: 1, color: AppColors.borderSubtle),
                   ),
           pedidoProductoLineCard(context, partidas[j], compact,
-              currencyLabel: line.amountCurrencyLabel),
+              currencyLabel: line.amountCurrencyLabel,
+              retailerDetail: retailerDetail),
         ],
       ],
     );
@@ -528,3 +588,104 @@ String _totalRefEtiquetaPedidoAliado(TransactionRequestModel r) {
   }
   return buf.toString();
 }
+
+/// Tabla compacta de repuestos del pedido. Solo se usa en el detalle web.
+class PedidoProductosWebTable extends StatelessWidget {
+  const PedidoProductosWebTable({
+    super.key,
+    required this.lines,
+    this.viewer = PedidoDesgloseViewer.importador,
+  });
+
+  final List<TransactionRequestModel> lines;
+  final PedidoDesgloseViewer viewer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final rows = <({PedidoProductoLineUi line, String currency})>[];
+    for (final request in lines) {
+      for (final line in transactionRequestLineasDesgloseForViewer(
+        request,
+        viewer,
+      )) {
+        rows.add((line: line, currency: request.amountCurrencyLabel));
+      }
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    const header = TextStyle(fontSize: 11, fontWeight: FontWeight.w700);
+    Widget cell(String text, TextStyle style, {TextAlign align = TextAlign.start}) {
+      return Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: align,
+        style: style,
+      );
+    }
+
+    TableRow headerRow() {
+      final style = header.copyWith(color: theme.textSecondary);
+      return TableRow(
+        decoration: BoxDecoration(color: theme.tableHeaderBg),
+        children: [
+          _pad(cell('SKU', style)),
+          _pad(cell('Repuesto', style)),
+          _pad(cell('Cant.', style, align: TextAlign.end)),
+          _pad(cell('P. unitario', style, align: TextAlign.end)),
+          _pad(cell('Subtotal', style, align: TextAlign.end)),
+        ],
+      );
+    }
+
+    TableRow dataRow(int index) {
+      final row = rows[index];
+      final line = row.line;
+      final sku = line.sku?.trim();
+      final unit = line.cantidad > 0 ? line.precioRef / line.cantidad : line.precioRef;
+      final zebra = index.isEven ? theme.tableRowEven : theme.tableRowOdd;
+      final primary = TextStyle(fontSize: 12.5, color: theme.textPrimary, fontWeight: FontWeight.w600);
+      final muted = TextStyle(fontSize: 12, color: theme.textSecondary);
+      return TableRow(
+        decoration: BoxDecoration(color: zebra),
+        children: [
+          _pad(cell((sku == null || sku.isEmpty) ? '—' : sku, muted)),
+          _pad(cell(line.nombre, primary)),
+          _pad(cell('${line.cantidad}', primary, align: TextAlign.end)),
+          _pad(cell('${formatRefAmount(unit)} ${row.currency}', muted, align: TextAlign.end)),
+          _pad(cell('${formatRefAmount(line.precioRef)} ${row.currency}', primary, align: TextAlign.end)),
+        ],
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.borderSubtle),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.1),
+            1: FlexColumnWidth(2.4),
+            2: FlexColumnWidth(0.7),
+            3: FlexColumnWidth(1.3),
+            4: FlexColumnWidth(1.3),
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            headerRow(),
+            for (var i = 0; i < rows.length; i++) dataRow(i),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _pad(Widget child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: child,
+    );

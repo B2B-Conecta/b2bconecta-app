@@ -48,6 +48,9 @@ class CatalogImportResult {
     this.validationErrors = const [],
     this.persistenceErrors = const [],
     this.dryRun = false,
+    this.priceChanges = 0,
+    this.stockChanges = 0,
+    this.imageUrlChanges = 0,
   });
 
   final int inserted;
@@ -56,6 +59,9 @@ class CatalogImportResult {
   final List<CatalogImportRowError> validationErrors;
   final List<CatalogImportRowError> persistenceErrors;
   final bool dryRun;
+  final int priceChanges;
+  final int stockChanges;
+  final int imageUrlChanges;
 
   int get successCount => inserted + updated;
 
@@ -96,6 +102,9 @@ class CatalogImportResult {
       validationErrors: [...validationErrors, ...other.validationErrors],
       persistenceErrors: [...persistenceErrors, ...other.persistenceErrors],
       dryRun: dryRun || other.dryRun,
+      priceChanges: priceChanges + other.priceChanges,
+      stockChanges: stockChanges + other.stockChanges,
+      imageUrlChanges: imageUrlChanges + other.imageUrlChanges,
     );
   }
 
@@ -122,9 +131,11 @@ class CatalogImportPreview {
     required this.headers,
     required this.sampleRows,
     this.totalDataRowsEstimate,
+    this.sampleRowNumbers = const [],
   });
 
   final List<String> headers;
   final List<Map<String, String>> sampleRows;
+  final List<int> sampleRowNumbers;
   final int? totalDataRowsEstimate;
 }

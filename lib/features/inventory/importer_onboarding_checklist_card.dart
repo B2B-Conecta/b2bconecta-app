@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'importer_onboarding_checklist.dart';
 
 class ImporterOnboardingChecklistCard extends StatefulWidget {
@@ -24,17 +25,27 @@ class _ImporterOnboardingChecklistCardState
     extends State<ImporterOnboardingChecklistCard> {
   bool _open = false;
 
+  void _openStep(ImporterOnboardingStep step) {
+    if (step.title == 'Cargar el primer producto' ||
+        step.title == 'Publicar el catálogo') {
+      widget.onAddProduct();
+      return;
+    }
+    widget.onOpenProfile();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final checklist = widget.checklist;
     if (checklist.isComplete) return const SizedBox.shrink();
     final pending = checklist.steps.where((step) => !step.done);
-    final next = pending.isEmpty ? null : pending.first.title;
+    final next = pending.isEmpty ? null : pending.first;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: theme.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(color: theme.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -51,10 +62,12 @@ class _ImporterOnboardingChecklistCardState
                     children: [
                       Expanded(
                         child: Text(
-                          'Inicio rápido',
+                          'Configuración de tienda',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                            color: theme.textPrimary,
                           ),
                         ),
                       ),
@@ -62,24 +75,30 @@ class _ImporterOnboardingChecklistCardState
                         '${checklist.doneCount} de ${checklist.total}',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: AppColors.brand,
+                          color: theme.brand,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                      Icon(
-                        _open ? Icons.expand_less : Icons.expand_more,
-                        color: AppColors.textSecondary,
+                      const SizedBox(width: 4),
+                      Transform.rotate(
+                        angle: _open ? 3.1416 : 0,
+                        child: LucideIcon(
+                          LucideGlyph.chevronDown,
+                          size: 18,
+                          color: theme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
-                  if (!_open && next != null) ...[
-                    const SizedBox(height: 2),
+                  if (next != null) ...[
+                    const SizedBox(height: 4),
                     Text(
-                      'Siguiente: $next',
-                      maxLines: 1,
+                      'Siguiente: ${next.title}',
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                       ),
                     ),
                   ],
@@ -89,10 +108,25 @@ class _ImporterOnboardingChecklistCardState
                     child: LinearProgressIndicator(
                       value: checklist.progress,
                       minHeight: 6,
-                      backgroundColor: AppColors.brandBlueContainer,
-                      color: AppColors.brand,
+                      backgroundColor: theme.brandContainer,
+                      color: theme.brand,
                     ),
                   ),
+                  if (next != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.brand,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        onPressed: () => _openStep(next),
+                        child: const Text('Completar paso'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -106,23 +140,25 @@ class _ImporterOnboardingChecklistCardState
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
-                      leading: Icon(
+                      leading: LucideIcon(
                         step.done
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        color: step.done
-                            ? AppColors.successGreen
-                            : AppColors.brand,
+                            ? LucideGlyph.circleCheck
+                            : LucideGlyph.circle,
+                        size: 18,
+                        color: step.done ? theme.successFg : theme.brand,
                       ),
                       title: Text(
                         step.title,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: theme.textPrimary,
+                        ),
                       ),
-                      subtitle: Text(step.detail),
-                      onTap: step.title == 'Cargar el primer producto' ||
-                              step.title == 'Publicar el catálogo'
-                          ? widget.onAddProduct
-                          : widget.onOpenProfile,
+                      subtitle: Text(
+                        step.detail,
+                        style: TextStyle(color: theme.textSecondary),
+                      ),
+                      onTap: () => _openStep(step),
                     ),
                 ],
               ),

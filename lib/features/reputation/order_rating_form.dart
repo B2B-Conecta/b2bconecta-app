@@ -18,6 +18,7 @@ class OrderRatingForm extends StatefulWidget {
     this.emphasized = false,
     this.initialComment = '',
     this.cancellationReasonBanner,
+    this.guidance,
   });
 
   final String title;
@@ -38,6 +39,9 @@ class OrderRatingForm extends StatefulWidget {
 
   /// Texto destacado con el motivo de cancelación (si aplica).
   final String? cancellationReasonBanner;
+
+  /// Sustituye la guía del control deslizante. Null conserva el texto del sheet móvil.
+  final String? guidance;
 
   @override
   State<OrderRatingForm> createState() => _OrderRatingFormState();
@@ -143,8 +147,9 @@ class _OrderRatingFormState extends State<OrderRatingForm> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Ajustá cada categoría con el control deslizante. '
-                    'La valoración general se calcula automáticamente.',
+                    widget.guidance ??
+                        'Ajustá cada categoría con el control deslizante. '
+                            'La valoración general se calcula automáticamente.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,

@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/profile/profile_service.dart';
@@ -16,6 +17,7 @@ import 'product_custom_fields_section.dart';
 import 'product_delete_outcome_sheet.dart';
 import 'product_image_gallery_editor.dart';
 import 'importer_product_price_preview.dart';
+import 'inventory_qr_label.dart';
 
 /// Crear o editar un producto del inventario (importador).
 class ImporterProductEditScreen extends StatefulWidget {
@@ -47,10 +49,26 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
   bool _isActive = true;
   bool _hasWarranty = false;
   bool _saving = false;
+  bool _exportingLabel = false;
   bool _pagoSoloDivisas = false;
   Map<String, dynamic> _customFields = const {};
 
   bool get _isEdit => widget.initial != null && widget.initial!.id.isNotEmpty;
+
+  Future<void> _downloadQrLabel() async {
+    setState(() => _exportingLabel = true);
+    try {
+      await InventoryQrLabel.download([widget.initial!]);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo descargar la etiqueta QR.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportingLabel = false);
+    }
+  }
 
   String? get _selectedCategory {
     final family = _categoryFamily;
@@ -459,9 +477,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           ),
         ),
         subtitle: Text(
-          _isActive
-              ? 'Las tiendas ven este producto en el catálogo.'
-              : 'Un producto pausado se oculta de inmediato del catálogo de las tiendas.',
+          _isActive ? 'Visible en el catálogo.' : 'Oculto del catálogo.',
           style: const TextStyle(fontSize: 12),
         ),
         value: _isActive,
@@ -478,7 +494,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     );
   }
 
-  Widget _buildMainFields() {
+  Widget _buildMainFields({bool technical = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -521,8 +537,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               'Precio USD',
               hint: 'Opcional · promoción, menor que el REF',
             ).copyWith(
-              helperText:
-                  'Precio de promoción. Si lo dejas vacío, la tienda solo ve el REF.',
+              helperText: 'Opcional. Vacío = solo REF.',
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
@@ -538,8 +553,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               'Precio (Bs)',
               hint: _tasaBcv == null ? 'No disponible' : null,
             ).copyWith(
-              helperText:
-                  'Solo lectura. Se calcula sobre el precio REF. La promoción USD no entra.',
+              helperText: 'Calculado sobre el REF.',
             ),
           ),
         ],
@@ -566,11 +580,10 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           controller: _minOrderQtyController,
           decoration: _dec(
             'Pedido mínimo / MOQ',
-            hint: 'Opcional (vacío = 1 unidad)',
+            hint: 'Vacío = 1',
           ).copyWith(
             helperText:
-                'Solo si quiere exigir un mínimo mayor a 1. '
-                'Vacío = el aliado puede pedir desde ${ProductMinOrderQty.platformDefault} unidad.',
+                'Vacío = desde ${ProductMinOrderQty.platformDefault} unidad.',
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -584,95 +597,129 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
             return null;
           },
         ),
-        const SizedBox(height: 8),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: const EdgeInsets.only(top: 12),
-          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-          clipBehavior: Clip.none,
-          title: const Text(
-            'Compatibilidad y descripción',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          subtitle: const Text(
-            'Opcional. La tienda puede comprar sin estos datos.',
-            style: TextStyle(fontSize: 12),
-          ),
-          children: [
-            TextFormField(
-              controller: _descController,
-              decoration: _dec('Descripción'),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _categoryFamily,
-              isExpanded: true,
-              decoration: _dec('Categoría'),
-              validator: (value) =>
-                  value == null ? 'Selecciona una categoría' : null,
-              items: [
-                for (final family in catalogTaxonomy.keys)
-                  DropdownMenuItem(
-                    value: family,
-                    child: Text(catalogCategoryDisplayLabel(family)),
-                  ),
-              ],
-              onChanged: _saving
-                  ? null
-                  : (value) => setState(() {
-                        _categoryFamily = value;
-                        _subcategory = null;
-                      }),
-            ),
-            if (_categoryFamily != null) ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey(_categoryFamily),
-                value: _subcategory ?? '',
-                isExpanded: true,
-                decoration: _dec('Subcategoría'),
-                items: [
-                  const DropdownMenuItem(
-                      value: '', child: Text('Sin especificar')),
-                  for (final child in catalogTaxonomy[_categoryFamily]!)
-                    DropdownMenuItem(value: child, child: Text(child)),
-                ],
-                onChanged: _saving
-                    ? null
-                    : (value) => setState(
-                        () => _subcategory = value == '' ? null : value),
-              ),
-            ],
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _compatController,
-              decoration: _dec('Compatibilidad'),
-            ),
-            const SizedBox(height: 12),
-            ProductCustomFieldsEditor(
-              initial: _customFields,
-              enabled: !_saving,
-              onChanged: (fields) => _customFields = fields,
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text(
-                'Producto con garantía',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: const Text(
-                'La tienda ve el sello de garantía en el catálogo.',
-                style: TextStyle(fontSize: 12),
-              ),
-              value: _hasWarranty,
-              onChanged:
-                  _saving ? null : (v) => setState(() => _hasWarranty = v),
-            ),
-          ],
-        ),
+        if (technical) ...[
+          const SizedBox(height: 8),
+          _technicalBlock(inline: false),
+        ],
       ],
     );
+  }
+
+  Widget _technicalBlock({required bool inline}) {
+    final fields = _technicalFields();
+    if (inline) {
+      final theme = B2BThemeExtension.of(context);
+      return Material(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Detalles',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: theme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...fields,
+            ],
+          ),
+        ),
+      );
+    }
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(top: 12),
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      clipBehavior: Clip.none,
+      title: const Text(
+        'Detalles',
+        style: TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: const Text(
+        'Opcional',
+        style: TextStyle(fontSize: 12),
+      ),
+      children: fields,
+    );
+  }
+
+  List<Widget> _technicalFields() {
+    return [
+      TextFormField(
+        controller: _descController,
+        decoration: _dec('Descripción'),
+        maxLines: 3,
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        value: _categoryFamily,
+        isExpanded: true,
+        decoration: _dec('Categoría'),
+        validator: (value) =>
+            value == null ? 'Selecciona una categoría' : null,
+        items: [
+          for (final family in catalogTaxonomy.keys)
+            DropdownMenuItem(
+              value: family,
+              child: Text(catalogCategoryDisplayLabel(family)),
+            ),
+        ],
+        onChanged: _saving
+            ? null
+            : (value) => setState(() {
+                  _categoryFamily = value;
+                  _subcategory = null;
+                }),
+      ),
+      if (_categoryFamily != null) ...[
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey(_categoryFamily),
+          value: _subcategory ?? '',
+          isExpanded: true,
+          decoration: _dec('Subcategoría'),
+          items: [
+            const DropdownMenuItem(value: '', child: Text('Sin especificar')),
+            for (final child in catalogTaxonomy[_categoryFamily]!)
+              DropdownMenuItem(value: child, child: Text(child)),
+          ],
+          onChanged: _saving
+              ? null
+              : (value) =>
+                  setState(() => _subcategory = value == '' ? null : value),
+        ),
+      ],
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _compatController,
+        decoration: _dec('Compatibilidad'),
+      ),
+      const SizedBox(height: 12),
+      ProductCustomFieldsEditor(
+        initial: _customFields,
+        enabled: !_saving,
+        onChanged: (fields) => _customFields = fields,
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text(
+          'Garantía',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: const Text(
+          'Sello visible en el catálogo.',
+          style: TextStyle(fontSize: 12),
+        ),
+        value: _hasWarranty,
+        onChanged: _saving ? null : (v) => setState(() => _hasWarranty = v),
+      ),
+    ];
   }
 
   Widget _buildFormActions({required bool desktop}) {
@@ -742,62 +789,75 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     );
   }
 
+  Widget _galleryCard() {
+    final theme = B2BThemeExtension.of(context);
+    return Material(
+      color: theme.surfaceCard,
+      borderRadius: BorderRadius.circular(16),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.borderSubtle),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildVisibilitySwitch(),
+              const SizedBox(height: 8),
+              _buildImageSection(),
+              _buildShareButton(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFormContent({required bool desktop}) {
     if (desktop) {
       return Form(
         key: _formKey,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppBreakpoints.productDetailMaxWidth,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: AppDecorations.cardShadow,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildShareButton(),
-                              _buildVisibilitySwitch(),
-                              const SizedBox(height: 16),
-                              _buildImageSection(),
-                            ],
-                          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final three = constraints.maxWidth >= 1080;
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AppBreakpoints.productDetailMaxWidth,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 4, child: _galleryCard()),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildMainFields(technical: !three),
+                            _buildFormActions(desktop: true),
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 28),
-                  Expanded(
-                    flex: 6,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildMainFields(),
-                        _buildFormActions(desktop: true),
+                      if (three) ...[
+                        const SizedBox(width: 20),
+                        Expanded(
+                          flex: 4,
+                          child: _technicalBlock(inline: true),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       );
     }
@@ -807,12 +867,11 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
-          _buildShareButton(),
           _buildVisibilitySwitch(),
           const SizedBox(height: 8),
-          _buildMainFields(),
-          const SizedBox(height: 12),
           _buildImageSection(),
+          const SizedBox(height: 12),
+          _buildMainFields(),
           _buildFormActions(desktop: false),
         ],
       ),
@@ -830,9 +889,8 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop =
+    final wide =
         MediaQuery.sizeOf(context).width >= AppBreakpoints.b2bDesktop;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -840,6 +898,12 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         surfaceTintColor: Colors.transparent,
         title: Text(_isEdit ? 'Editar producto' : 'Añadir producto'),
         actions: [
+          if (_isEdit && !wide)
+            IconButton(
+              tooltip: 'Descargar etiqueta QR de inventario',
+              onPressed: _saving || _exportingLabel ? null : _downloadQrLabel,
+              icon: const Icon(Icons.qr_code_2),
+            ),
           if (_isEdit)
             IconButton(
               tooltip: 'Compartir producto',
@@ -849,25 +913,6 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
               ),
               icon: const Icon(Icons.ios_share_rounded),
             ),
-          if (_isEdit && isDesktop)
-            TextButton.icon(
-              onPressed: _saving ? null : _deleteProduct,
-              icon: Icon(Icons.delete_outline, color: Colors.red.shade700),
-              label: Text(
-                'Eliminar',
-                style: TextStyle(color: Colors.red.shade700),
-              ),
-            ),
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Guardar'),
-          ),
         ],
       ),
       body: _buildFormBody(),

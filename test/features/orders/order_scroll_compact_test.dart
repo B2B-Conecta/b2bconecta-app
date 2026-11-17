@@ -68,7 +68,7 @@ void main() {
                       pages: [workspace],
                       profile: const ProfileModel(id: 'qa', role: 'aliado'),
                       unreadNotifications: 0,
-                      onNotificationTap: () {},
+                      onNotificationTap: (_) {},
                       onOpenSettings: () {},
                       railBadgeLabel: 'Tienda de prueba',
                     );

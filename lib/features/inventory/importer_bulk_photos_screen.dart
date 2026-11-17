@@ -82,10 +82,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
     final preview = _preview;
     if (preview == null || preview.files.isEmpty) return;
 
-    final matched = preview.bySku.keys
-        .where((k) => !preview.unknownSkus.any((u) => u.toLowerCase() == k))
-        .where((k) => !preview.overLimitSkus.any((u) => u.toLowerCase() == k))
-        .length;
+    final matched = preview.uploadableSkuCount;
 
     if (matched == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,8 +139,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
             children: [
               Text('Productos actualizados: ${result.updated}'),
               Text('Omitidos: ${result.skipped}'),
-              if (result.errorCount > 0)
-                Text('Errores: ${result.errorCount}'),
+              if (result.errorCount > 0) Text('Errores: ${result.errorCount}'),
               if (result.errors.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 const Text(
@@ -299,9 +295,7 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
   }
 
   Widget _summaryCard(ProductImageBulkPreview preview) {
-    final matched = preview.bySku.length -
-        preview.unknownSkus.length -
-        preview.overLimitSkus.length;
+    final matched = preview.uploadableSkuCount;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -331,10 +325,17 @@ class _ImporterBulkPhotosScreenState extends State<ImporterBulkPhotosScreen> {
               '${preview.unknownSkus.length} SKU sin producto en inventario',
               color: AppColors.brandAccent,
             ),
+          if (preview.invalidEntries.isNotEmpty) ...[
+            _statRow(Icons.warning_amber_outlined,
+                '${preview.invalidEntries.length} archivos rechazados',
+                color: Colors.red.shade700),
+            for (final entry in preview.invalidEntries.take(5))
+              Text(entry, style: const TextStyle(fontSize: 12)),
+          ],
           if (preview.overLimitSkus.isNotEmpty)
             _statRow(
               Icons.warning_amber_outlined,
-              '${preview.overLimitSkus.length} SKU con más de 3 fotos',
+              '${preview.overLimitSkus.length} SKU con fotos excedidas o posiciones repetidas',
               color: Colors.red.shade700,
             ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 import 'package:motolink_pro_app/features/logistics/importer_envio_politica_panel.dart';
 import 'package:motolink_pro_app/features/payments/importer_accepted_pago_metodos_section.dart';
@@ -73,20 +74,27 @@ class _ImporterCommercialSettingsState
   }
 
   @override
-  Widget build(BuildContext context) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Form(
             key: _form,
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Pedido mínimo',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  const Text(
-                      'Monto mínimo por pedido. Usa 0 para permitir pedidos sin monto mínimo.'),
-                  const SizedBox(height: 16),
+                  Text('Pedido mínimo',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                      )),
+                  const SizedBox(height: 4),
+                  Text('0 = sin mínimo.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.textSecondary,
+                      )),
+                  const SizedBox(height: 12),
                   SegmentedButton<MinOrderCurrency>(
                       segments: const [
                         ButtonSegment(
@@ -101,14 +109,21 @@ class _ImporterCommercialSettingsState
                           ? null
                           : (values) =>
                               setState(() => _currency = values.first)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextFormField(
                       controller: _amount,
                       enabled: !_saving,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                          labelText: 'Monto mínimo en ${_currency.unitLabel}'),
+                          labelText: 'Monto mínimo en ${_currency.unitLabel}',
+                          filled: true,
+                          fillColor: theme.inputFill,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: theme.borderSubtle),
+                          ),
+                      ),
                       validator: (_) =>
                           _value == null || !_value!.isFinite || _value! < 0
                               ? 'Indique un monto válido, mayor o igual a 0.'
@@ -121,17 +136,25 @@ class _ImporterCommercialSettingsState
                       children: [
                         TextButton(
                             onPressed: _saving ? null : _cancel,
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.textSecondary,
+                              minimumSize: const Size(0, 40),
+                            ),
                             child: const Text('Cancelar')),
                         FilledButton(
                             onPressed: _saving ? null : _save,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 40),
+                            ),
                             child: Text(
                                 _saving ? 'Guardando…' : 'Guardar mínimo')),
                       ]),
                 ])),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         ImporterAcceptedPagoMetodosSection(
             profile: widget.profile, onSaved: widget.onChanged),
         const SizedBox(height: 20),
         const ImporterEnvioPoliticaPanel(),
       ]);
+  }
 }

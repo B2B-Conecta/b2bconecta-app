@@ -11,7 +11,9 @@
 // "no está disponible" sin datos del producto.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const ORIGIN = "https://app.b2bconecta.com.ve";
+import { previewOrigin } from "./origin.ts";
+
+const ORIGIN = previewOrigin(Deno.env.get("SUPABASE_URL") ?? "");
 const BRAND_IMAGE = `${ORIGIN}/icons/Icon-512.png`;
 const BRAND_TITLE = "B2B Conecta";
 const BRAND_DESCRIPTION =

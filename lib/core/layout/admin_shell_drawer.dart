@@ -26,6 +26,9 @@ class AdminShellDrawer extends StatelessWidget {
     this.resolveNavBadge,
     this.signingOut = false,
     this.subtitle = 'Panel administrador',
+    this.footer,
+    this.accountOpensMenu = false,
+    this.importerAccountMenu = false,
   });
 
   final ProfileModel profile;
@@ -40,6 +43,15 @@ class AdminShellDrawer extends StatelessWidget {
   final ShellNavBadge? Function(Object? key)? resolveNavBadge;
   final bool signingOut;
   final String subtitle;
+
+  /// Bloque sobre la tarjeta de cuenta (p. ej. tiendas activas).
+  final Widget? footer;
+
+  /// La tarjeta abre el menú de cuenta en lugar de entrar directo a ajustes.
+  final bool accountOpensMenu;
+
+  /// Menú de cuenta del importador: pestañas de Perfil.
+  final bool importerAccountMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +120,11 @@ class AdminShellDrawer extends StatelessWidget {
                       },
                     ),
             ),
+            if (footer != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: footer!,
+              ),
             Divider(height: 1, color: theme.border),
             ShellUserMenu(
               profile: profile,
@@ -116,7 +133,9 @@ class AdminShellDrawer extends StatelessWidget {
                   : DesktopShellChrome.light,
               extended: true,
               signingOut: signingOut,
-              openSettingsOnTap: true,
+              openProfileOnTap: importerAccountMenu && !accountOpensMenu,
+              openSettingsOnTap: !importerAccountMenu && !accountOpensMenu,
+              importerAccountMenu: importerAccountMenu,
               onAction: (action) {
                 Navigator.of(context).maybePop();
                 onAction(action);

@@ -1,4 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import_photos.dart';
+import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dart';
+import 'package:motolink_pro_app/features/inventory/product_image_bulk_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_gallery_editor.dart';
@@ -18,6 +25,76 @@ void main() {
     expect(parseProductImageFilename('VAR70-AMO-03.jpg')?.slot, 1);
   });
 
+  test('el ZIP bloquea la colisión entre SKU exacto y sufijo de foto', () {
+    final zip = Uint8List.fromList(ZipEncoder().encode(
+      Archive()..addFile(ArchiveFile('ABC_2.jpg', 3, [255, 216, 255])),
+    )!);
+    final conflict = ProductImageBulkService.parseZipBytes(
+      zip,
+      knownSkuKeys: {'abc', 'abc_2'},
+    );
+    expect(conflict.uploadableSkuCount, 0);
+    expect(conflict.invalidEntries.single, contains('SKU ambiguo'));
+    final exact = ProductImageBulkService.parseZipBytes(
+      zip,
+      knownSkuKeys: {'abc_2'},
+    );
+    expect(exact.files.single.sku, 'ABC_2');
+    expect(exact.files.single.slot, 1);
+  });
+
+  test('retiene un SKU ambiguo para resolverlo manualmente', () {
+    final zip = Uint8List.fromList(ZipEncoder().encode(
+      Archive()..addFile(ArchiveFile('ABC_2.jpg', 3, [255, 216, 255])),
+    )!);
+    final preview = ProductImageBulkService.parseZipBytes(
+      zip,
+      knownSkuKeys: {'abc', 'abc_2'},
+      keepAmbiguousForReview: true,
+    );
+    expect(preview.files.single.sku, isEmpty);
+    expect(preview.invalidEntries, isEmpty);
+  });
+
+  test('la revisión exige SKU válido y una portada sin posiciones repetidas',
+      () {
+    const row = CatalogImportNormalizedRow(
+      rowIndex: 2,
+      sku: 'ABC',
+      name: 'Disco',
+      priceUsd: 10,
+      stock: 3,
+    );
+    final target = {'abc': (row: row, available: true)};
+    final file = ProductImageBulkFile(
+      pathInZip: 'abc.jpg',
+      bytes: Uint8List(1),
+      extension: 'jpeg',
+      sku: 'abc',
+      slot: 1,
+    );
+    final cover = CatalogPhotoDraft(file: file, sku: ' ABC ', approved: true);
+    final second = cover.copyWith(slot: 2);
+    expect(
+        CatalogPhotoDraft.assignmentErrors([cover, second], target), isEmpty);
+    expect(CatalogPhotoDraft.assignmentErrors([cover, cover], target),
+        contains('abc'));
+    expect(
+        CatalogPhotoDraft.assignmentErrors([second], target), contains('abc'));
+    expect(
+        CatalogPhotoDraft.assignmentErrors(
+          [cover],
+          {'abc': (row: row, available: false)},
+        ),
+        contains('abc'));
+    expect(
+        CatalogPhotoDraft.assignmentErrors(
+          [cover.copyWith(sku: 'def')],
+          target,
+        ),
+        contains('def'));
+  });
+
   test('mergeProductImageUrls append respeta max 3', () {
     final out = mergeProductImageUrls(
       existing: ['a'],
@@ -28,7 +105,8 @@ void main() {
   });
 
   test('parseProductImageUrlsJson legacy fallback', () {
-    final urls = parseProductImageUrlsJson(null, legacyImageUrl: 'http://x/a.jpg');
+    final urls =
+        parseProductImageUrlsJson(null, legacyImageUrl: 'http://x/a.jpg');
     expect(urls, ['http://x/a.jpg']);
   });
 
@@ -73,6 +151,9 @@ void main() {
   });
 
   testWidgets('la ficha muestra Tomar foto mientras haya cupo', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -105,5 +186,38 @@ void main() {
     );
 
     expect(find.text('Tomar foto'), findsNothing);
+  });
+
+  testWidgets('tocar la foto del producto abre el zoom', (tester) async {
+    final bytes = base64Decode(
+      'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductImageGalleryEditor(
+            slots: [
+              ProductImageEditSlot.pending(bytes, 'gif'),
+              ProductImageEditSlot.pending(bytes, 'gif'),
+            ],
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Image).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(find.byTooltip('Cerrar fotos'), findsOneWidget);
+    expect(find.byTooltip('Acercar foto'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('1 / 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Foto siguiente'));
+    await tester.pump();
+    expect(find.text('2 / 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

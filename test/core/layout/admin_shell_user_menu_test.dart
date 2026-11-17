@@ -58,7 +58,7 @@ void main() {
             isOwner: true,
           ),
           unreadNotifications: 0,
-          onNotificationTap: () {},
+          onNotificationTap: (_) {},
         ),
       ),
     );
@@ -71,15 +71,15 @@ void main() {
     await tester.tap(find.text('Super Admin'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mi perfil'), findsOneWidget);
-    expect(find.text('Configuración de cuenta'), findsOneWidget);
+    expect(find.text('Ajustes del sistema'), findsOneWidget);
+    expect(find.text('Cuenta y seguridad'), findsOneWidget);
     expect(find.text('Preferencias de notificaciones'), findsOneWidget);
     expect(find.text('Cerrar sesión'), findsOneWidget);
 
     await tester.tap(find.text('Cerrar sesión'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mi perfil'), findsNothing);
+    expect(find.text('Ajustes del sistema'), findsNothing);
     expect(signedOut, isTrue);
   });
 

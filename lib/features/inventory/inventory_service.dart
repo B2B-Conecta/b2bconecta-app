@@ -377,7 +377,19 @@ class InventoryService {
     return query;
   }
 
-  /// ID del producto con ese [sku] para el dueño actual, o `null`.
+  /// Loads an inventory product only when it belongs to the signed-in owner.
+  static Future<PartModel?> fetchMyProductById(String productId) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) return null;
+    final row = await SupabaseAccess.client
+        .from('products')
+        .select()
+        .eq('owner_id', uid)
+        .eq('id', productId)
+        .maybeSingle();
+    return row == null ? null : PartModel.fromJson(row);
+  }
+
   static Future<Map<String, dynamic>?> fetchProductDiscountRulesById(
     String productId,
   ) async {

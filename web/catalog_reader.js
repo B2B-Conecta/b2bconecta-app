@@ -12,3 +12,7 @@ globalThis.b2bCatalogReader.preparePhoto = async (bytes) => {
   const reader = await import('./assets/catalog-reader/reader.js');
   return reader.preparePhoto(bytes);
 };
+globalThis.b2bCatalogReader.readPhotoQrs = async (bytes) => {
+  const reader = await import('./assets/catalog-reader/reader.js');
+  return reader.readPhotoQrs(bytes);
+};

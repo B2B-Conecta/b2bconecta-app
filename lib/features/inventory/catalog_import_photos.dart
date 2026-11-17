@@ -35,6 +35,9 @@ class CatalogPhotoDraft {
     this.workbookPhoto,
     this.sourceRowBinding,
     this.edited,
+    this.assignmentNote,
+    this.lockSku = false,
+    this.inventoryProductId,
   });
 
   final ProductImageBulkFile file;
@@ -44,6 +47,9 @@ class CatalogPhotoDraft {
   final CatalogSourcePhoto? workbookPhoto;
   final int? sourceRowBinding;
   final CatalogEditedPhoto? edited;
+  final String? assignmentNote;
+  final bool lockSku;
+  final String? inventoryProductId;
 
   String get skuKey => sku.trim().toLowerCase();
 
@@ -62,6 +68,9 @@ class CatalogPhotoDraft {
       workbookPhoto: workbookPhoto,
       sourceRowBinding: sku == null ? sourceRowBinding : null,
       edited: restoreOriginal ? null : edited ?? this.edited,
+      assignmentNote: assignmentNote,
+      lockSku: lockSku,
+      inventoryProductId: sku == null || lockSku ? inventoryProductId : null,
     );
   }
 
@@ -185,8 +194,9 @@ class CatalogPhotoWriteResult {
   final Map<String, String> pending;
 
   static Future<CatalogPhotoWriteResult> save(
-    Map<String, List<ProductImageBulkFile>> files,
-  ) async {
+    Map<String, List<ProductImageBulkFile>> files, {
+    Map<String, String>? expectedProductIds,
+  }) async {
     if (files.isEmpty) return const CatalogPhotoWriteResult();
     final pending = <String, String>{};
     Map<String, ProductSkuImageIndexEntry> index;
@@ -205,6 +215,12 @@ class CatalogPhotoWriteResult {
       final target = index[entry.key];
       if (target == null) {
         pending[entry.key] = 'El repuesto no está disponible en tu inventario.';
+        continue;
+      }
+      if (expectedProductIds != null &&
+          expectedProductIds[entry.key] != target.productId) {
+        pending[entry.key] =
+            'Cambió la referencia de este SKU. Revisa la foto.';
         continue;
       }
       try {

@@ -1,3 +1,4 @@
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import '../shared/order_priority_controls.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_list_heading.dart';
@@ -883,6 +884,8 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         children: [
           ImporterOrderShippingSection(
             lines: g,
+            embedded:
+                MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu,
             onChanged: () => _load(silent: true),
           ),
         ],

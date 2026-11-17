@@ -22,6 +22,8 @@ void main() {
     expect(result.photos.map((photo) => photo.singleRow),
         [true, true, false, false]);
     expect(identical(result.photos[0].bytes, result.photos[1].bytes), isTrue);
+    expect(result.photos.first.bytes.sublist(0, 8),
+        [137, 80, 78, 71, 13, 10, 26, 10]);
     expect(result.issues.single, contains('imagen externa'));
     expect(
       readWorkbookPhotos((bytes: source, sheetName: 'Otra')).photos,
@@ -67,6 +69,36 @@ void main() {
           'moto_2': (row: reassigned, available: true),
         }),
         contains('moto_2'));
+  });
+
+  test('una fila anclada del PDF sugiere el SKU y espera confirmación', () {
+    const row = CatalogImportNormalizedRow(
+      rowIndex: 3,
+      sku: 'PG01-04',
+      name: 'Caucho',
+      priceUsd: 16,
+      stock: 1,
+    );
+    final photo = (
+      bytes: Uint8List.fromList(const [1]),
+      name: 'pdf-imagen-1.jpg',
+      extension: 'jpeg',
+      sourceRow: 3,
+      singleRow: false,
+    );
+    final targets = {'pg01-04': (row: row, available: true)};
+    final suggested = CatalogPhotoDraft.fromWorkbook(
+      [photo],
+      targets,
+      trustAnchoredRow: true,
+      approveSuggestions: false,
+    );
+    expect(suggested.single.sku, 'PG01-04');
+    expect(suggested.single.approved, isFalse);
+    expect(suggested.single.sourceRowBinding, 3);
+
+    final ignored = CatalogPhotoDraft.fromWorkbook([photo], targets);
+    expect(ignored.single.sku, isEmpty);
   });
 
   test('el recorte elimina un fondo opaco, centra la pieza y permite sombra',

@@ -41,6 +41,8 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.expandMessages = false,
     this.conversationContext,
     this.emptyHint,
+    this.closedEmptyTitle,
+    this.closedEmptyDescription,
 
     /// Varias líneas del mismo importador: vista única; inserción en [transactionRequestId].
     this.mergedThreadRequestIds,
@@ -74,8 +76,14 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   final bool expandMessages;
   final Widget? conversationContext;
 
-  /// Texto cuando todavía no hay mensajes.
+  /// Texto cuando todavía no hay mensajes y se puede responder.
   final String? emptyHint;
+
+  /// Título del estado vacío cuando el hilo ya no admite respuesta (solo web).
+  final String? closedEmptyTitle;
+
+  /// Descripción del estado vacío cuando el hilo ya no admite respuesta.
+  final String? closedEmptyDescription;
 
   @override
   State<OrderMotolinkThreadSection> createState() =>
@@ -515,9 +523,11 @@ class _OrderMotolinkThreadSectionState
       messages = ChatConversationNotice(
         title: canReply
             ? '¿Tienes una duda sobre este pedido?'
-            : 'Este pedido aún no tiene mensajes',
-        description: widget.emptyHint ??
-            (canReply ? 'Escribe aquí para iniciar la conversación.' : null),
+            : (widget.closedEmptyTitle ?? 'Este pedido aún no tiene mensajes'),
+        description: canReply
+            ? (widget.emptyHint ??
+                'Escribe aquí para iniciar la conversación.')
+            : (widget.closedEmptyDescription ?? widget.emptyHint),
       );
     } else if (widget.expandMessages) {
       messages = ChatTimeline(
@@ -534,41 +544,46 @@ class _OrderMotolinkThreadSectionState
         itemBuilder: (context, i) => _messageTile(uid, i),
       );
     }
+    final hidePanelMenu = widget.suppressBuiltinTitle &&
+        widget.suppressInlineHelp &&
+        widget.conversationContext == null;
     return Column(
       mainAxisSize: widget.expandMessages ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.only(start: 14, end: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: widget.conversationContext ??
-                    (widget.suppressBuiltinTitle
-                        ? const SizedBox.shrink()
-                        : const Text('Chat del pedido',
-                            style: TextStyle(fontWeight: FontWeight.w700))),
-              ),
-              PopupMenuButton<_ChatAction>(
-                tooltip: 'Opciones del chat',
-                onSelected: _handleChatAction,
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: _ChatAction.refresh,
-                    enabled: !_loading,
-                    child: const Text('Actualizar mensajes'),
-                  ),
-                  if (!widget.suppressInlineHelp)
-                    const PopupMenuItem(
-                      value: _ChatAction.help,
-                      child: Text('Ayuda del chat'),
+        if (!hidePanelMenu) ...[
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 14, end: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: widget.conversationContext ??
+                      (widget.suppressBuiltinTitle
+                          ? const SizedBox.shrink()
+                          : const Text('Chat del pedido',
+                              style: TextStyle(fontWeight: FontWeight.w700))),
+                ),
+                PopupMenuButton<_ChatAction>(
+                  tooltip: 'Opciones del chat',
+                  onSelected: _handleChatAction,
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: _ChatAction.refresh,
+                      enabled: !_loading,
+                      child: const Text('Actualizar mensajes'),
                     ),
-                ],
-              ),
-            ],
+                    if (!widget.suppressInlineHelp)
+                      const PopupMenuItem(
+                        value: _ChatAction.help,
+                        child: Text('Ayuda del chat'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
+          const Divider(height: 1),
+        ],
         if (_loading && _items.isNotEmpty)
           const LinearProgressIndicator(minHeight: 2),
         if (_error != null && _items.isNotEmpty)

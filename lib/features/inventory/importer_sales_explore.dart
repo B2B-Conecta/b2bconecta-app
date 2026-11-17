@@ -1,24 +1,57 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'importer_sales_product_sheet.dart';
 import 'importer_sales_snapshot.dart';
 
 enum ImporterSalesMetricKind { active, delivered, units, revenue }
 
+Future<void> _showImporterPanel(BuildContext context, Widget child) {
+  final theme = B2BThemeExtension.of(context);
+  final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  if (!wide) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: theme.dialogSurface,
+      builder: (_) => child,
+    );
+  }
+  return showDialog<void>(
+    context: context,
+    barrierColor: theme.textPrimary.withOpacity(0.35),
+    builder: (ctx) => Dialog(
+      backgroundColor: theme.dialogSurface,
+      surfaceTintColor: theme.dialogSurface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.borderSubtle),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.8,
+        ),
+        child: SingleChildScrollView(child: child),
+      ),
+    ),
+  );
+}
+
 Future<void> showImporterSalesMetricSheet({
   required BuildContext context,
   required ImporterSalesSnapshot snapshot,
   required ImporterSalesMetricKind kind,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (ctx) => _SalesMetricSheet(snapshot: snapshot, kind: kind),
+  return _showImporterPanel(
+    context,
+    _SalesMetricSheet(snapshot: snapshot, kind: kind),
   );
 }
 
@@ -28,12 +61,9 @@ Future<void> showImporterSalesSkuSheet({
   required ImporterSalesProductStat product,
   required bool lowRotation,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (ctx) => _SalesSkuSheet(
+  return _showImporterPanel(
+    context,
+    _SalesSkuSheet(
       snapshot: snapshot,
       product: product,
       lowRotation: lowRotation,
@@ -53,48 +83,56 @@ class _SalesMetricSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spec = _spec;
+    final theme = B2BThemeExtension.of(context);
+    final preview = spec.breakdown.take(3).toList();
     return Padding(
       padding: EdgeInsets.fromLTRB(
         16,
-        0,
-        16,
+        12,
+        8,
         16 + MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            spec.title,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            spec.subtitle,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: AppColors.textSecondary,
+          _sheetHeader(context, spec.title, spec.subtitle),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                for (var i = 0; i < spec.stats.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(
+                    child: _FactChip(
+                      label: spec.stats[i].$1,
+                      value: spec.stats[i].$2,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final s in spec.stats) _FactChip(label: s.$1, value: s.$2),
-            ],
-          ),
-          if (spec.breakdown.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              spec.breakdownTitle,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          if (preview.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                spec.breakdownTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  color: theme.textSecondary,
+                ),
+              ),
             ),
             const SizedBox(height: 8),
-            for (final row in spec.breakdown)
+            for (final row in preview)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(right: 8, bottom: 8),
                 child: _ShareRow(
                   name: row.$1,
                   trailing: row.$2,
@@ -102,20 +140,18 @@ class _SalesMetricSheet extends StatelessWidget {
                 ),
               ),
           ],
-          const SizedBox(height: 8),
-          for (final action in spec.actions)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FilledButton.tonalIcon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  action.onPressed(context);
-                },
-                icon: Icon(action.icon, size: 18),
-                label: Text(action.label),
-              ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8, top: 4),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var i = 0; i < spec.actions.length; i++)
+                  _actionButton(context, spec.actions[i], primary: i == 0),
+              ],
             ),
-          const SizedBox(height: 8),
+          ),
         ],
       ),
     );
@@ -128,7 +164,7 @@ class _SalesMetricSheet extends StatelessWidget {
         return _MetricSpec(
           title: 'Pedidos en curso',
           subtitle:
-              'Solicitudes de los últimos $days días que aún no se entregaron ni se cancelaron.',
+              'Aún sin entregar ni cancelar, últimos $days días.',
           stats: [
             ('En curso', '${snapshot.ordersActive}'),
             ('Entregados', '${snapshot.ordersEntregados}'),
@@ -156,8 +192,7 @@ class _SalesMetricSheet extends StatelessWidget {
       case ImporterSalesMetricKind.delivered:
         return _MetricSpec(
           title: 'Pedidos entregados',
-          subtitle:
-              'Cierres con éxito en los últimos $days días. El ticket medio usa todos los pedidos no cancelados.',
+          subtitle: 'Cierres de los últimos $days días.',
           stats: [
             ('Entregados', '${snapshot.ordersEntregados}'),
             (
@@ -184,7 +219,7 @@ class _SalesMetricSheet extends StatelessWidget {
         return _MetricSpec(
           title: 'Unidades vendidas',
           subtitle:
-              'Suma de cantidades pedidas (sin cancelados) en los últimos $days días.',
+              'Cantidades pedidas, sin cancelados, últimos $days días.',
           stats: [
             ('Unidades', '${snapshot.unitsSold}'),
             ('Por día', snapshot.unitsPerDay.toStringAsFixed(1)),
@@ -214,7 +249,7 @@ class _SalesMetricSheet extends StatelessWidget {
         return _MetricSpec(
           title: 'Facturado',
           subtitle:
-              'Total REF de pedidos no cancelados en los últimos $days días.',
+              'REF de pedidos no cancelados, últimos $days días.',
           stats: [
             ('Facturado', '${formatRefAmount(snapshot.revenueRef)} REF'),
             (
@@ -262,77 +297,181 @@ class _SalesSkuSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final share = snapshot.productRevenueShare(product);
+    final theme = B2BThemeExtension.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         16,
-        0,
-        16,
+        12,
+        8,
         16 + MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
+          _sheetHeader(
+            context,
             product.name,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-          ),
-          const SizedBox(height: 4),
-          Text(
             lowRotation
-                ? 'Rotación en los últimos ${snapshot.days} días'
-                : 'Desempeño en los últimos ${snapshot.days} días',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ? 'Rotación, últimos ${snapshot.days} días'
+                : 'Desempeño, últimos ${snapshot.days} días',
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _FactChip(label: 'Unidades', value: '${product.units}'),
-              if (!lowRotation || product.revenue > 0)
-                _FactChip(
-                  label: 'Facturado',
-                  value: '${formatRefAmount(product.revenue)} REF',
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _FactChip(
+                    label: 'Unidades',
+                    value: '${product.units}',
+                  ),
                 ),
-              if (!lowRotation && snapshot.revenueRef > 0)
-                _FactChip(
-                  label: 'Del período',
-                  value: '${(share * 100).toStringAsFixed(0)}%',
-                ),
-            ],
+                if (!lowRotation || product.revenue > 0) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _FactChip(
+                      label: 'Facturado',
+                      value: '${formatRefAmount(product.revenue)} REF',
+                    ),
+                  ),
+                ],
+                if (!lowRotation && snapshot.revenueRef > 0) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _FactChip(
+                      label: 'Del período',
+                      value: '${(share * 100).toStringAsFixed(0)}%',
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           if (product.units == 0) ...[
             const SizedBox(height: 12),
-            Text(
-              'Este SKU está activo y no tuvo pedidos en el período. Conviene revisar precio, foto o visibilidad.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                color: AppColors.textSecondary,
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                'Sin pedidos en el período. Revisa precio, foto o visibilidad.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: theme.textSecondary,
+                ),
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          FilledButton.tonalIcon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              showImporterSalesProductSheet(
-                context: context,
-                kind: lowRotation ? 'low' : 'top',
-                days: snapshot.days,
-              );
-            },
-            icon: const Icon(Icons.list_alt_outlined, size: 18),
-            label: Text(
-              lowRotation ? 'Ver poca rotación' : 'Ver más vendidos',
+          Padding(
+            padding: const EdgeInsets.only(right: 8, top: 12),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _actionButton(
+                context,
+                _SheetAction(
+                  label: lowRotation ? 'Ver poca rotación' : 'Ver más vendidos',
+                  icon: Icons.list_alt_outlined,
+                  onPressed: (ctx) => showImporterSalesProductSheet(
+                    context: ctx,
+                    kind: lowRotation ? 'low' : 'top',
+                    days: snapshot.days,
+                  ),
+                ),
+                primary: true,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
         ],
       ),
     );
   }
+}
+
+Widget _sheetHeader(BuildContext context, String title, String subtitle) {
+  final theme = B2BThemeExtension.of(context);
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: theme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: theme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+      IconButton(
+        tooltip: 'Cerrar',
+        visualDensity: VisualDensity.compact,
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: Icon(Icons.close, size: 18, color: theme.textSecondary),
+      ),
+    ],
+  );
+}
+
+Widget _actionButton(
+  BuildContext context,
+  _SheetAction action, {
+  required bool primary,
+}) {
+  final theme = B2BThemeExtension.of(context);
+  void run() {
+    Navigator.of(context).pop();
+    action.onPressed(context);
+  }
+
+  final style = ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: 14),
+    ),
+    foregroundColor: primary
+        ? null
+        : WidgetStatePropertyAll(theme.textSecondary),
+    side: primary
+        ? null
+        : WidgetStatePropertyAll(BorderSide(color: theme.borderSubtle)),
+    shape: const WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(10)),
+      ),
+    ),
+  );
+  final icon = Icon(action.icon, size: 18);
+  final label = Text(action.label, maxLines: 1, overflow: TextOverflow.ellipsis);
+  if (primary) {
+    return FilledButton.icon(
+      onPressed: run,
+      style: style,
+      icon: icon,
+      label: label,
+    );
+  }
+  return OutlinedButton.icon(
+    onPressed: run,
+    style: style,
+    icon: icon,
+    label: label,
+  );
 }
 
 class _MetricSpec {
@@ -373,29 +512,41 @@ class _FactChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    final theme = B2BThemeExtension.of(context);
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surfaceTinted,
+        color: theme.surfaceSubtle,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSubtle),
+        border: Border.all(color: theme.borderSubtle),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: theme.textSecondary,
+              ),
             ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: theme.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -414,6 +565,7 @@ class _ShareRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -424,19 +576,22 @@ class _ShareRow extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
+                  color: theme.textPrimary,
                 ),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               trailing,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: theme.textSecondary,
               ),
             ),
           ],
@@ -447,8 +602,8 @@ class _ShareRow extends StatelessWidget {
           child: LinearProgressIndicator(
             value: fraction.clamp(0, 1),
             minHeight: 4,
-            backgroundColor: AppColors.borderSubtle,
-            color: AppColors.brandAccent,
+            backgroundColor: theme.borderSubtle,
+            color: theme.brand,
           ),
         ),
       ],

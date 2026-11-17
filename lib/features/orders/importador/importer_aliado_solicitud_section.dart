@@ -588,3 +588,104 @@ String _totalRefEtiquetaPedidoAliado(TransactionRequestModel r) {
   }
   return buf.toString();
 }
+
+/// Tabla compacta de repuestos del pedido. Solo se usa en el detalle web.
+class PedidoProductosWebTable extends StatelessWidget {
+  const PedidoProductosWebTable({
+    super.key,
+    required this.lines,
+    this.viewer = PedidoDesgloseViewer.importador,
+  });
+
+  final List<TransactionRequestModel> lines;
+  final PedidoDesgloseViewer viewer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final rows = <({PedidoProductoLineUi line, String currency})>[];
+    for (final request in lines) {
+      for (final line in transactionRequestLineasDesgloseForViewer(
+        request,
+        viewer,
+      )) {
+        rows.add((line: line, currency: request.amountCurrencyLabel));
+      }
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    const header = TextStyle(fontSize: 11, fontWeight: FontWeight.w700);
+    Widget cell(String text, TextStyle style, {TextAlign align = TextAlign.start}) {
+      return Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: align,
+        style: style,
+      );
+    }
+
+    TableRow headerRow() {
+      final style = header.copyWith(color: theme.textSecondary);
+      return TableRow(
+        decoration: BoxDecoration(color: theme.tableHeaderBg),
+        children: [
+          _pad(cell('SKU', style)),
+          _pad(cell('Repuesto', style)),
+          _pad(cell('Cant.', style, align: TextAlign.end)),
+          _pad(cell('P. unitario', style, align: TextAlign.end)),
+          _pad(cell('Subtotal', style, align: TextAlign.end)),
+        ],
+      );
+    }
+
+    TableRow dataRow(int index) {
+      final row = rows[index];
+      final line = row.line;
+      final sku = line.sku?.trim();
+      final unit = line.cantidad > 0 ? line.precioRef / line.cantidad : line.precioRef;
+      final zebra = index.isEven ? theme.tableRowEven : theme.tableRowOdd;
+      final primary = TextStyle(fontSize: 12.5, color: theme.textPrimary, fontWeight: FontWeight.w600);
+      final muted = TextStyle(fontSize: 12, color: theme.textSecondary);
+      return TableRow(
+        decoration: BoxDecoration(color: zebra),
+        children: [
+          _pad(cell((sku == null || sku.isEmpty) ? '—' : sku, muted)),
+          _pad(cell(line.nombre, primary)),
+          _pad(cell('${line.cantidad}', primary, align: TextAlign.end)),
+          _pad(cell('${formatRefAmount(unit)} ${row.currency}', muted, align: TextAlign.end)),
+          _pad(cell('${formatRefAmount(line.precioRef)} ${row.currency}', primary, align: TextAlign.end)),
+        ],
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.borderSubtle),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.1),
+            1: FlexColumnWidth(2.4),
+            2: FlexColumnWidth(0.7),
+            3: FlexColumnWidth(1.3),
+            4: FlexColumnWidth(1.3),
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            headerRow(),
+            for (var i = 0; i < rows.length; i++) dataRow(i),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _pad(Widget child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: child,
+    );

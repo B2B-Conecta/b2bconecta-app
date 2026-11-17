@@ -57,10 +57,12 @@ Future<void> showImporterCommandPalette(BuildContext context) {
     builder: (ctx) => Dialog(
       backgroundColor: theme.dialogSurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-      child: const SizedBox(
-        width: 640,
-        height: 520,
-        child: _Palette(compact: false),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.72,
+        ),
+        child: const _Palette(compact: false),
       ),
     ),
   );
@@ -88,7 +90,40 @@ class _PaletteState extends State<_Palette> {
   void initState() {
     super.initState();
     _hits = _actions();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _move(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _move(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      _openSelected();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      Navigator.of(context).maybePop();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _move(int delta) {
+    if (_hits.isEmpty) return;
+    setState(() {
+      _selected = (_selected + delta) % _hits.length;
+      if (_selected < 0) _selected = _hits.length - 1;
+    });
   }
 
   @override
@@ -106,7 +141,7 @@ class _PaletteState extends State<_Palette> {
           subtitle: 'Abrir la bandeja con el filtro de pendientes',
           glyph: LucideGlyph.shoppingCart,
           onOpen: () {
-            Navigator.of(context).pop();
+            Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.navigateToImporterPedidosExplore('nuevos');
           },
         ),
@@ -116,7 +151,7 @@ class _PaletteState extends State<_Palette> {
           subtitle: 'Productos, stock y precios',
           glyph: LucideGlyph.package,
           onOpen: () {
-            Navigator.of(context).pop();
+            Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.navigateToImporterInventory();
           },
         ),
@@ -126,7 +161,7 @@ class _PaletteState extends State<_Palette> {
           subtitle: 'Cortes emitidos pendientes de pago',
           glyph: LucideGlyph.badgeDollarSign,
           onOpen: () {
-            Navigator.of(context).pop();
+            Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.navigateToImporterPendingCommissions();
           },
         ),
@@ -207,7 +242,7 @@ class _PaletteState extends State<_Palette> {
           subtitle: '$status · USD $amount',
           glyph: LucideGlyph.shoppingCart,
           onOpen: () {
-            Navigator.of(context).pop();
+            Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.openImporterOrder(id);
           },
         ));
@@ -239,7 +274,7 @@ class _PaletteState extends State<_Palette> {
               subtitle: sku.isEmpty ? 'Inventario' : 'SKU $sku',
               glyph: LucideGlyph.package,
               onOpen: () {
-                Navigator.of(context).pop();
+                Navigator.of(context, rootNavigator: true).pop();
                 MainShellTabController.navigateToImporterInventorySearch(
                   sku.isEmpty ? name : sku,
                 );
@@ -266,7 +301,7 @@ class _PaletteState extends State<_Palette> {
           subtitle: rif.isEmpty ? 'Tienda compradora' : rif,
           glyph: LucideGlyph.store,
           onOpen: () {
-            Navigator.of(context).pop();
+            Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.navigateToImporterPedidosSearch(name);
           },
         ));
@@ -286,89 +321,82 @@ class _PaletteState extends State<_Palette> {
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
-    return Shortcuts(
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.arrowDown): _MoveIntent(1),
-        SingleActivator(LogicalKeyboardKey.arrowUp): _MoveIntent(-1),
-        SingleActivator(LogicalKeyboardKey.enter): _OpenIntent(),
-      },
-      child: Actions(
-        actions: {
-          _MoveIntent: CallbackAction<_MoveIntent>(onInvoke: (intent) {
-            if (_hits.isEmpty) return null;
-            setState(() {
-              _selected = (_selected + intent.delta) % _hits.length;
-              if (_selected < 0) _selected = _hits.length - 1;
-            });
-            return null;
-          }),
-          _OpenIntent: CallbackAction<_OpenIntent>(onInvoke: (_) {
-            _openSelected();
-            return null;
-          }),
-        },
-        child: Material(
+    final isMac = Theme.of(context).platform == TargetPlatform.macOS ||
+        Theme.of(context).platform == TargetPlatform.iOS;
+    return Focus(
+      onKeyEvent: _onKey,
+      child: Material(
           color: theme.dialogSurface,
           borderRadius: BorderRadius.circular(widget.compact ? 0 : 16),
           child: Column(
+            mainAxisSize:
+                widget.compact ? MainAxisSize.max : MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                child: TextField(
-                  controller: _ctrl,
-                  focusNode: _focus,
-                  onChanged: _onChanged,
-                  onSubmitted: (_) => _openSelected(),
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: theme.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Pedidos, SKU o tienda…',
-                    hintStyle: TextStyle(color: theme.textMuted),
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(left: 10, right: 6),
-                      child: LucideIcon(
-                        LucideGlyph.search,
-                        size: 18,
-                        color: theme.textMuted,
-                      ),
+                padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+                child: Row(
+                  children: [
+                    LucideIcon(
+                      LucideGlyph.search,
+                      size: 18,
+                      color: theme.textSecondary,
                     ),
-                    prefixIconConstraints:
-                        const BoxConstraints(minWidth: 40, minHeight: 40),
-                    suffixIcon: Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: Center(
-                        child: Text(
-                          '⌘K',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: theme.textMuted,
-                          ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        focusNode: _focus,
+                        autofocus: true,
+                        enabled: true,
+                        readOnly: false,
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.search,
+                        onChanged: _onChanged,
+                        onSubmitted: (_) => _openSelected(),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textPrimary,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          hintText: 'Pedidos, SKU o tienda…',
+                          hintStyle: TextStyle(color: theme.textMuted),
                         ),
                       ),
                     ),
-                    suffixIconConstraints:
-                        const BoxConstraints(minWidth: 40, minHeight: 36),
-                    filled: true,
-                    fillColor: theme.inputFill,
-                    isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.borderSubtle),
+                    if (!widget.compact)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.surfaceSubtle,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isMac ? '⌘K' : 'Ctrl+K',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: LucideIcon(
+                        LucideGlyph.close,
+                        size: 18,
+                        color: theme.textSecondary,
+                      ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.borderSubtle),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.brand, width: 1.4),
-                    ),
-                  ),
+                  ],
                 ),
               ),
               if (_loading)
@@ -377,8 +405,14 @@ class _PaletteState extends State<_Palette> {
                   color: theme.brand,
                   backgroundColor: theme.borderSubtle,
                 ),
-              Expanded(
-                child: ListView.builder(
+              Flexible(
+                fit: widget.compact ? FlexFit.tight : FlexFit.loose,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: widget.compact ? double.infinity : 420,
+                  ),
+                  child: ListView.builder(
+                  shrinkWrap: !widget.compact,
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
                   itemCount: _hits.length,
                   itemBuilder: (context, i) {
@@ -435,21 +469,12 @@ class _PaletteState extends State<_Palette> {
                       ),
                     );
                   },
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      ),
     );
   }
-}
-
-class _MoveIntent extends Intent {
-  const _MoveIntent(this.delta);
-  final int delta;
-}
-
-class _OpenIntent extends Intent {
-  const _OpenIntent();
 }

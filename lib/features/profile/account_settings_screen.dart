@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/auth/auth_service.dart';
+import 'package:motolink_pro_app/core/notifications/web_push_service.dart';
+import 'package:motolink_pro_app/core/notifications/web_push_status.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
@@ -33,6 +35,7 @@ class AccountSettingsScreen extends StatefulWidget {
     super.key,
     this.embedded = false,
     this.panel = AccountSettingsPanel.full,
+    this.roleLabel,
   });
 
   /// Sin AppBar: se embebe como pestaña de Perfil.
@@ -41,12 +44,15 @@ class AccountSettingsScreen extends StatefulWidget {
   /// Qué bloque mostrar (pestañas Alertas / Seguridad del Perfil).
   final AccountSettingsPanel panel;
 
+  /// Rol visible en la tarjeta de sesión. Evita el texto de tienda minorista.
+  final String? roleLabel;
+
   @override
   State<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
 }
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
-  static const _twoColMin = 900.0;
+  static const _twoColMin = 1100.0;
 
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -373,8 +379,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        ProfileRoleLabels.aliadoEs,
-                        maxLines: 1,
+                        widget.roleLabel?.trim().isNotEmpty == true
+                            ? widget.roleLabel!.trim()
+                            : ProfileRoleLabels.aliadoEs,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12.5,
@@ -399,7 +407,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             const SizedBox(height: 2),
             Text(
               email.isEmpty ? '—' : email,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 15,
@@ -474,7 +482,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Preferencias de notificaciones',
+              'En la plataforma',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -483,7 +491,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Alertas dentro de la plataforma (independientes del push del navegador).',
+              'Avisos mientras usas el panel.',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
@@ -508,7 +516,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             else ...[
               _notifSwitch(
                 title: 'Pedidos aprobados',
-                subtitle: 'Avisos cuando un mayorista aprueba tu pedido.',
+                subtitle: 'Cuando se aprueba un pedido.',
                 value: prefs.orderApproved,
                 onChanged: (v) {
                   setState(() => prefs.orderApproved = v);
@@ -518,7 +526,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               Divider(height: 1, color: theme.borderSubtle),
               _notifSwitch(
                 title: 'Recordatorios KYC',
-                subtitle: 'Plazos y documentos pendientes del expediente.',
+                subtitle: 'Documentos y plazos pendientes.',
                 value: prefs.kycReminders,
                 onChanged: (v) {
                   setState(() => prefs.kycReminders = v);
@@ -528,7 +536,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               Divider(height: 1, color: theme.borderSubtle),
               _notifSwitch(
                 title: 'Mensajes de mayoristas',
-                subtitle: 'Nuevos mensajes en el chat de pedidos.',
+                subtitle: 'Mensajes nuevos en pedidos.',
                 value: prefs.wholesaleMessages,
                 onChanged: (v) {
                   setState(() => prefs.wholesaleMessages = v);
@@ -539,6 +547,156 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _browserPushCard() {
+    final theme = B2BThemeExtension.of(context);
+    final service = WebPushService.instance;
+    return AnimatedBuilder(
+      animation: service,
+      builder: (context, _) {
+        final status = service.status;
+        final label = switch (status) {
+          WebPushUiStatus.subscribed => 'Activas',
+          WebPushUiStatus.permissionDenied => 'Bloqueadas',
+          WebPushUiStatus.expired => 'Por renovar',
+          WebPushUiStatus.unsupported ||
+          WebPushUiStatus.iosNeedsInstall =>
+            'No disponibles',
+          WebPushUiStatus.error => 'Error',
+          WebPushUiStatus.permissionDefault => 'Apagadas',
+        };
+        final detail = switch (status) {
+          WebPushUiStatus.subscribed =>
+            'Pedidos, cambios de estado y mensajes llegan aunque la pestaña esté en segundo plano.',
+          WebPushUiStatus.permissionDenied =>
+            'El navegador bloqueó los avisos. Actívalos en los ajustes del sitio.',
+          WebPushUiStatus.expired => 'Vuelve a activarlas en este navegador.',
+          WebPushUiStatus.iosNeedsInstall =>
+            'En iPhone, añade la app a inicio y ábrela desde el icono.',
+          WebPushUiStatus.unsupported =>
+            'Este navegador no admite avisos push.',
+          WebPushUiStatus.error => 'No se pudieron activar. Reintenta.',
+          WebPushUiStatus.permissionDefault =>
+            'Pedidos, cambios de estado y mensajes fuera de esta página.',
+        };
+        final tone = status.isActive
+            ? theme.successFg
+            : (status == WebPushUiStatus.permissionDenied ||
+                    status == WebPushUiStatus.error
+                ? Theme.of(context).colorScheme.error
+                : theme.textSecondary);
+        return _settingsCard(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Fuera de la página',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: tone.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: tone,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  detail,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: theme.textSecondary,
+                  ),
+                ),
+                if (service.lastError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    service.lastError!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (status.canActivate)
+                      FilledButton(
+                        onPressed: () => service.enableFromUserGesture(),
+                        child: const Text('Activar en este navegador'),
+                      ),
+                    if (status == WebPushUiStatus.subscribed) ...[
+                      OutlinedButton(
+                        onPressed: () => service.disableFromUserGesture(),
+                        child: const Text('Pausar'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () async {
+                          try {
+                            await service.sendTestNotification();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Aviso de prueba enviado. Cambia de pestaña para verlo.',
+                                ),
+                              ),
+                            );
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('No se pudo enviar el aviso.'),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Probar'),
+                      ),
+                    ],
+                    if (status == WebPushUiStatus.error)
+                      OutlinedButton(
+                        onPressed: () => service.enableFromUserGesture(),
+                        child: const Text('Reintentar'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -739,7 +897,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   Widget _bodyContent({required double width}) {
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
     final twoCol = width >= _twoColMin;
-    final compactPwd = width < AppBreakpoints.mobileMenu;
+    final compactPwd = width < _twoColMin;
     final showIntro =
         widget.embedded || width >= AppBreakpoints.mobileMenu;
 
@@ -750,12 +908,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           if (showIntro)
             _pageIntro(
               title: 'Alertas',
-              subtitle:
-                  'Elige qué avisos quieres recibir dentro de la plataforma.',
+              subtitle: 'En el panel y en el navegador.',
             ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
-            child: _notificationsCard(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _notificationsCard(),
+                if (kIsWeb) ...[
+                  const SizedBox(height: 16),
+                  _browserPushCard(),
+                ],
+              ],
+            ),
           ),
         ],
       );
@@ -784,8 +950,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           if (showIntro)
             _pageIntro(
               title: 'Seguridad',
-              subtitle:
-                  'Administra tu sesión, contraseña y acceso a este dispositivo.',
+              subtitle: 'Sesión y contraseña.',
             ),
           if (twoCol)
             Row(

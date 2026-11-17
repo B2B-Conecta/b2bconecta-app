@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'catalog_import/catalog_import_result.dart';
@@ -34,16 +35,29 @@ Future<CatalogImportPreviewDetailsAction?>
     context: context,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.black.withOpacity(0.45),
+    barrierColor: B2BThemeExtension.of(context).textPrimary.withOpacity(0.45),
     transitionDuration: const Duration(milliseconds: 220),
     pageBuilder: (ctx, animation, secondaryAnimation) {
-      return CatalogImportPreviewDetailsDialog(
+      final wide =
+          MediaQuery.sizeOf(ctx).width >= AppBreakpoints.mobileMenu;
+      final dialog = CatalogImportPreviewDetailsDialog(
         preview: preview,
         fileName: fileName,
         coreHeaders: coreHeaders,
         erpHeaders: erpHeaders,
         onEditRow: onEditRow,
         rowOffset: rowOffset,
+        expand: !wide,
+      );
+      if (wide) return dialog;
+      final height = MediaQuery.sizeOf(ctx).height;
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: SizedBox(
+          width: MediaQuery.sizeOf(ctx).width,
+          height: height * 0.94,
+          child: dialog,
+        ),
       );
     },
     transitionBuilder: (ctx, animation, secondary, child) {
@@ -69,6 +83,7 @@ class CatalogImportPreviewDetailsDialog extends StatefulWidget {
     required this.erpHeaders,
     this.onEditRow,
     this.rowOffset = 0,
+    this.expand = false,
   });
 
   final CatalogImportPreview preview;
@@ -78,6 +93,7 @@ class CatalogImportPreviewDetailsDialog extends StatefulWidget {
   final Future<Map<String, String>?> Function(
       int row, Map<String, String> values)? onEditRow;
   final int rowOffset;
+  final bool expand;
 
   @override
   State<CatalogImportPreviewDetailsDialog> createState() =>
@@ -164,14 +180,35 @@ class _CatalogImportPreviewDetailsDialogState
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final size = MediaQuery.sizeOf(context);
-    final desktop = size.width >= AppBreakpoints.b2bDesktop;
+    final desktop = size.width >= AppBreakpoints.mobileMenu;
     final maxW = desktop
-        ? (_isFull
-            ? math.min(size.width * 0.9, 1080.0)
-            : math.min(size.width * 0.78, 880.0))
-        : size.width - 20;
-    final maxH = _isFull ? size.height * 0.9 : size.height * 0.78;
+        ? math.min(size.width - 48, _isFull ? 1440.0 : 1280.0)
+        : size.width;
+    final maxH = widget.expand
+        ? size.height
+        : (_isFull ? size.height * 0.92 : size.height * 0.88);
+    final panel = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(),
+        Divider(height: 1, color: theme.borderSubtle),
+        Expanded(child: _tablePane()),
+        _paginationBar(),
+        Divider(height: 1, color: theme.borderSubtle),
+        _stickyFooter(),
+      ],
+    );
+
+    if (widget.expand) {
+      return Material(
+        color: theme.dialogSurface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        clipBehavior: Clip.antiAlias,
+        child: panel,
+      );
+    }
 
     return SafeArea(
       child: Center(
@@ -182,17 +219,14 @@ class _CatalogImportPreviewDetailsDialogState
             curve: Curves.easeOutCubic,
             width: maxW,
             height: maxH,
-            margin: EdgeInsets.symmetric(
-              horizontal: desktop ? 12 : 10,
-              vertical: 10,
-            ),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: theme.dialogSurface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderSubtle),
+              border: Border.all(color: theme.borderSubtle),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.black.withOpacity(0.16),
+                  color: theme.textPrimary.withOpacity(0.16),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -200,17 +234,7 @@ class _CatalogImportPreviewDetailsDialogState
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _header(),
-                  const Divider(height: 1),
-                  Expanded(child: _tablePane()),
-                  _paginationBar(),
-                  const Divider(height: 1),
-                  _stickyFooter(),
-                ],
-              ),
+              child: panel,
             ),
           ),
         ),
@@ -515,24 +539,31 @@ class _CatalogImportPreviewDetailsDialogState
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Scrollbar(
-            controller: _horizontalScroll,
-            thumbVisibility: true,
-            trackVisibility: true,
-            scrollbarOrientation: ScrollbarOrientation.bottom,
-            child: SingleChildScrollView(
-              controller: _horizontalScroll,
-              scrollDirection: Axis.horizontal,
-              child: Scrollbar(
-                controller: _verticalScroll,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Scrollbar(
+                controller: _horizontalScroll,
                 thumbVisibility: true,
                 trackVisibility: true,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
                 child: SingleChildScrollView(
-                  controller: _verticalScroll,
-                  child: table,
+                  controller: _horizontalScroll,
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: Scrollbar(
+                      controller: _verticalScroll,
+                      thumbVisibility: true,
+                      trackVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _verticalScroll,
+                        child: table,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -685,6 +716,8 @@ class _HeaderChip extends StatelessWidget {
         ],
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w800,

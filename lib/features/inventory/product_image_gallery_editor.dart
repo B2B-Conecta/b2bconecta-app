@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/product_photo_lightbox.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'product_images.dart';
@@ -68,6 +71,28 @@ class ProductImageGalleryEditor extends StatelessWidget {
     }
   }
 
+  void _openZoom(BuildContext context, int index) {
+    final images = <ImageProvider<Object>>[];
+    var start = 0;
+    for (var i = 0; i < slots.length; i++) {
+      final slot = slots[i];
+      if (!slot.hasContent) continue;
+      if (i == index) start = images.length;
+      if (slot.pendingBytes != null) {
+        images.add(MemoryImage(slot.pendingBytes!));
+      } else if (slot.url != null && slot.url!.isNotEmpty) {
+        images.add(NetworkImage(slot.url!));
+      }
+    }
+    if (images.isEmpty) return;
+    showProductPhotoLightbox(
+      context,
+      images: images,
+      initialIndex: start,
+      productName: 'Fotos del producto',
+    );
+  }
+
   void _removeAt(int index) {
     final next = List<ProductImageEditSlot>.from(slots);
     if (index < next.length) {
@@ -115,26 +140,29 @@ class ProductImageGalleryEditor extends StatelessWidget {
         ),
         if (canAdd && enabled) ...[
           const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => _pickImage(
-                context,
-                count,
-                channel: DocumentPickChannel.camera,
-              ),
-              icon: const Icon(Icons.photo_camera_outlined, size: 18),
-              label: const Text('Tomar foto'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.brand,
-                side: const BorderSide(color: AppColors.brand),
-                visualDensity: VisualDensity.compact,
+          if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _pickImage(
+                  context,
+                  count,
+                  channel: DocumentPickChannel.camera,
+                ),
+                icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                label: const Text('Tomar foto'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.brand,
+                  side: const BorderSide(color: AppColors.brand),
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 4),
           Text(
-            'Toca un recuadro vacío para elegir de la galería, o usa Tomar foto. La primera foto es la portada.',
+            MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu
+                ? 'Toca un recuadro o toma una foto. La primera es la portada.'
+                : 'Toca un recuadro para elegir archivo. La primera es la portada.',
             style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ],
@@ -158,14 +186,40 @@ class ProductImageGalleryEditor extends StatelessWidget {
             ? Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (slot.pendingBytes != null)
-                    Image.memory(slot.pendingBytes!, fit: BoxFit.cover)
-                  else if (slot.url != null)
-                    Image.network(
-                      slot.url!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder(label),
+                  GestureDetector(
+                    onTap: () => _openZoom(context, index),
+                    child: SizedBox.expand(
+                      child: slot.pendingBytes != null
+                          ? Image.memory(slot.pendingBytes!, fit: BoxFit.cover)
+                          : Image.network(
+                              slot.url!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _placeholder(label),
+                            ),
                     ),
+                  ),
+                  Positioned(
+                    left: 4,
+                    bottom: 4,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: B2BThemeExtension.of(context)
+                              .surfaceCard
+                              .withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            Icons.zoom_in,
+                            size: 14,
+                            color: B2BThemeExtension.of(context).textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   if (index == 0)
                     Positioned(
                       left: 4,

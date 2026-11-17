@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/features/orders/importador/importer_order_detail_chrome.dart';
 import 'package:motolink_pro_app/features/orders/admin/orders_data_table.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_widget.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
@@ -97,6 +99,12 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
         final selected =
             groups.where((g) => _keyOf(g) == selectedKey).firstOrNull;
         final detailOpen = selected != null;
+        final selectedEntry = selected == null
+            ? null
+            : OrderListEntry(selected, viewerRole: viewerRole);
+        final publishChrome = selectedEntry != null &&
+            viewerRole == AppHomeRole.importador &&
+            constraints.maxWidth >= AppBreakpoints.mobileMenu;
         final mobileRetailer =
             headerBuilder != null && viewerRole == AppHomeRole.aliado;
         return ScrollCompactLayout(
@@ -286,6 +294,14 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                           ? 0
                                                           : 8),
                                                   child: Row(children: [
+                                                    if (publishChrome)
+                                                      _ImporterOrderChromeBinder(
+                                                        reference: selectedEntry
+                                                            .reference,
+                                                        status: selectedEntry
+                                                            .status,
+                                                        onClose: onClose,
+                                                      ),
                                                     IconButton(
                                                         onPressed: () {
                                                           OrderFloatingChat
@@ -298,7 +314,7 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                             Icons.arrow_back)),
                                                     Expanded(
                                                         child: Text(
-                                                            'Pedido ${OrderListEntry(selected, viewerRole: viewerRole).reference}',
+                                                            'Pedido ${selectedEntry!.reference}',
                                                             style: TextStyle(
                                                                 fontSize: 16,
                                                                 fontWeight:
@@ -468,4 +484,56 @@ class OrderFulfilmentProgress extends StatelessWidget {
           ]);
         }));
   }
+}
+
+/// Publica el pedido abierto en el encabezado de escritorio, después del frame.
+class _ImporterOrderChromeBinder extends StatefulWidget {
+  const _ImporterOrderChromeBinder({
+    required this.reference,
+    required this.status,
+    required this.onClose,
+  });
+
+  final String reference;
+  final String status;
+  final VoidCallback onClose;
+
+  @override
+  State<_ImporterOrderChromeBinder> createState() =>
+      _ImporterOrderChromeBinderState();
+}
+
+class _ImporterOrderChromeBinderState extends State<_ImporterOrderChromeBinder> {
+  void _publish() {
+    ImporterOrderDetailChrome.instance.publish(
+      reference: widget.reference,
+      statusLabel: widget.status,
+      onClose: widget.onClose,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _publish();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ImporterOrderChromeBinder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _publish();
+    });
+  }
+
+  @override
+  void dispose() {
+    ImporterOrderDetailChrome.instance.release(widget.onClose);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

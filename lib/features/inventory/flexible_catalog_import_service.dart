@@ -21,6 +21,9 @@ class FlexibleCatalogImportService {
   /// Filas en la tarjeta compacta del wizard (mapeo).
   static const defaultSampleRowCount = 5;
 
+  /// Muestra extra para igualar la vista previa con «Asocia tus columnas».
+  static const mappingPreviewRowCount = 7;
+
   /// Máximo de filas al abrir «Ver detalles de la carga».
   /// Suficiente para catálogos típicos; archivos enormes se truncan con aviso.
   static const detailsPreviewMaxRows = 2000;
@@ -33,6 +36,7 @@ class FlexibleCatalogImportService {
     required Uint8List bytes,
     required CatalogImportFileMeta meta,
     bool detectHeader = true,
+    int sampleRowCount = defaultSampleRowCount,
   }) {
     final table = _readTabular(bytes, meta, detectHeader: detectHeader);
     final headerRow = table.headerIndex + 1;
@@ -45,7 +49,10 @@ class FlexibleCatalogImportService {
       encoding: meta.encoding,
       csvDelimiter: table.delimiter ?? meta.csvDelimiter,
     );
-    return (file: file, preview: _preview(table, file));
+    return (
+      file: file,
+      preview: _preview(table, file, sampleRowCount: sampleRowCount),
+    );
   }
 
   /// Paso 1: extrae cabeceras y filas de muestra para el wizard de mapeo.
@@ -127,6 +134,7 @@ class FlexibleCatalogImportService {
     required CatalogImportMapping mapping,
     Map<int, Map<String, String>> corrections = const {},
     void Function(String skuKey)? onSourceSku,
+    void Function(int rowIndex, String sku, String name)? onCatalogRow,
   }) {
     final missing = mapping.missingRequiredFields();
     if (missing.isNotEmpty) {
@@ -152,8 +160,16 @@ class FlexibleCatalogImportService {
         final rawByHeader = _zipRow(headers, rawCells);
         final corrected = corrections[r + 1];
         if (corrected != null) rawByHeader.addAll(corrected);
-        final sku = rawByHeader[skuColumn]?.trim().toLowerCase();
-        if (sku != null && sku.isNotEmpty) onSourceSku?.call(sku);
+        final rawSku = rawByHeader[skuColumn]?.trim() ?? '';
+        final nameSource =
+            mapping.columnMap[CatalogImportField.name.key]?.source;
+        final rawName = nameSource == null
+            ? ''
+            : (rawByHeader[nameSource]?.trim() ?? '');
+        if (rawSku.isNotEmpty) {
+          onSourceSku?.call(rawSku.toLowerCase());
+          onCatalogRow?.call(r + 1, rawSku, rawName);
+        }
         try {
           final mapped = CatalogImportValidator.mapRawRow(
             rowIndex: r + 1,

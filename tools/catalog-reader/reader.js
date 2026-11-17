@@ -63,7 +63,7 @@ export async function read(bytes, name, progress) {
             name: photo.file.name,
             bytes: new Uint8Array(await photo.file.arrayBuffer()),
             row,
-            singleRow: !pdf && photo.row != null,
+            singleRow: pdf ? row != null : photo.row != null,
           });
         }
         const rows = sheet.rows.slice(header).map(row => row.map(value => '"' + String(value).replaceAll('"','""').replace(/[\r\n]+/g,' ') + '"').join(','));

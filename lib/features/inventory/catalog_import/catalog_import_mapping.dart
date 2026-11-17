@@ -206,9 +206,18 @@ class CatalogImportMapping {
       };
 
   /// Valida que los campos obligatorios estén mapeados.
+  ///
+  /// Stock o precio con valor de relleno no exigen columna.
   List<String> missingRequiredFields() {
     final missing = <String>[];
     for (final field in catalogImportRequiredFields) {
+      if (field == CatalogImportField.stock && options.emptyStockFill != null) {
+        continue;
+      }
+      if (field == CatalogImportField.priceUsd &&
+          options.emptyPriceFill != null) {
+        continue;
+      }
       final binding = bindingFor(field);
       if (binding == null || binding.source.trim().isEmpty) {
         missing.add(field.key);
@@ -294,6 +303,8 @@ class CatalogImportOptions {
     this.newProductsActive = false,
     this.batchSize = 500,
     this.pagoSoloDivisas = false,
+    this.emptyStockFill,
+    this.emptyPriceFill,
   });
 
   final CatalogImportUpsertMode upsertMode;
@@ -302,6 +313,12 @@ class CatalogImportOptions {
   final bool newProductsActive;
   final int batchSize;
   final bool pagoSoloDivisas;
+
+  /// Si la celda de stock está vacía (o no hay columna), usar este entero.
+  final int? emptyStockFill;
+
+  /// Si la celda de precio está vacía (o no hay columna), usar este monto.
+  final double? emptyPriceFill;
 
   factory CatalogImportOptions.fromJson(Map<String, dynamic> json) {
     return CatalogImportOptions(
@@ -313,6 +330,12 @@ class CatalogImportOptions {
       newProductsActive: json['new_products_active'] == true,
       batchSize: CatalogImportFileMeta._asInt(json['batch_size'], fallback: 500),
       pagoSoloDivisas: json['pago_solo_divisas'] == true,
+      emptyStockFill: json['empty_stock_fill'] == null
+          ? null
+          : CatalogImportFileMeta._asInt(json['empty_stock_fill'], fallback: 0),
+      emptyPriceFill: json['empty_price_fill'] == null
+          ? null
+          : double.tryParse(json['empty_price_fill'].toString()),
     );
   }
 
@@ -323,5 +346,7 @@ class CatalogImportOptions {
         'new_products_active': newProductsActive,
         'batch_size': batchSize,
         if (pagoSoloDivisas) 'pago_solo_divisas': true,
+        if (emptyStockFill != null) 'empty_stock_fill': emptyStockFill,
+        if (emptyPriceFill != null) 'empty_price_fill': emptyPriceFill,
       };
 }

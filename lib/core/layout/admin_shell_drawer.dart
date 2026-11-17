@@ -28,6 +28,7 @@ class AdminShellDrawer extends StatelessWidget {
     this.subtitle = 'Panel administrador',
     this.footer,
     this.accountOpensMenu = false,
+    this.importerAccountMenu = false,
   });
 
   final ProfileModel profile;
@@ -48,6 +49,9 @@ class AdminShellDrawer extends StatelessWidget {
 
   /// La tarjeta abre el menú de cuenta en lugar de entrar directo a ajustes.
   final bool accountOpensMenu;
+
+  /// Menú de cuenta del importador: pestañas de Perfil.
+  final bool importerAccountMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +133,9 @@ class AdminShellDrawer extends StatelessWidget {
                   : DesktopShellChrome.light,
               extended: true,
               signingOut: signingOut,
-              openSettingsOnTap: !accountOpensMenu,
+              openProfileOnTap: importerAccountMenu && !accountOpensMenu,
+              openSettingsOnTap: !importerAccountMenu && !accountOpensMenu,
+              importerAccountMenu: importerAccountMenu,
               onAction: (action) {
                 Navigator.of(context).maybePop();
                 onAction(action);

@@ -33,6 +33,8 @@ class B2bDesktopShell extends StatelessWidget {
     this.railSelectionActive = true,
     this.accountFooterSelected = false,
     this.accountOpensMenu = false,
+    this.importerAccountMenu = false,
+    this.searchHint,
     this.breadcrumbsOverride,
     this.navBadges,
     this.resolveNavBadge,
@@ -78,6 +80,12 @@ class B2bDesktopShell extends StatelessWidget {
   /// La tarjeta abre el menú de cuenta (Perfil y Configuración).
   final bool accountOpensMenu;
 
+  /// Menú de cuenta del importador: pestañas de Perfil.
+  final bool importerAccountMenu;
+
+  /// Texto del buscador del header.
+  final String? searchHint;
+
   final List<AdminShellBreadcrumb>? breadcrumbsOverride;
 
   final Listenable? navBadges;
@@ -110,6 +118,8 @@ class B2bDesktopShell extends StatelessWidget {
       railSelectionActive: railSelectionActive,
       accountFooterSelected: accountFooterSelected,
       accountOpensMenu: accountOpensMenu,
+      importerAccountMenu: importerAccountMenu,
+      searchHint: searchHint,
       breadcrumbsOverride: breadcrumbsOverride,
       navBadges: navBadges,
       resolveNavBadge: resolveNavBadge,

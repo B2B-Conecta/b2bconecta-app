@@ -17,7 +17,9 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'importer_bulk_photos_screen.dart';
 import 'importer_flexible_import_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
@@ -807,41 +809,58 @@ class _ImporterInventoryDashboardState
   }
 
   Future<void> _downloadImportTemplate() async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Text(
-                'Plantilla de ejemplo',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
+    final wide =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final theme = B2BThemeExtension.of(context);
+    Widget choices(BuildContext ctx) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Text(
+              'Plantilla',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
             ),
-            ListTile(
-              leading: const Icon(Icons.table_chart_outlined),
-              title: const Text('Excel (.xlsx)'),
-              subtitle: const Text(
-                'Incluye mínimo, variantes e imagen',
-              ),
-              onTap: () => Navigator.pop(ctx, 'xlsx'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: const Text('CSV (.csv)'),
-              subtitle: const Text(
-                'Mismo layout, separado por coma',
-              ),
-              onTap: () => Navigator.pop(ctx, 'csv'),
-            ),
-            const SizedBox(height: 8),
-          ],
+          ),
+          ListTile(
+            leading: const Icon(Icons.table_chart_outlined),
+            title: const Text('Excel (.xlsx)'),
+            subtitle: const Text('Mínimo, variantes e imagen'),
+            onTap: () => Navigator.pop(ctx, 'xlsx'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('CSV (.csv)'),
+            subtitle: const Text('Mismo layout, separado por coma'),
+            onTap: () => Navigator.pop(ctx, 'csv'),
+          ),
+          const SizedBox(height: 8),
+        ],
+      );
+    }
+
+    final String? choice;
+    if (wide) {
+      choice = await showDialog<String>(
+        context: context,
+        barrierColor: theme.textPrimary.withOpacity(0.45),
+        builder: (ctx) => Dialog(
+          backgroundColor: theme.dialogSurface,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: choices(ctx),
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      choice = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: theme.dialogSurface,
+        builder: (ctx) => SafeArea(child: choices(ctx)),
+      );
+    }
     if (choice == null || !mounted) return;
     try {
       if (choice == 'csv') {
@@ -885,40 +904,45 @@ class _ImporterInventoryDashboardState
       PickedDocumentBytes file) async {
     final progress = ValueNotifier('Leyendo ${file.fileName}…');
     final navigator = Navigator.of(context, rootNavigator: true);
-    final route = DialogRoute<void>(
+    DialogRoute<void>? route;
+    route = DialogRoute<void>(
       context: context,
       barrierDismissible: false,
+      barrierColor:
+          B2BThemeExtension.of(context).textPrimary.withOpacity(0.35),
       builder: (_) => PopScope(
         canPop: false,
-        child: AlertDialog(
-          title: const Text('Preparando catálogo'),
-          content: ValueListenableBuilder<String>(
-            valueListenable: progress,
-            builder: (_, message, __) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(message),
-                const SizedBox(height: 16),
-                const LinearProgressIndicator(),
-              ],
-            ),
-          ),
+        child: _CatalogReadProgressDialog(
+          fileName: file.fileName,
+          progress: progress,
+          onCancel: () {
+            final current = route;
+            if (current != null && current.isActive) {
+              navigator.removeRoute(current);
+            }
+          },
         ),
       ),
     );
     navigator.push(route);
-    List<CatalogDocumentSheet> sheets;
+    final activeRoute = route;
+    var cancelled = false;
+    Object? failure;
+    List<CatalogDocumentSheet> sheets = const [];
     try {
       sheets = await readCatalogDocument(file.bytes, file.fileName, (message) {
-        if (route.isActive) progress.value = message;
+        if (activeRoute.isActive) progress.value = message;
       });
+    } catch (error) {
+      failure = error;
     } finally {
-      if (route.isActive) navigator.removeRoute(route);
-      await route.completed;
+      cancelled = !activeRoute.isActive;
+      if (activeRoute.isActive) navigator.removeRoute(activeRoute);
+      await activeRoute.completed;
       progress.dispose();
     }
-    if (!mounted) return null;
+    if (cancelled || !mounted) return null;
+    if (failure != null) throw failure;
     if (sheets.isEmpty) {
       throw const FormatException(
           'El documento no contiene una tabla utilizable.');
@@ -958,41 +982,62 @@ class _ImporterInventoryDashboardState
     final name = picked.fileName;
     final ext = name.split('.').last.toLowerCase();
     CatalogDocumentSheet? sheet;
-    late final CatalogImportFileMeta fileMeta;
-    CatalogImportPreview preview;
-    try {
-      if (ext == 'xls' || ext == 'pdf') {
+    late CatalogImportFileMeta fileMeta;
+    late CatalogImportPreview preview;
+    while (true) {
+      try {
+        if (ext == 'xls' || ext == 'pdf') {
+          if (!mounted) return;
+          sheet = await _readCatalogSheet(picked);
+          if (sheet == null || !mounted) return;
+          bytes = sheet.csv;
+        }
+        final prepared = FlexibleCatalogImportService.prepareFile(
+          bytes: bytes,
+          meta: CatalogImportFileMeta(
+            name: name,
+            format: ext == 'csv' || sheet != null
+                ? CatalogImportFileFormat.csv
+                : CatalogImportFileFormat.xlsx,
+          ),
+          detectHeader: sheet == null,
+          sampleRowCount: FlexibleCatalogImportService.mappingPreviewRowCount,
+        );
+        fileMeta = prepared.file;
+        preview = prepared.preview;
+        if (preview.headers.isEmpty) {
+          throw const FormatException('El archivo no tiene cabeceras.');
+        }
+        break;
+      } catch (e) {
         if (!mounted) return;
-        sheet = await _readCatalogSheet(picked);
-        if (sheet == null || !mounted) return;
-        bytes = sheet.csv;
+        final theme = B2BThemeExtension.of(context);
+        final retry = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: theme.dialogSurface,
+            title: Text(
+              'No se pudo leer el archivo',
+              style: TextStyle(color: theme.textPrimary),
+            ),
+            content: Text(
+              'No se importó nada. El archivo sigue seleccionado.\n$e',
+              style: TextStyle(color: theme.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cerrar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        );
+        if (retry != true || !mounted) return;
       }
-      final prepared = FlexibleCatalogImportService.prepareFile(
-        bytes: bytes,
-        meta: CatalogImportFileMeta(
-          name: name,
-          format: ext == 'csv' || sheet != null
-              ? CatalogImportFileFormat.csv
-              : CatalogImportFileFormat.xlsx,
-        ),
-        detectHeader: sheet == null,
-      );
-      fileMeta = prepared.file;
-      preview = prepared.preview;
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo leer el archivo: $e')),
-      );
-      return;
-    }
-
-    if (preview.headers.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El archivo no tiene cabeceras.')),
-      );
-      return;
     }
 
     if (!mounted) return;
@@ -1330,93 +1375,118 @@ class _ImporterInventoryDashboardState
     var lowStock = _filterLowStock;
     final applied = await showAdaptiveAdminSheet<bool>(
       context: context,
-      draggable: true,
-      initialChildSize: 0.7,
-      minChildSize: 0.45,
-      maxChildSize: 0.94,
-      builder: (ctx, scroll) => StatefulBuilder(
-          builder: (ctx, update) => Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(children: [
-                      const Expanded(
-                          child: Text('Filtrar productos',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w800))),
-                      IconButton(
-                          tooltip: 'Cerrar filtros',
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close)),
-                    ]),
-                    Expanded(
-                        child: ListView(controller: scroll, children: [
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                          value: category,
-                          isExpanded: true,
-                          decoration:
-                              const InputDecoration(labelText: 'Categoría'),
-                          items: categories
-                              .map((value) => DropdownMenuItem(
-                                  value: value,
-                                  child: Text(value,
-                                      overflow: TextOverflow.ellipsis)))
-                              .toList(),
-                          onChanged: (value) {
-                            if (value != null) update(() => category = value);
-                          }),
-                      if (metrics == null)
-                        Padding(
-                            padding: const EdgeInsets.only(top: 8),
+      draggable: false,
+      desktopMaxWidth: 440,
+      builder: (ctx, _) => StatefulBuilder(
+        builder: (ctx, update) {
+          final theme = B2BThemeExtension.of(ctx);
+          final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                      'Filtrar productos',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar filtros',
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: Icon(Icons.close, color: theme.textPrimary),
+                  ),
+                ]),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoría',
+                    isDense: true,
+                  ),
+                  items: categories
+                      .map((value) => DropdownMenuItem(
+                            value: value,
                             child: Text(
-                                'No se pudieron cargar todas las categorías. Actualiza el inventario para reintentar.',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12))),
-                      const SizedBox(height: 24),
-                      const Text('Fotos',
-                          style: TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 8),
-                      Wrap(spacing: 8, children: [
-                        for (final option in ProductPhotoListFilter.values)
-                          ChoiceChip(
-                              label: Text(switch (option) {
-                                ProductPhotoListFilter.all => 'Todas',
-                                ProductPhotoListFilter.withPhotos =>
-                                  'Con fotos',
-                                ProductPhotoListFilter.withoutPhotos =>
-                                  'Sin fotos',
-                              }),
-                              selected: photo == option,
-                              onSelected: (_) => update(() => photo = option)),
-                      ]),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('No alcanza la compra mínima'),
-                          subtitle: const Text(
-                              'El stock disponible no cubre el mínimo de unidades del producto.'),
-                          value: lowStock,
-                          onChanged: (value) => update(() => lowStock = value)),
-                    ])),
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      TextButton(
-                          onPressed: () => update(() {
-                                category = 'Todas';
-                                photo = ProductPhotoListFilter.all;
-                                lowStock = false;
-                              }),
-                          child: const Text('Restablecer')),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: FilledButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Aplicar filtros'))),
-                    ]),
-                  ]))),
+                              value,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) update(() => category = value);
+                  },
+                ),
+                if (metrics == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'No se pudieron cargar todas las categorías. Actualiza el inventario para reintentar.',
+                      style: TextStyle(color: theme.textSecondary, fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                Text(
+                  'Fotos',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: theme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final option in ProductPhotoListFilter.values)
+                    ChoiceChip(
+                      label: Text(switch (option) {
+                        ProductPhotoListFilter.all => 'Todas',
+                        ProductPhotoListFilter.withPhotos => 'Con fotos',
+                        ProductPhotoListFilter.withoutPhotos => 'Sin fotos',
+                      }),
+                      selected: photo == option,
+                      onSelected: (_) => update(() => photo = option),
+                    ),
+                ]),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('No alcanza la compra mínima'),
+                  subtitle: const Text(
+                    'El stock disponible no cubre el mínimo de unidades del producto.',
+                  ),
+                  value: lowStock,
+                  onChanged: (value) => update(() => lowStock = value),
+                ),
+                const SizedBox(height: 4),
+                Row(children: [
+                  TextButton(
+                    onPressed: () => update(() {
+                      category = 'Todas';
+                      photo = ProductPhotoListFilter.all;
+                      lowStock = false;
+                    }),
+                    child: const Text('Restablecer'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Aplicar filtros'),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          );
+        },
+      ),
     );
     if (applied != true || !mounted) return;
     setState(() {
@@ -1450,23 +1520,57 @@ class _ImporterInventoryDashboardState
               _showHelpDialog();
           }
         },
-        itemBuilder: (_) => const [
-          PopupMenuItem(
-            value: 'import',
-            child: Text(
-                kIsWeb ? 'Importar Excel / CSV / PDF' : 'Importar Excel / CSV'),
-          ),
-          PopupMenuItem(value: 'photos', child: Text('Importar ZIP de fotos')),
-          PopupMenuItem(value: 'template', child: Text('Descargar plantilla')),
-          PopupMenuDivider(),
-          PopupMenuItem(value: 'export', child: Text('Exportar a Excel')),
-          PopupMenuItem(value: 'share', child: Text('Compartir vitrina / QR')),
-          PopupMenuDivider(),
-          PopupMenuItem(
-              value: 'select', child: Text('Publicar o pausar varios')),
-          PopupMenuItem(value: 'delete', child: Text('Eliminar varios')),
-          PopupMenuItem(value: 'help', child: Text('Ayuda de importación')),
-        ],
+        itemBuilder: (menuCtx) {
+          final theme = B2BThemeExtension.of(menuCtx);
+          PopupMenuEntry<String> header(String label) => PopupMenuItem<String>(
+                enabled: false,
+                height: 32,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                    color: theme.textMuted,
+                  ),
+                ),
+              );
+          return [
+            header('Cargar'),
+            const PopupMenuItem(
+              value: 'import',
+              child: Text(
+                kIsWeb ? 'Importar Excel / CSV / PDF' : 'Importar Excel / CSV',
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'photos',
+              child: Text('Importar ZIP de fotos'),
+            ),
+            const PopupMenuItem(
+              value: 'template',
+              child: Text('Descargar plantilla'),
+            ),
+            const PopupMenuItem(
+              value: 'help',
+              child: Text('Ayuda de importación'),
+            ),
+            const PopupMenuDivider(),
+            header('Compartir'),
+            const PopupMenuItem(value: 'export', child: Text('Exportar a Excel')),
+            const PopupMenuItem(
+              value: 'share',
+              child: Text('Compartir vitrina / QR'),
+            ),
+            const PopupMenuDivider(),
+            header('Varios'),
+            const PopupMenuItem(
+              value: 'select',
+              child: Text('Publicar o pausar varios'),
+            ),
+            const PopupMenuItem(value: 'delete', child: Text('Eliminar varios')),
+          ];
+        },
         child: compact
             ? null
             : const Padding(
@@ -1548,12 +1652,7 @@ class _ImporterInventoryDashboardState
                           filled: true,
                           fillColor: AppColors.fieldFill,
                           suffixIcon: _searchController.text.isEmpty
-                              ? IconButton(
-                                  tooltip: 'Buscar productos',
-                                  onPressed: () =>
-                                      _reloadInventory(refreshMetrics: false),
-                                  icon:
-                                      const Icon(Icons.arrow_forward, size: 20))
+                              ? null
                               : IconButton(
                                   tooltip: 'Borrar búsqueda',
                                   onPressed: () {
@@ -1951,4 +2050,169 @@ class _ImporterInventoryDashboardState
       },
     );
   }
+}
+
+@visibleForTesting
+Widget catalogReadProgressPreview({
+  required String fileName,
+  required ValueNotifier<String> progress,
+  required VoidCallback onCancel,
+}) {
+  return _CatalogReadProgressDialog(
+    fileName: fileName,
+    progress: progress,
+    onCancel: onCancel,
+  );
+}
+
+/// Avance de lectura de Excel, PDF o XLS. En móvil queda anclado abajo.
+class _CatalogReadProgressDialog extends StatelessWidget {
+  const _CatalogReadProgressDialog({
+    required this.fileName,
+    required this.progress,
+    required this.onCancel,
+  });
+
+  final String fileName;
+  final ValueNotifier<String> progress;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    return Dialog(
+      backgroundColor: theme.dialogSurface,
+      surfaceTintColor: theme.dialogSurface,
+      elevation: 12,
+      shadowColor: theme.textPrimary.withOpacity(0.18),
+      alignment: mobile ? Alignment.bottomCenter : Alignment.center,
+      insetPadding: mobile
+          ? EdgeInsets.fromLTRB(12, 12, 12, 12 + bottom)
+          : const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: theme.borderSubtle),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: ValueListenableBuilder<String>(
+            valueListenable: progress,
+            builder: (context, message, _) {
+              final fraction = catalogReadPageFraction(message);
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.brandContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Center(
+                            child: LucideIcon(
+                              LucideGlyph.fileText,
+                              size: 20,
+                              color: theme.brand,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Leyendo archivo',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: theme.textSecondary,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: fraction,
+                      minHeight: 6,
+                      color: theme.brand,
+                      backgroundColor: theme.surfaceSubtle,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: onCancel,
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.textSecondary,
+                        minimumSize: const Size(88, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(color: theme.borderSubtle),
+                        ),
+                      ),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// `página 3 de 7` → 3/7. Sin ese texto la barra sigue indeterminada.
+@visibleForTesting
+double? catalogReadPageFraction(String message) {
+  final match = RegExp(r'página\s+(\d+)\s+de\s+(\d+)').firstMatch(message);
+  if (match == null) return null;
+  final current = int.tryParse(match.group(1)!);
+  final total = int.tryParse(match.group(2)!);
+  if (current == null || total == null || total <= 0) return null;
+  return (current / total).clamp(0.0, 1.0);
 }

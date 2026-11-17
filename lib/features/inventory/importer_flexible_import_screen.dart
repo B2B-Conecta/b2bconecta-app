@@ -8,15 +8,21 @@ import 'catalog_import/catalog_import_result.dart';
 import 'catalog_import_orchestrator.dart';
 import 'catalog_import_photo_review.dart';
 import 'catalog_import_photos.dart';
+import 'catalog_photo_adjustments.dart';
 import 'catalog_photo_source.dart';
 import 'catalog_workbook_photos.dart';
 import 'product_image_bulk_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'catalog_import_header_guess.dart';
+import 'catalog_import_issue_scan.dart';
 import 'catalog_import_preview_details_dialog.dart';
+import 'catalog_import_validator.dart';
 import 'flexible_catalog_import_service.dart';
+import 'importer_import_review_panel.dart';
+import 'product_min_order_qty.dart';
 import 'product_custom_fields.dart';
 import 'importer_import_visibility_section.dart';
 import 'product_custom_fields_section.dart';
@@ -82,7 +88,6 @@ class _ImporterFlexibleImportScreenState
   List<String> _invalidPhotoFiles = [];
   late CatalogPhotoSource? _workbookPhotos = widget.documentPhotos;
   bool _workbookReviewed = false;
-  bool _confirmedExtractedData = false;
   bool _readingWorkbookPhotos = false;
   String? _photoZipName;
   bool _captureUnmapped = true;
@@ -91,10 +96,16 @@ class _ImporterFlexibleImportScreenState
       ImporterNewProductsVisibility.paused;
   bool _importing = false;
   bool _savingPhotos = false;
-  bool _optionalExpanded = false;
-  bool _advancedOptionsExpanded = false;
-  bool _erpSectionExpanded = false;
+  bool _cancelRequested = false;
+  int? _emptyStockFill;
+  double? _emptyPriceFill;
+  CatalogImportResult? _lastDryRun;
+  String? _lastDryRunKey;
   bool _previewExpanded = false;
+  final _mappingCardKey = GlobalKey();
+  final _previewCardKey = GlobalKey();
+  int _previewRowLimit = catalogMappingPreviewInitialRows;
+  double _previewTableHeight = catalogMappingPreviewInitialHeight;
   final List<ImportCustomFieldMappingRow> _customFieldMappings = [];
   int _processedRows = 0;
   int _lastProgressUiUpdateMs = 0;
@@ -128,10 +139,9 @@ class _ImporterFlexibleImportScreenState
         'Precio de lista (en catálogo: REF, o USD si su cuenta es solo divisas).',
     CatalogImportField.salePriceUsd:
         'Precio promocional en USD, si aplica. Debe ser menor al precio de lista.',
-    CatalogImportField.stock:
-        'Unidades en almacén. Asocia «Cantidad» solo si representa existencias. Escribe 0 si el repuesto está agotado.',
+        CatalogImportField.stock: '0 si está agotado.',
     CatalogImportField.minOrderQty:
-        'Unidades mínimas por pedido. Si el proveedor la define, esa cantidad manda (mínimo 1). Si no mapeas la columna, los productos nuevos quedan en 5.',
+        'Mínimo por pedido. Vacío = ${ProductMinOrderQty.platformDefault}.',
     CatalogImportField.category:
         'Familia o línea (Motor, Frenos, Eléctrico, etc.).',
     CatalogImportField.compatibility:
@@ -291,6 +301,309 @@ class _ImporterFlexibleImportScreenState
       .where((f) => (_columnSelections[f.key] ?? '').isNotEmpty)
       .length;
 
+  int get _detectedPhotos {
+    final embedded = _workbookPhotos?.photos.length ?? 0;
+    final zip = _photoZipName == null
+        ? 0
+        : _photos.where((draft) => draft.workbookPhoto == null).length;
+    return embedded + zip;
+  }
+
+  int get _includedPhotos => _photos.where((draft) => draft.approved).length;
+
+  String get _importSignature => [
+        _columnSelections.entries.map((e) => '${e.key}:${e.value}').join('|'),
+        '$_emptyStockFill',
+        '$_emptyPriceFill',
+        '$_decimalCommaOnPrice',
+        _upsertMode.name,
+        _newProductsVisibility.name,
+        '$_captureUnmapped',
+        _corrections.entries
+            .map((e) => '${e.key}:${e.value.entries.map((c) => '${c.key}=${c.value}').join(',')}')
+            .join(';'),
+        '$_includedPhotos',
+        '$_detectedPhotos',
+      ].join('#');
+
+  CatalogImportSampleScan get _sampleScan => CatalogImportSampleScan.inspect(
+        rows: _reviewedSampleRows,
+        skuColumn: _columnSelections[CatalogImportField.sku.key],
+        nameColumn: _columnSelections[CatalogImportField.name.key],
+        priceColumn: _columnSelections[CatalogImportField.priceUsd.key],
+        stockColumn: _columnSelections[CatalogImportField.stock.key],
+        emptyStockFill: _emptyStockFill,
+        emptyPriceFill: _emptyPriceFill,
+      );
+
+  List<String> get _missingLabels {
+    final labels = <String>[];
+    for (final field in catalogImportRequiredFields) {
+      if (field == CatalogImportField.stock && _emptyStockFill != null) {
+        continue;
+      }
+      if (field == CatalogImportField.priceUsd && _emptyPriceFill != null) {
+        continue;
+      }
+      if ((_columnSelections[field.key] ?? '').isEmpty) {
+        labels.add(_labelVe(field));
+      }
+    }
+    return labels;
+  }
+
+  CatalogImportLiveStatus get _liveStatus => CatalogImportLiveStatus.resolve(
+        missingLabels: _missingLabels,
+        scan: _sampleScan,
+        estimatedRows: widget.preview.totalDataRowsEstimate,
+        emptyStockFill: _emptyStockFill,
+        emptyPriceFill: _emptyPriceFill,
+        decimalCommaOn: _decimalCommaOnPrice,
+        lastRun: _lastDryRunKey == _importSignature ? _lastDryRun : null,
+        detectedPhotos: _detectedPhotos,
+        includedPhotos: _includedPhotos,
+      );
+
+  void _applyEmptyStock(int value) {
+    setState(() => _emptyStockFill = value);
+    _showMessage('Stock vacío = $value. El estado de validación ya se actualizó.');
+  }
+
+  Future<void> _askFixedStock() async {
+    final theme = B2BThemeExtension.of(context);
+    final controller = TextEditingController(
+      text: _emptyStockFill?.toString() ?? '0',
+    );
+    final value = await _showAdaptive<int>(
+      maxWidth: 420,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Valor fijo de stock',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Se usa en las celdas vacías. Las que ya tienen número no cambian.',
+              style: TextStyle(color: theme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Existencias',
+                filled: true,
+                fillColor: theme.inputFill,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () {
+                    final n = int.tryParse(controller.text.trim());
+                    Navigator.pop(ctx, n != null && n >= 0 ? n : null);
+                  },
+                  child: const Text('Aplicar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (value != null) _applyEmptyStock(value);
+  }
+
+  Future<void> _askFixedPrice() async {
+    final theme = B2BThemeExtension.of(context);
+    final controller = TextEditingController(
+      text: _emptyPriceFill?.toString() ?? '',
+    );
+    final value = await _showAdaptive<double>(
+      maxWidth: 420,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Precio fijo',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Solo rellena precios vacíos.',
+              style: TextStyle(color: theme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Precio',
+                filled: true,
+                fillColor: theme.inputFill,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () {
+                    final n = CatalogImportValidator.parseImportNumber(
+                      controller.text,
+                    );
+                    Navigator.pop(ctx, n != null && n >= 0 ? n : null);
+                  },
+                  child: const Text('Aplicar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+    setState(() => _emptyPriceFill = value);
+    _showMessage('Precio vacío = $value.');
+  }
+
+  Future<void> _remapColumn(CatalogImportField field) async {
+    final theme = B2BThemeExtension.of(context);
+    final selected = await _showAdaptive<String>(
+      maxWidth: 440,
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                'Columna de ${_labelVe(field)}',
+                style: TextStyle(
+                  color: theme.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final header in widget.preview.headers)
+                    ListTile(
+                      title: Text(
+                        header,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: theme.textPrimary),
+                      ),
+                      onTap: () => Navigator.pop(ctx, header),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null) return;
+    setState(() => _columnSelections[field.key] = selected);
+  }
+
+  Widget _quickActions({required bool dense}) {
+    final status = _liveStatus;
+    final scan = _sampleScan;
+    final chips = <Widget>[];
+    if (status.stockNeedsAction) {
+      chips.addAll([
+        ActionChip(
+          label: const Text('Asignar 0 a stock vacío'),
+          onPressed: _importing ? null : () => _applyEmptyStock(0),
+        ),
+        ActionChip(
+          label: Text('Stock mínimo (${ProductMinOrderQty.platformDefault})'),
+          onPressed: _importing
+              ? null
+              : () => _applyEmptyStock(ProductMinOrderQty.platformDefault),
+        ),
+        ActionChip(
+          label: const Text('Valor fijo'),
+          onPressed: _importing ? null : _askFixedStock,
+        ),
+        ActionChip(
+          label: const Text('Mapear otra columna'),
+          onPressed: _importing
+              ? null
+              : () => _remapColumn(CatalogImportField.stock),
+        ),
+      ]);
+    }
+    if (status.priceNeedsAction) {
+      chips.addAll([
+        ActionChip(
+          label: const Text('Definir precio fijo'),
+          onPressed: _importing ? null : _askFixedPrice,
+        ),
+        ActionChip(
+          label: const Text('Mapear precio'),
+          onPressed: _importing
+              ? null
+              : () => _remapColumn(CatalogImportField.priceUsd),
+        ),
+      ]);
+    }
+    if (status.commaNeedsAction) {
+      chips.add(
+        ActionChip(
+          label: Text(
+            scan.commaAmbiguous ? 'Hay coma y punto' : 'Usar coma decimal',
+          ),
+          onPressed: _importing
+              ? null
+              : () => setState(() => _decimalCommaOnPrice = true),
+        ),
+      );
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: dense ? 0 : 8),
+      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+    );
+  }
+
   CatalogImportMapping _buildMapping({required bool dryRun}) {
     final columnMap = <String, CatalogImportColumnBinding>{};
     for (final field in CatalogImportField.values) {
@@ -323,6 +636,8 @@ class _ImporterFlexibleImportScreenState
         dryRun: dryRun,
         newProductsActive: _newProductsVisibility.isActive,
         pagoSoloDivisas: widget.pagoSoloDivisas,
+        emptyStockFill: _emptyStockFill,
+        emptyPriceFill: _emptyPriceFill,
       ),
       columnMap: columnMap,
       customFieldsMap: _buildCustomFieldsMap(),
@@ -336,6 +651,7 @@ class _ImporterFlexibleImportScreenState
   void _startProgress(String label) {
     setState(() {
       _importing = true;
+      _cancelRequested = false;
       _progressLabel = label;
       _processedRows = 0;
       _lastProgressUiUpdateMs = 0;
@@ -360,6 +676,7 @@ class _ImporterFlexibleImportScreenState
     Map<String, CatalogPhotoTarget>? targets,
     Set<String> photoSkuKeys = const {},
     void Function(String)? onSourceSku,
+    void Function(int rowIndex, String sku, String name)? onCatalogRow,
     void Function(String)? onProductSaved,
   }) {
     return CatalogImportOrchestrator.execute(
@@ -368,6 +685,7 @@ class _ImporterFlexibleImportScreenState
       corrections: _corrections,
       photoSkuKeys: photoSkuKeys,
       onSourceSku: onSourceSku,
+      onCatalogRow: onCatalogRow,
       onProductSaved: onProductSaved,
       onPhotoCandidate: targets == null
           ? null
@@ -388,6 +706,7 @@ class _ImporterFlexibleImportScreenState
           _partial = partial;
         });
       },
+      shouldCancel: () => _cancelRequested,
     );
   }
 
@@ -438,11 +757,37 @@ class _ImporterFlexibleImportScreenState
       if (!mounted || (chooseZip && picked == null)) return;
 
       final targets = <String, CatalogPhotoTarget>{};
+      final catalog = <String, CatalogSkuChoice>{};
       final sourceSkus = <String>{};
       await _execute(
         dryRun: true,
         targets: targets,
         onSourceSku: sourceSkus.add,
+        onCatalogRow: (rowIndex, sku, name) {
+          final key = sku.trim().toLowerCase();
+          if (key.isEmpty) return;
+          final current = catalog[key];
+          if (current == null || (current.name.isEmpty && name.trim().isNotEmpty)) {
+            catalog[key] = CatalogSkuChoice(
+              sku: sku.trim(),
+              name: name.trim(),
+              rowIndex: rowIndex,
+            );
+          }
+          targets.putIfAbsent(
+            key,
+            () => (
+              row: CatalogImportNormalizedRow(
+                rowIndex: rowIndex,
+                sku: sku.trim(),
+                name: name.trim(),
+                priceUsd: 0,
+                stock: 0,
+              ),
+              available: true,
+            ),
+          );
+        },
       );
       if (!mounted) return;
 
@@ -475,12 +820,15 @@ class _ImporterFlexibleImportScreenState
         invalid = preview.invalidEntries;
       }
       if (!_workbookReviewed && workbook != null) {
+        final pdf = widget.fileName.toLowerCase().endsWith('.pdf');
         drafts.addAll(
           CatalogPhotoDraft.fromWorkbook(
             workbook.photos,
             targets,
             existing: drafts,
             sourceRowOffset: widget.sourceRowOffset,
+            trustAnchoredRow: pdf,
+            approveSuggestions: !pdf,
           ),
         );
       }
@@ -501,10 +849,9 @@ class _ImporterFlexibleImportScreenState
           builder: (_) => CatalogImportPhotoReview(
             drafts: drafts,
             targets: targets,
+            catalog: (catalog.values.toList()
+              ..sort((a, b) => a.rowIndex.compareTo(b.rowIndex))),
             invalidEntries: [...?workbook?.issues, ...invalid],
-            originLabel: widget.fileName.toLowerCase().endsWith('.pdf')
-                ? 'PDF'
-                : 'Excel',
           ),
         ),
       );
@@ -589,7 +936,8 @@ class _ImporterFlexibleImportScreenState
 
   Future<void> _runImport() async {
     if (!_validateMapping()) return;
-    _startProgress('Revisando archivo…');
+    _startProgress('Simulando filas…');
+    var saving = false;
     try {
       final targets = <String, CatalogPhotoTarget>{};
       final result = await _execute(
@@ -597,19 +945,38 @@ class _ImporterFlexibleImportScreenState
         targets: _photos.isEmpty ? null : targets,
       );
       if (!mounted) return;
-      setState(() => _importing = false);
+      if (_cancelRequested) {
+        setState(() => _importing = false);
+        _showMessage('Simulación cancelada. El mapeo se conserva.');
+        return;
+      }
+      setState(() {
+        _importing = false;
+        _lastDryRun = result;
+        _lastDryRunKey = _importSignature;
+      });
 
       final assignmentErrors =
           CatalogPhotoDraft.assignmentErrors(_photos, targets);
       final photos = <String, List<ProductImageBulkFile>>{};
       for (final draft in _photos.where((draft) => draft.approved)) {
-        photos.putIfAbsent(draft.skuKey, () => []).add(draft.assigned);
+        final file = draft.assigned;
+        final bytes = catalogMasterNeedsFit(file.bytes)
+            ? await compute(fitCatalogMasterBytes, file.bytes)
+            : file.bytes;
+        photos.putIfAbsent(draft.skuKey, () => []).add(ProductImageBulkFile(
+              pathInZip: file.pathInZip,
+              bytes: bytes,
+              extension: identical(bytes, file.bytes) ? file.extension : 'jpeg',
+              sku: file.sku,
+              slot: file.slot,
+            ));
       }
 
-      _confirmedExtractedData = false;
-      final confirmed = await _showSimulation(result, photos, assignmentErrors);
+      final confirmed = await _showSimulation(result, assignmentErrors);
       if (!mounted || confirmed != true) return;
 
+      saving = true;
       _startProgress('Guardando repuestos…');
       final savedSkus = <String>{};
       final imported = await _execute(
@@ -618,6 +985,16 @@ class _ImporterFlexibleImportScreenState
         onProductSaved: savedSkus.add,
       );
       if (!mounted) return;
+      if (_cancelRequested) {
+        setState(() => _importing = false);
+        final retry = await _showImportFailure(
+          title: 'Guardado detenido',
+          body: 'Se guardaron ${imported.successCount} repuestos antes de '
+              'cancelar. El mapeo sigue igual: puedes reintentar el resto.',
+        );
+        if (retry == true && mounted) return _runImport();
+        return;
+      }
       final eligiblePhotos = {
         for (final sku in savedSkus) sku: photos[sku]!,
       };
@@ -638,11 +1015,32 @@ class _ImporterFlexibleImportScreenState
         photos.keys.where((sku) => !savedSkus.contains(sku)).toList(),
       );
       if (mounted) Navigator.pop(context, imported);
-    } catch (_) {
-      if (mounted) _showMessage('No se pudo completar la importación.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _importing = false;
+        _savingPhotos = false;
+      });
+      final saved = _partial?.successCount ?? 0;
+      final retry = await _showImportFailure(
+        title: saving ? 'No se completó el guardado' : 'No se pudo simular',
+        body: saving
+            ? 'Falló el lote después de guardar $saved repuestos. '
+                'El mapeo se conserva: reintenta sin volver a asociar columnas.'
+            : 'No se pudo leer el archivo para simular. '
+                'El mapeo se conserva. ${_readableError(error)}',
+      );
+      if (retry == true && mounted) return _runImport();
     } finally {
       if (mounted && _importing) setState(() => _importing = false);
     }
+  }
+
+  String _readableError(Object error) {
+    if (error is FormatException && error.message.trim().isNotEmpty) {
+      return error.message;
+    }
+    return 'Inténtalo de nuevo.';
   }
 
   String _formatImportError(CatalogImportRowError error) {
@@ -676,107 +1074,126 @@ class _ImporterFlexibleImportScreenState
 
   Future<bool?> _showSimulation(
     CatalogImportResult result,
-    Map<String, List<ProductImageBulkFile>> photos,
     Map<String, String> assignmentErrors,
   ) {
-    final included =
-        photos.values.fold(0, (total, files) => total + files.length);
     final isPdf = widget.fileName.toLowerCase().endsWith('.pdf');
-    var downloading = false;
-    return showDialog<bool>(
+    final embedded = _workbookPhotos?.photos.length ?? 0;
+    return _showAdaptive<bool>(
+      expand: true,
+      maxWidth: 920,
+      builder: (ctx) => ImporterImportReviewPanel(
+        result: result,
+        detectedPhotos: _detectedPhotos,
+        includedPhotos: _includedPhotos,
+        discardedFiles: _invalidPhotoFiles.length,
+        workbookPending: !_workbookReviewed && embedded > 0,
+        assignmentErrors: assignmentErrors,
+        requirePdfConfirm: widget.documentPhotos != null && isPdf,
+        formatError: _formatImportError,
+        onEditRow: (error) async {
+          await _correctRow(error.rowIndex, message: error.message);
+          if (ctx.mounted) Navigator.pop(ctx, false);
+        },
+        onFillEmptyStock: (value) {
+          setState(() => _emptyStockFill = value);
+          Navigator.pop(ctx, false);
+          _showMessage(
+            'Stock vacío = $value. Vuelve a simular para actualizar los errores.',
+          );
+        },
+        onDownload: result.errorCount == 0 && result.successCount > 0
+            ? _downloadReviewedWorkbook
+            : null,
+        onBack: () => Navigator.pop(ctx, false),
+        onConfirm: () => Navigator.pop(ctx, true),
+      ),
+    );
+  }
+
+  Future<T?> _showAdaptive<T>({
+    required WidgetBuilder builder,
+    double maxWidth = 560,
+    bool expand = false,
+  }) {
+    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final theme = B2BThemeExtension.of(context);
+    if (!wide) {
+      return showModalBottomSheet<T>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: theme.dialogSurface,
+        builder: (ctx) {
+          final height = MediaQuery.sizeOf(ctx).height * (expand ? 0.92 : 0.72);
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+            child: SizedBox(
+              height: expand ? height : null,
+              child: SafeArea(child: builder(ctx)),
+            ),
+          );
+        },
+      );
+    }
+    return showDialog<T>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, updateDialog) => AlertDialog(
-          title: const Text('Revisa antes de guardar'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                    '${result.inserted} por crear · ${result.updated} por actualizar'),
-                Text(
-                    '${result.skipped} filas omitidas · ${result.errorCount} con errores'),
-                Text('${result.priceChanges} cambios de precio · '
-                    '${result.stockChanges} cambios de stock'),
-                if (result.imageUrlChanges > 0)
-                  Text('${result.imageUrlChanges} cambios de URL de foto'),
-                if (_photoZipName != null ||
-                    (_workbookPhotos?.photos.isNotEmpty ?? false)) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                      'Fotos incluidas: $included · Repuestos con fotos: ${photos.length}'),
-                  Text('${_photos.length - included} fotos sin incluir'
-                      '${_invalidPhotoFiles.isEmpty ? '' : ' · ${_invalidPhotoFiles.length} archivos descartados'}'),
-                  const Text('Las galerías con fotos se conservan.'),
-                  if (!_workbookReviewed &&
-                      (_workbookPhotos?.photos.isNotEmpty ?? false))
-                    const Text(
-                        'Las fotos detectadas se incluyen después de revisarlas.'),
-                  if (assignmentErrors.isNotEmpty)
-                    Text(
-                      'Vuelve a revisar ${assignmentErrors.length} asignaciones de fotos.',
-                      style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-                    ),
-                ],
-                if (widget.documentPhotos != null && isPdf)
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                        'Revisé el SKU, el precio y el stock extraídos del PDF.'),
-                    value: _confirmedExtractedData,
-                    onChanged: (value) => updateDialog(
-                        () => _confirmedExtractedData = value ?? false),
-                  ),
-                if (result.validationErrors.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text('Corrige las filas o guarda solo las válidas.'),
-                  for (final error in result.validationErrors.take(20))
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(_formatImportError(error)),
-                      trailing: const Icon(Icons.edit_outlined),
-                      onTap: () async {
-                        await _correctRow(error.rowIndex,
-                            message: error.message);
-                        if (ctx.mounted) Navigator.pop(ctx, false);
-                      },
-                    ),
-                  if (result.validationErrors.length > 20)
-                    const Text('Se muestran los primeros 20 errores.'),
-                ],
-                if (result.validationErrors.isEmpty && result.successCount > 0)
-                  TextButton.icon(
-                    onPressed:
-                        downloading || (isPdf && !_confirmedExtractedData)
-                            ? null
-                            : () async {
-                                updateDialog(() => downloading = true);
-                                await _downloadReviewedWorkbook();
-                                if (ctx.mounted)
-                                  updateDialog(() => downloading = false);
-                              },
-                    icon: const Icon(Icons.download_outlined),
-                    label: Text(downloading
-                        ? 'Preparando Excel…'
-                        : 'Descargar Excel revisado'),
-                  ),
-              ],
+      builder: (ctx) {
+        final height = MediaQuery.sizeOf(ctx).height * (expand ? 0.86 : 0.7);
+        return Dialog(
+          backgroundColor: theme.dialogSurface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: maxWidth,
+              maxHeight: height,
+            ),
+            child: SizedBox(
+              width: maxWidth,
+              height: expand ? height : null,
+              child: builder(ctx),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Volver'),
+        );
+      },
+    );
+  }
+
+  Future<bool?> _showImportFailure({
+    required String title,
+    required String body,
+  }) {
+    final theme = B2BThemeExtension.of(context);
+    return _showAdaptive<bool>(
+      maxWidth: 480,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            FilledButton(
-              onPressed: result.successCount == 0 ||
-                      assignmentErrors.isNotEmpty ||
-                      (isPdf && !_confirmedExtractedData)
-                  ? null
-                  : () => Navigator.pop(ctx, true),
-              child: const Text('Confirmar importación'),
+            const SizedBox(height: 8),
+            Text(body, style: TextStyle(color: theme.textSecondary, height: 1.4)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cerrar'),
+                ),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Reintentar'),
+                ),
+              ],
             ),
           ],
         ),
@@ -810,42 +1227,64 @@ class _ImporterFlexibleImportScreenState
     }
     final values = {...original, ...?_corrections[rowIndex]};
     final edited = <String, String>{};
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Corregir fila ${rowIndex + widget.sourceRowOffset}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (message != null) ...[
-                Text(message),
-                const SizedBox(height: 12),
-              ],
-              for (final source in fields.keys)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: TextFormField(
-                    initialValue: values[source],
-                    decoration: InputDecoration(
-                      labelText: fields[source],
-                      border: const OutlineInputBorder(),
+    final theme = B2BThemeExtension.of(context);
+    final saved = await _showAdaptive<bool>(
+      expand: true,
+      maxWidth: 560,
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              'Fila ${rowIndex + widget.sourceRowOffset}',
+              style: TextStyle(
+                color: theme.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              children: [
+                if (message != null) ...[
+                  Text(message, style: TextStyle(color: theme.textSecondary)),
+                  const SizedBox(height: 12),
+                ],
+                for (final source in fields.keys)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextFormField(
+                      initialValue: values[source],
+                      decoration: InputDecoration(
+                        labelText: fields[source],
+                        filled: true,
+                        fillColor: theme.inputFill,
+                        border: const OutlineInputBorder(),
+                      ),
+                      onChanged: (value) => edited[source] = value,
                     ),
-                    onChanged: (value) => edited[source] = value,
                   ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
                 ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Aplicar corrección'),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Aplicar'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -871,54 +1310,78 @@ class _ImporterFlexibleImportScreenState
     final pageContext = context;
     while (true) {
       if (!pageContext.mounted) return;
-      final retry = await showDialog<bool>(
-        context: pageContext,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Resultado de la importación'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                    '${products.inserted} repuestos creados · ${products.updated} actualizados'),
-                Text(
-                    '${products.skipped} filas omitidas · ${products.errorCount} errores'),
-                if (products.inserted > 0 && !_newProductsVisibility.isActive)
-                  const Text('Los repuestos nuevos quedan en pausa.'),
-                for (final error in products.allErrors.take(20))
-                  Text(_formatImportError(error)),
-                if (eligiblePhotos.isNotEmpty || excluded.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text('Galerías guardadas: $saved'),
-                  if (skipped > 0)
-                    Text('Galerías con fotos existentes: $skipped'),
-                  if (excluded.isNotEmpty)
-                    Text(
-                        'Sin confirmación del repuesto: ${excluded.take(20).join(', ')}'),
-                  for (final item in photos.pending.entries.take(20))
-                    Text('${item.key} · ${item.value}'),
-                  if (photos.pending.length > 20)
-                    Text(
-                        '${photos.pending.length} galerías pendientes en total.'),
-                ],
-              ],
+      final theme = B2BThemeExtension.of(pageContext);
+      final mobile = MediaQuery.sizeOf(pageContext).width <
+          AppBreakpoints.mobileMenu;
+      final notes = <String>[
+        if (products.inserted > 0 && !_newProductsVisibility.isActive)
+          'Los repuestos nuevos quedan en pausa.',
+        for (final error in products.allErrors.take(20))
+          _formatImportError(error),
+        if (eligiblePhotos.isNotEmpty || excluded.isNotEmpty) ...[
+          'Galerías guardadas: $saved',
+          if (skipped > 0) 'Galerías con fotos existentes: $skipped',
+          if (excluded.isNotEmpty)
+            'Sin confirmación del repuesto: ${excluded.take(20).join(', ')}',
+          for (final item in photos.pending.entries.take(20))
+            '${item.key} · ${item.value}',
+          if (photos.pending.length > 20)
+            '${photos.pending.length} galerías pendientes en total.',
+        ],
+      ];
+      Widget card(BuildContext ctx) {
+        return _ImportOutcomeCard(
+          inserted: products.inserted,
+          updated: products.updated,
+          skippedRows: products.skipped,
+          errors: products.errorCount,
+          notes: notes,
+          canRetryPhotos: photos.pending.isNotEmpty,
+          onClose: () => Navigator.pop(ctx, false),
+          onRetry: photos.pending.isEmpty
+              ? null
+              : () => Navigator.pop(ctx, true),
+        );
+      }
+
+      final bool? retry;
+      if (mobile) {
+        retry = await showModalBottomSheet<bool>(
+          context: pageContext,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          backgroundColor: theme.dialogSurface,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (ctx) => Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+            child: card(ctx),
+          ),
+        );
+      } else {
+        retry = await showDialog<bool>(
+          context: pageContext,
+          barrierDismissible: false,
+          barrierColor: theme.textPrimary.withOpacity(0.35),
+          builder: (ctx) => Dialog(
+            backgroundColor: theme.dialogSurface,
+            surfaceTintColor: theme.dialogSurface,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: theme.borderSubtle),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: card(ctx),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cerrar'),
-            ),
-            if (photos.pending.isNotEmpty)
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Reintentar fotos'),
-              ),
-          ],
-        ),
-      );
+        );
+      }
       if (!pageContext.mounted || retry != true) return;
       _startProgress('Reintentando fotos…');
       setState(() => _savingPhotos = true);
@@ -1056,12 +1519,13 @@ class _ImporterFlexibleImportScreenState
     required Widget child,
     IconData? icon,
   }) {
+    final theme = B2BThemeExtension.of(context);
     return Card(
       elevation: 0,
-      color: AppColors.surfaceTinted,
+      color: theme.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: AppDecorations.radius12,
-        side: BorderSide(color: Colors.black.withOpacity(0.06)),
+        side: BorderSide(color: theme.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -1072,7 +1536,7 @@ class _ImporterFlexibleImportScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 20, color: AppColors.brandBlue),
+                  Icon(icon, size: 20, color: theme.brand),
                   const SizedBox(width: 8),
                 ],
                 Expanded(
@@ -1081,9 +1545,12 @@ class _ImporterFlexibleImportScreenState
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
+                          color: theme.textPrimary,
                         ),
                       ),
                       if (subtitle != null) ...[
@@ -1092,8 +1559,8 @@ class _ImporterFlexibleImportScreenState
                           subtitle,
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: AppColors.textSecondary,
-                            height: 1.4,
+                            color: theme.textSecondary,
+                            height: 1.35,
                           ),
                         ),
                       ],
@@ -1113,37 +1580,28 @@ class _ImporterFlexibleImportScreenState
   Widget _fileSummaryCard() {
     final estimate = widget.preview.totalDataRowsEstimate;
     final ext = widget.fileName.split('.').last.toUpperCase();
-    final headerRow = widget.fileMeta.headerRow + widget.sourceRowOffset;
-    final sheetName = widget.fileMeta.sheetName;
+    final theme = B2BThemeExtension.of(context);
 
     return _sectionCard(
       icon: Icons.description_outlined,
       title: widget.fileName,
       subtitle: '$ext · ${widget.preview.headers.length} columnas · '
-          '${estimate ?? '?'} repuestos aprox.',
+          '${estimate ?? '?'} filas',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (ext != 'PDF')
-            Text('Encabezados en la fila $headerRow'
-                '${sheetName == null ? '' : ' · $sheetName'}'),
           Text(
-            'Revisa que el SKU, el nombre, el precio y el stock '
-            'correspondan a las columnas de tu archivo.',
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              color: AppColors.textSecondary,
-            ),
+            'SKU, nombre, precio y stock.',
+            style: TextStyle(fontSize: 12.5, color: theme.textSecondary),
           ),
-          const SizedBox(height: 6),
-          if (widget.documentPhotos != null) ...[
-            const Text(
-                'Revisa el SKU, los precios y el stock extraídos antes de guardar.'),
-            for (final issue in widget.documentPhotos!.issues.take(8))
-              Text(issue, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 6),
-          ],
+          if (widget.documentPhotos != null)
+            for (final issue in widget.documentPhotos!.issues.take(4))
+              Text(
+                issue,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: theme.textSecondary),
+              ),
           _previewDetailsButton(),
         ],
       ),
@@ -1151,30 +1609,32 @@ class _ImporterFlexibleImportScreenState
   }
 
   Widget _autoMapReadyBanner() {
-    final ready = _mappedRequiredCount == catalogImportRequiredFields.length;
-    if (!ready) return const SizedBox.shrink();
-
-    final autoExtras = _captureUnmapped ? _unmappedHeaders().length : 0;
-    final detail = autoExtras > 0
-        ? 'Columnas obligatorias asociadas. '
-            'Se guardarán $autoExtras columnas extra como datos internos.'
-        : 'Columnas obligatorias asociadas.';
+    final status = _liveStatus;
+    if (!status.clean) return const SizedBox.shrink();
+    final theme = B2BThemeExtension.of(context);
+    final tone = status.clean ? theme.successFg : theme.warningFg;
+    final bg = status.clean ? theme.successBg : theme.warningBg;
+    final detail = status.clean
+        ? (_captureUnmapped && _unmappedHeaders().isNotEmpty
+            ? 'Columnas listas · ${_unmappedHeaders().length} extra'
+            : 'Columnas listas.')
+        : status.message;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.successGreen.withOpacity(0.1),
+        color: bg,
         borderRadius: AppDecorations.radius12,
-        border: Border.all(color: AppColors.successGreen.withOpacity(0.35)),
+        border: Border.all(color: tone.withOpacity(0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.check_circle,
-            color: AppColors.successGreen,
+          Icon(
+            status.clean ? Icons.check_circle : Icons.error_outline,
+            color: tone,
             size: 22,
           ),
           const SizedBox(width: 10),
@@ -1183,8 +1643,8 @@ class _ImporterFlexibleImportScreenState
               detail,
               style: TextStyle(
                 fontSize: 13,
-                height: 1.4,
-                color: Colors.green.shade900,
+                height: 1.35,
+                color: theme.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1202,14 +1662,15 @@ class _ImporterFlexibleImportScreenState
     required ValueChanged<bool> onExpandedChanged,
     required Widget child,
   }) {
+    final theme = B2BThemeExtension.of(context);
     return Material(
-      color: Colors.white,
+      color: theme.surfaceCard,
       elevation: 0,
       borderRadius: AppDecorations.radius12,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: AppDecorations.radius12,
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: theme.borderSubtle),
         ),
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -1218,14 +1679,22 @@ class _ImporterFlexibleImportScreenState
             onExpansionChanged: onExpandedChanged,
             tilePadding: const EdgeInsets.fromLTRB(14, 4, 8, 0),
             childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            leading: Icon(icon, color: AppColors.brandBlue, size: 22),
+            leading: Icon(icon, color: theme.brand, size: 22),
             title: Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: theme.textPrimary,
+              ),
             ),
             subtitle: Text(
               subtitle,
-              style: const TextStyle(fontSize: 12, height: 1.3),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, height: 1.3, color: theme.textSecondary),
             ),
             children: [child],
           ),
@@ -1235,8 +1704,9 @@ class _ImporterFlexibleImportScreenState
   }
 
   Widget _stepIndicator({required bool desktop}) {
-    final step1Done =
-        _mappedRequiredCount == catalogImportRequiredFields.length;
+    final theme = B2BThemeExtension.of(context);
+    final mapped = _missingLabels.isEmpty;
+    final clean = _liveStatus.clean;
     final step2Count = _customFieldMappings
         .where(
             (r) => (r.fieldLabel.trim().isNotEmpty) && r.sourceColumn != null)
@@ -1248,26 +1718,21 @@ class _ImporterFlexibleImportScreenState
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: done
-                ? AppColors.brandBlueContainer.withOpacity(0.55)
-                : AppColors.fieldFill,
+            color: done ? theme.brandContainer : theme.inputFill,
             borderRadius: AppDecorations.radius12,
             border: Border.all(
-              color: done
-                  ? AppColors.brandBlue.withOpacity(0.35)
-                  : Colors.transparent,
+              color: done ? theme.brand.withOpacity(0.35) : theme.borderSubtle,
             ),
           ),
           child: Row(
             children: [
               CircleAvatar(
                 radius: 13,
-                backgroundColor:
-                    done ? AppColors.brandBlue : AppColors.textSecondary,
+                backgroundColor: done ? theme.brand : theme.textMuted,
                 child: Text(
                   '$n',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1280,16 +1745,21 @@ class _ImporterFlexibleImportScreenState
                   children: [
                     Text(
                       label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: desktop ? 13 : 12,
+                        color: theme.textPrimary,
                       ),
                     ),
                     Text(
                       detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textSecondary,
+                        color: theme.textSecondary,
                       ),
                     ),
                   ],
@@ -1306,34 +1776,27 @@ class _ImporterFlexibleImportScreenState
         step(
           1,
           'Columnas clave',
-          '$_mappedRequiredCount/${catalogImportRequiredFields.length} listas',
-          step1Done,
+          '$_mappedRequiredCount/${catalogImportRequiredFields.length}',
+          mapped,
         ),
         const SizedBox(width: 8),
         step(
           2,
-          'Extras ERP',
+          'Extras',
           step2Count > 0
-              ? '$step2Count manual(es)'
+              ? '$step2Count'
               : autoCount > 0
                   ? '$autoCount auto'
                   : 'Opcional',
           step2Count > 0 || (_captureUnmapped && autoCount > 0),
         ),
         const SizedBox(width: 8),
-        step(3, 'Confirmar', 'Revisar y guardar', step1Done),
+        step(3, 'Confirmar', clean ? 'Listo' : 'Revisar', clean),
       ],
     );
   }
 
   Widget _coreMappingCard({required bool desktop}) {
-    final optionalFields = _optionalFields.where((f) {
-      if (!widget.pagoSoloDivisas) return true;
-      // Solo divisas: un precio USD de lista; sin oferta ni % pago USD.
-      return f != CatalogImportField.usdPaymentDiscountPct &&
-          f != CatalogImportField.salePriceUsd;
-    }).toList();
-
     Widget requiredGrid() {
       return LayoutBuilder(
         builder: (context, constraints) {
@@ -1363,8 +1826,7 @@ class _ImporterFlexibleImportScreenState
     return _sectionCard(
       icon: Icons.storefront_outlined,
       title: 'Asocia tus columnas',
-      subtitle:
-          'SKU, nombre, precio y stock son obligatorios. Escribe 0 si el producto no tiene existencias.',
+      subtitle: 'SKU, nombre, precio y stock.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1374,67 +1836,44 @@ class _ImporterFlexibleImportScreenState
           ),
           const SizedBox(height: 8),
           requiredGrid(),
-          const SizedBox(height: 4),
-          Material(
-            color: AppColors.fieldFill,
-            borderRadius: AppDecorations.radius12,
-            child: InkWell(
-              borderRadius: AppDecorations.radius12,
-              onTap: _importing
-                  ? null
-                  : () => setState(
-                        () => _optionalExpanded = !_optionalExpanded,
-                      ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Campos opcionales',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    Icon(
-                      _optionalExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (_optionalExpanded) ...[
-            const SizedBox(height: 10),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final twoCol = desktop && constraints.maxWidth >= 520;
-                final itemWidth = twoCol
-                    ? (constraints.maxWidth - 12) / 2
-                    : constraints.maxWidth;
-
-                Widget field(CatalogImportField f) => SizedBox(
-                      width: itemWidth,
-                      child: _fieldDropdown(f, compact: twoCol),
-                    );
-
-                if (!twoCol) {
-                  return Column(
-                    children: optionalFields.map(field).toList(),
-                  );
-                }
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 0,
-                  children: optionalFields.map(field).toList(),
-                );
-              },
-            ),
-          ],
         ],
+      ),
+    );
+  }
+
+  Widget _optionalFieldsSection({required bool desktop}) {
+    final fields = _optionalFields.where((f) {
+      if (!widget.pagoSoloDivisas) return true;
+      return f != CatalogImportField.usdPaymentDiscountPct &&
+          f != CatalogImportField.salePriceUsd;
+    }).toList();
+    final mapped = fields
+        .where((f) => (_columnSelections[f.key] ?? '').trim().isNotEmpty)
+        .length;
+
+    return _sectionCard(
+      icon: Icons.list_alt_outlined,
+      title: 'Campos opcionales',
+      subtitle: mapped == 0
+          ? 'Listado compacto. Vacío = no se importa.'
+          : '$mapped de ${fields.length} con columna.',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final twoCol = desktop && constraints.maxWidth >= 640;
+          final itemWidth =
+              twoCol ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 0,
+            children: [
+              for (final field in fields)
+                SizedBox(
+                  width: itemWidth,
+                  child: _fieldDropdown(field, compact: true),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1740,7 +2179,7 @@ class _ImporterFlexibleImportScreenState
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final threeCol = constraints.maxWidth >= 860;
+        final threeCol = constraints.maxWidth >= 640;
         final tileWidth =
             threeCol ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth;
 
@@ -1780,7 +2219,7 @@ class _ImporterFlexibleImportScreenState
                           decoration: BoxDecoration(
                             color: selected
                                 ? AppColors.brandBlue.withOpacity(0.12)
-                                : Colors.white.withOpacity(0.7),
+                                : B2BThemeExtension.of(context).inputFill,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
@@ -1806,6 +2245,8 @@ class _ImporterFlexibleImportScreenState
                               const SizedBox(height: 4),
                               Text(
                                 _upsertModeDescription(mode),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: AppColors.textSecondary,
@@ -1842,111 +2283,92 @@ class _ImporterFlexibleImportScreenState
     final optionTiles = [
       _ImportOptionTileData(
         icon: Icons.price_change_outlined,
-        title: 'Montos con coma decimal',
-        subtitle:
-            'Actívalo si tu Excel muestra precios como 12,50 (habitual en '
-            'exportaciones venezolanas).',
+        title: 'Coma decimal',
+        subtitle: 'Precios como 12,50.',
         value: _decimalCommaOnPrice,
         onChanged:
             _importing ? null : (v) => setState(() => _decimalCommaOnPrice = v),
       ),
       _ImportOptionTileData(
         icon: Icons.library_add_outlined,
-        title: 'Guardar columnas adicionales',
-        subtitle:
-            'Si una columna no la mapeas arriba, se guarda automáticamente '
-            'con el nombre de la columna del Excel.',
+        title: 'Guardar columnas extra',
+        subtitle: 'Las no mapeadas se guardan con su nombre.',
         value: _captureUnmapped,
         onChanged:
             _importing ? null : (v) => setState(() => _captureUnmapped = v),
       ),
     ];
 
-    return _sectionCard(
+    final rules = _sectionCard(
+      icon: Icons.sync,
+      title: 'Códigos ya registrados',
+      subtitle: 'Si el SKU ya está en tu inventario.',
+      child: desktop
+          ? _upsertModeCards()
+          : _upsertModeDropdown(compact: true),
+    );
+    final visibility = _sectionCard(
+      icon: Icons.visibility_outlined,
+      title: 'Productos nuevos',
+      subtitle: _newProductsVisibility == ImporterNewProductsVisibility.paused
+          ? 'Entran en pausa hasta que los publiques.'
+          : 'Entran visibles en el catálogo.',
+      child: ImporterNewProductsVisibilitySection(
+        value: _newProductsVisibility,
+        enabled: !_importing,
+        compact: !desktop,
+        horizontal: desktop,
+        onChanged: (v) => setState(() => _newProductsVisibility = v),
+      ),
+    );
+    final advanced = _sectionCard(
       icon: Icons.tune,
-      title: 'Confirmar importación',
-      subtitle: 'Reglas para códigos repetidos y productos nuevos',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _OptionsSubheading(
-            title: 'Códigos ya registrados',
-            hint: 'Qué hacer si el SKU del archivo ya está en tu inventario',
-          ),
-          const SizedBox(height: 10),
-          if (desktop)
-            _upsertModeCards()
-          else
-            _upsertModeDropdown(compact: true),
-          const SizedBox(height: 20),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
-          const _OptionsSubheading(
-            title: 'Productos nuevos',
-            hint:
-                'Visibilidad para tiendas minoristas de códigos que aún no están en inventario',
-          ),
-          const SizedBox(height: 10),
-          if (desktop)
-            ImporterNewProductsVisibilitySection(
-              value: _newProductsVisibility,
-              enabled: !_importing,
-              onChanged: (v) => setState(() => _newProductsVisibility = v),
-            )
-          else
-            ImporterNewProductsVisibilitySection(
-              value: _newProductsVisibility,
-              enabled: !_importing,
-              compact: true,
-              onChanged: (v) => setState(() => _newProductsVisibility = v),
-            ),
-          const SizedBox(height: 20),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              initiallyExpanded: _advancedOptionsExpanded,
-              onExpansionChanged: (v) =>
-                  setState(() => _advancedOptionsExpanded = v),
-              title: const Text(
-                'Opciones avanzadas',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
-              subtitle: const Text(
-                'Coma decimal, columnas extra automáticas, simulación',
-                style: TextStyle(fontSize: 11.5),
-              ),
+      title: 'Opciones avanzadas',
+      subtitle: 'Separador decimal y columnas extra.',
+      child: desktop
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8),
-                if (desktop)
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final threeCol = constraints.maxWidth >= 860;
-                      final tileWidth = threeCol
-                          ? (constraints.maxWidth - 24) / 3
-                          : constraints.maxWidth;
-
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: optionTiles
-                            .map(
-                              (tile) => SizedBox(
-                                width: tileWidth,
-                                child: _ImportOptionTile(data: tile),
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  )
-                else
-                  ...optionTiles.map((tile) => _ImportOptionTile(data: tile)),
+                for (var i = 0; i < optionTiles.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  Expanded(child: _ImportOptionTile(data: optionTiles[i])),
+                ],
+              ],
+            )
+          : Column(
+              children: [
+                for (final tile in optionTiles) _ImportOptionTile(data: tile),
               ],
             ),
-          ),
+    );
+
+    if (!desktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          rules,
+          const SizedBox(height: 12),
+          visibility,
+          const SizedBox(height: 12),
+          advanced,
         ],
-      ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        rules,
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: visibility),
+            const SizedBox(width: 12),
+            Expanded(child: advanced),
+          ],
+        ),
+      ],
     );
   }
 
@@ -2042,15 +2464,18 @@ class _ImporterFlexibleImportScreenState
     );
   }
 
-  Widget _previewPanel() {
+  Widget _previewPanel({required bool matchMapping}) {
     final estimate = widget.preview.totalDataRowsEstimate;
-    final sample = widget.preview.sampleRows.length;
+    final rows = matchMapping
+        ? _reviewedSampleRows.take(_previewRowLimit).toList()
+        : _reviewedSampleRows
+            .take(catalogMappingPreviewInitialRows)
+            .toList();
+    final total = estimate ?? widget.preview.sampleRows.length;
     return _sectionCard(
       icon: Icons.table_chart_outlined,
       title: 'Vista previa',
-      subtitle: estimate == null
-          ? 'Muestra del archivo · azul = clave · acento = extra'
-          : 'Muestra $sample de ~$estimate · azul = clave · acento = extra',
+      subtitle: 'Muestra ${rows.length} de ~$total',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2058,24 +2483,67 @@ class _ImporterFlexibleImportScreenState
           const SizedBox(height: 6),
           _PreviewTable(
             headers: widget.preview.headers,
-            rows: _reviewedSampleRows,
+            rows: rows,
             coreHeaders: _coreMappedSources,
             erpHeaders: _erpMappedSources,
+            maxHeight: matchMapping
+                ? _previewTableHeight
+                : catalogMappingPreviewInitialHeight,
           ),
         ],
       ),
     );
   }
 
-  Widget _actionBar({required bool desktop}) {
-    final ready = _mappedRequiredCount == catalogImportRequiredFields.length;
-    final statusText = ready
-        ? 'Listo para simular · ${widget.preview.totalDataRowsEstimate ?? '?'} filas estimadas'
-        : 'Faltan campos obligatorios por asociar';
+  void _syncPreviewHeight() {
+    if (!mounted) return;
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    if (!desktop) {
+      _applyPreviewSize(
+        catalogMappingPreviewInitialRows,
+        catalogMappingPreviewInitialHeight,
+      );
+      return;
+    }
+    final mapping =
+        _mappingCardKey.currentContext?.findRenderObject() as RenderBox?;
+    final preview =
+        _previewCardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (mapping == null ||
+        preview == null ||
+        !mapping.hasSize ||
+        !preview.hasSize) {
+      return;
+    }
+    final fit = catalogMappingPreviewFit(
+      mappingHeight: mapping.size.height,
+      previewHeight: preview.size.height,
+      tableHeight: _previewTableHeight,
+      sampleCount: widget.preview.sampleRows.length,
+    );
+    _applyPreviewSize(fit.rows, fit.height);
+  }
 
+  void _applyPreviewSize(int rows, double height) {
+    if (_previewRowLimit == rows &&
+        (_previewTableHeight - height).abs() < 0.5) {
+      return;
+    }
+    setState(() {
+      _previewRowLimit = rows;
+      _previewTableHeight = height;
+    });
+  }
+
+  Widget _actionBar({required bool desktop}) {
+    final theme = B2BThemeExtension.of(context);
+    final status = _liveStatus;
+    final tone = status.clean ? theme.successFg : theme.warningFg;
     final importButton = FilledButton.icon(
-      onPressed:
-          _importing || _readingWorkbookPhotos || !ready ? null : _runImport,
+      onPressed: _importing || _readingWorkbookPhotos || !status.readyToSimulate
+          ? null
+          : _runImport,
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 46),
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -2083,81 +2551,68 @@ class _ImporterFlexibleImportScreenState
       icon: const Icon(Icons.fact_check_outlined),
       label: const Text('Simular importación'),
     );
-
-    return Material(
-      elevation: desktop ? 4 : 0,
-      color: AppColors.surfaceTinted,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(
-          horizontal: desktop ? 24 : 16,
-          vertical: 14,
+    final statusRow = Row(
+      children: [
+        Icon(
+          status.clean ? Icons.check_circle : Icons.error_outline,
+          color: tone,
+          size: desktop ? 20 : 18,
         ),
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Colors.black.withOpacity(0.08)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            status.message,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: desktop ? 13 : 12,
+              color: theme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: _maxContentWidth),
-            child: desktop
-                ? Row(
-                    children: [
-                      Icon(
-                        ready ? Icons.check_circle : Icons.info_outline,
-                        color: ready
-                            ? AppColors.successGreen
-                            : AppColors.brandAccent,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          statusText,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: ready
-                                ? AppColors.successGreen
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      importButton,
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            ready ? Icons.check_circle : Icons.info_outline,
-                            color: ready
-                                ? AppColors.successGreen
-                                : AppColors.brandAccent,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              statusText,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: ready
-                                    ? AppColors.successGreen
-                                    : AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      importButton,
-                    ],
-                  ),
+        if (desktop) ...[
+          const SizedBox(width: 12),
+          importButton,
+        ],
+      ],
+    );
+
+    return Material(
+      color: theme.surfaceCard,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          desktop ? 24 : 16,
+          12,
+          desktop ? 24 : 16,
+          desktop ? 14 : 12,
+        ),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: theme.borderSubtle)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  statusRow,
+                  if (status.stockNeedsAction ||
+                      status.priceNeedsAction ||
+                      status.commaNeedsAction) ...[
+                    const SizedBox(height: 8),
+                    _quickActions(dense: true),
+                  ],
+                  if (!desktop) ...[
+                    const SizedBox(height: 10),
+                    importButton,
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -2185,43 +2640,43 @@ class _ImporterFlexibleImportScreenState
                     _autoMapReadyBanner(),
                     _buildPhotoSection(),
                     const SizedBox(height: 14),
-                    if (desktop)
+                    if (desktop) ...[
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             flex: 10,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _coreMappingCard(desktop: true),
-                                const SizedBox(height: 14),
-                                _optionsCard(desktop: true),
-                              ],
+                            child: KeyedSubtree(
+                              key: _mappingCardKey,
+                              child: _coreMappingCard(desktop: true),
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             flex: 11,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _previewPanel(),
-                                const SizedBox(height: 14),
-                                _customFieldsMappingCard(desktop: true),
-                              ],
+                            child: KeyedSubtree(
+                              key: _previewCardKey,
+                              child: _previewPanel(matchMapping: true),
                             ),
                           ),
                         ],
-                      )
-                    else ...[
+                      ),
+                      const SizedBox(height: 14),
+                      _optionalFieldsSection(desktop: true),
+                      const SizedBox(height: 14),
+                      _customFieldsMappingCard(desktop: true),
+                      const SizedBox(height: 14),
+                      _optionsCard(desktop: true),
+                    ] else ...[
                       _coreMappingCard(desktop: false),
+                      const SizedBox(height: 14),
+                      _optionalFieldsSection(desktop: false),
                       const SizedBox(height: 14),
                       _optionsCard(desktop: false),
                       const SizedBox(height: 14),
                       _collapsiblePanel(
                         title: 'Vista previa',
-                        subtitle: 'Primeras filas del archivo',
+                        subtitle: 'Muestra de las filas',
                         icon: Icons.table_chart_outlined,
                         expanded: _previewExpanded,
                         onExpandedChanged: (v) =>
@@ -2233,7 +2688,9 @@ class _ImporterFlexibleImportScreenState
                             const SizedBox(height: 8),
                             _PreviewTable(
                               headers: widget.preview.headers,
-                              rows: _reviewedSampleRows,
+                              rows: _reviewedSampleRows
+                                  .take(catalogMappingPreviewInitialRows)
+                                  .toList(),
                               coreHeaders: _coreMappedSources,
                               erpHeaders: _erpMappedSources,
                             ),
@@ -2241,18 +2698,7 @@ class _ImporterFlexibleImportScreenState
                         ),
                       ),
                       const SizedBox(height: 10),
-                      _collapsiblePanel(
-                        title: 'Datos extra del ERP',
-                        subtitle:
-                            _captureUnmapped && _unmappedHeaders().isNotEmpty
-                                ? '${_unmappedHeaders().length} columna(s) auto'
-                                : 'Opcional · mapeo manual',
-                        icon: Icons.dataset_outlined,
-                        expanded: _erpSectionExpanded,
-                        onExpandedChanged: (v) =>
-                            setState(() => _erpSectionExpanded = v),
-                        child: _customFieldsMappingContent(desktop: false),
-                      ),
+                      _customFieldsMappingCard(desktop: false),
                     ],
                   ],
                 ),
@@ -2267,26 +2713,32 @@ class _ImporterFlexibleImportScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final desktop =
-        MediaQuery.sizeOf(context).width >= AppBreakpoints.b2bDesktop;
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+    if (desktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncPreviewHeight());
+    }
 
     return PopScope(
       canPop: !_importing,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: theme.background,
         appBar: AppBar(
-          backgroundColor: AppColors.surfaceTinted,
+          backgroundColor: theme.surfaceCard,
           surfaceTintColor: Colors.transparent,
+          foregroundColor: theme.textPrimary,
           title: const Text('Carga masiva'),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(28),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Text(
-                'Revisa tus repuestos y fotos antes de guardar',
+                'Mapea columnas y revisa antes de guardar',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary.withOpacity(0.95),
+                  color: theme.textSecondary,
                 ),
               ),
             ),
@@ -2303,43 +2755,54 @@ class _ImporterFlexibleImportScreenState
   }
 
   Widget _buildProgressOverlay() {
+    final theme = B2BThemeExtension.of(context);
     final partial = _partial;
     final estimate = widget.preview.totalDataRowsEstimate;
 
     return ColoredBox(
-      color: Colors.black.withOpacity(0.35),
+      color: theme.textPrimary.withOpacity(0.35),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
+          constraints: const BoxConstraints(maxWidth: 420),
           child: Card(
+            color: theme.dialogSurface,
             margin: const EdgeInsets.all(24),
             child: Padding(
               padding: const EdgeInsets.all(28),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CircularProgressIndicator(),
+                  CircularProgressIndicator(color: theme.brand),
                   const SizedBox(height: 20),
                   Text(
                     _progressLabel,
-                    style: const TextStyle(
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
+                      color: theme.textPrimary,
                     ),
                   ),
                   if (!_savingPhotos) ...[
                     const SizedBox(height: 8),
                     Text(
-                      '$_processedRows de ${estimate ?? '?'} filas procesadas',
-                      style: TextStyle(color: AppColors.textSecondary),
+                      '$_processedRows de ${estimate ?? '?'} filas',
+                      style: TextStyle(color: theme.textSecondary),
                     ),
                   ],
                   if (partial != null && !_savingPhotos) ...[
                     const SizedBox(height: 14),
-                    Text('Nuevos: ${partial.inserted}'),
-                    Text('Actualizados: ${partial.updated}'),
-                    Text('Errores: ${partial.errorCount}'),
+                    Text(
+                      '${partial.inserted} nuevos · ${partial.updated} actualizados · ${partial.errorCount} errores',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: theme.textPrimary),
+                    ),
                   ],
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => setState(() => _cancelRequested = true),
+                    child: const Text('Cancelar'),
+                  ),
                 ],
               ),
             ),
@@ -2350,39 +2813,6 @@ class _ImporterFlexibleImportScreenState
   }
 }
 
-class _OptionsSubheading extends StatelessWidget {
-  const _OptionsSubheading({
-    required this.title,
-    required this.hint,
-  });
-
-  final String title;
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13.5,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          hint,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _ImportOptionTileData {
   const _ImportOptionTileData({
@@ -2426,7 +2856,7 @@ class _ImportOptionTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.75),
+              color: B2BThemeExtension.of(context).inputFill,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
@@ -2469,18 +2899,286 @@ class _ImportOptionTile extends StatelessWidget {
   }
 }
 
+const catalogMappingPreviewInitialRows = 5;
+const catalogMappingPreviewInitialHeight = 220.0;
+const catalogMappingPreviewHeaderHeight = 40.0;
+const catalogMappingPreviewRowHeight = 36.0;
+
+/// Altura de la vista previa para igualar «Asocia tus columnas».
+///
+/// Muestra hasta 7 filas si caben en esa tarjeta. Si una fila más la haría
+/// más alta, se queda en 5 filas y 220 px.
+@visibleForTesting
+({int rows, double height}) catalogMappingPreviewFit({
+  required double mappingHeight,
+  required double previewHeight,
+  required double tableHeight,
+  required int sampleCount,
+}) {
+  const maxRows = 7;
+  const gutter = 14.0;
+  final chrome = previewHeight - tableHeight;
+  if (chrome <= 0 || sampleCount <= catalogMappingPreviewInitialRows) {
+    return (
+      rows: catalogMappingPreviewInitialRows,
+      height: catalogMappingPreviewInitialHeight,
+    );
+  }
+  final available = mappingHeight - chrome;
+  if (available <= catalogMappingPreviewInitialHeight + 1) {
+    return (
+      rows: catalogMappingPreviewInitialRows,
+      height: catalogMappingPreviewInitialHeight,
+    );
+  }
+  final fit = ((available -
+              catalogMappingPreviewHeaderHeight -
+              gutter) /
+          catalogMappingPreviewRowHeight)
+      .floor();
+  if (fit <= catalogMappingPreviewInitialRows) {
+    return (
+      rows: catalogMappingPreviewInitialRows,
+      height: catalogMappingPreviewInitialHeight,
+    );
+  }
+  var shown = fit;
+  if (shown > maxRows) shown = maxRows;
+  if (shown > sampleCount) shown = sampleCount;
+  return (rows: shown, height: available);
+}
+
+class _ImportOutcomeCard extends StatelessWidget {
+  const _ImportOutcomeCard({
+    required this.inserted,
+    required this.updated,
+    required this.skippedRows,
+    required this.errors,
+    required this.notes,
+    required this.canRetryPhotos,
+    required this.onClose,
+    required this.onRetry,
+  });
+
+  final int inserted;
+  final int updated;
+  final int skippedRows;
+  final int errors;
+  final List<String> notes;
+  final bool canRetryPhotos;
+  final VoidCallback onClose;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final clean = errors == 0 && !canRetryPhotos;
+    final tone = clean ? theme.successFg : theme.warningFg;
+    final toneBg = clean ? theme.successBg : theme.warningBg;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 16 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: toneBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(
+                    clean ? Icons.check_rounded : Icons.error_outline,
+                    color: tone,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Resultado de la importación',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      clean
+                          ? 'El catálogo quedó actualizado.'
+                          : 'Revisa las filas con incidencia.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: _metric(theme, 'Creados', inserted)),
+              const SizedBox(width: 8),
+              Expanded(child: _metric(theme, 'Actualizados', updated)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _metric(theme, 'Omitidas', skippedRows)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _metric(
+                  theme,
+                  'Errores',
+                  errors,
+                  alert: errors > 0,
+                ),
+              ),
+            ],
+          ),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _outcomeNotes(theme, notes),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TextButton(
+                onPressed: onClose,
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.textSecondary,
+                  minimumSize: const Size(88, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: theme.borderSubtle),
+                  ),
+                ),
+                child: const Text('Cerrar'),
+              ),
+              if (onRetry != null)
+                FilledButton(
+                  onPressed: onRetry,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: const Text('Reintentar fotos'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _outcomeNotes(B2BThemeExtension theme, List<String> notes) {
+    final lines = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final note in notes)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              note,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.textSecondary,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+      ],
+    );
+    if (notes.length <= 4) return lines;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 168),
+      child: SingleChildScrollView(child: lines),
+    );
+  }
+
+  Widget _metric(
+    B2BThemeExtension theme,
+    String label,
+    int value, {
+    bool alert = false,
+  }) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: alert ? theme.warningBg : theme.surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$value',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: alert ? theme.warningFg : theme.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PreviewTable extends StatefulWidget {
   const _PreviewTable({
     required this.headers,
     required this.rows,
     required this.coreHeaders,
     required this.erpHeaders,
+    this.maxHeight = catalogMappingPreviewInitialHeight,
   });
 
   final List<String> headers;
   final List<Map<String, String>> rows;
   final Set<String> coreHeaders;
   final Set<String> erpHeaders;
+  final double maxHeight;
 
   @override
   State<_PreviewTable> createState() => _PreviewTableState();
@@ -2513,9 +3211,9 @@ class _PreviewTableState extends State<_PreviewTable> {
       headingRowColor: WidgetStateProperty.all(
         AppColors.brandBlueContainer.withOpacity(0.4),
       ),
-      headingRowHeight: 40,
-      dataRowMinHeight: 36,
-      dataRowMaxHeight: 52,
+      headingRowHeight: catalogMappingPreviewHeaderHeight,
+      dataRowMinHeight: catalogMappingPreviewRowHeight,
+      dataRowMaxHeight: catalogMappingPreviewRowHeight,
       columnSpacing: 20,
       columns: widget.headers.map((h) {
         final isCore = widget.coreHeaders.contains(h);
@@ -2553,6 +3251,7 @@ class _PreviewTableState extends State<_PreviewTable> {
                     (h) => DataCell(
                       Text(
                         row[h] ?? '',
+                        maxLines: 1,
                         style: TextStyle(
                           fontSize: 12,
                           color: widget.coreHeaders.contains(h) ||
@@ -2574,11 +3273,11 @@ class _PreviewTableState extends State<_PreviewTable> {
       borderRadius: AppDecorations.radius12,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.black.withOpacity(0.08)),
+          border: Border.all(color: B2BThemeExtension.of(context).borderSubtle),
           borderRadius: AppDecorations.radius12,
         ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 220),
+        child: SizedBox(
+          height: widget.maxHeight,
           child: Scrollbar(
             controller: _horizontalScroll,
             thumbVisibility: true,

@@ -1,6 +1,9 @@
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
+import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'order_list_colors.dart';
 import 'order_list_entry.dart';
@@ -77,21 +80,8 @@ class OrderDetailOverview extends StatelessWidget {
               height: 1.15,
               letterSpacing: -.3,
               color: theme.textPrimary)),
-      if (entry.bolivares != null) ...[
-        const SizedBox(height: 4),
-        Text(entry.bolivares!,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: theme.textSecondary)),
-      ] else ...[
-        const SizedBox(height: 4),
-        Text('Bs —',
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: theme.textMuted)),
-      ],
+      const SizedBox(height: 4),
+      _OrderBolivarLabel(lines: lines, theme: theme),
     ]);
     final note = nextStep.isEmpty
         ? const SizedBox.shrink()
@@ -276,5 +266,98 @@ class OrderDetailOverview extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// Equivalente en Bs del total REF. En escritorio usa la tasa del pedido
+/// o, si no está congelada, la tasa de referencia activa.
+class _OrderBolivarLabel extends StatefulWidget {
+  const _OrderBolivarLabel({required this.lines, required this.theme});
+
+  final List<TransactionRequestModel> lines;
+  final B2BThemeExtension theme;
+
+  @override
+  State<_OrderBolivarLabel> createState() => _OrderBolivarLabelState();
+}
+
+class _OrderBolivarLabelState extends State<_OrderBolivarLabel> {
+  double? _liveRate;
+  bool _loading = false;
+
+  bool get _web =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+  bool get _ref => orderAmountCurrency(widget.lines) == 'REF';
+
+  double? get _frozen {
+    if (!_ref || !widget.lines.every((line) => line.precioTotalBsUi != null)) {
+      return null;
+    }
+    return widget.lines.fold<double>(
+        0, (sum, line) => sum + line.precioTotalBsUi!);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _prime();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderBolivarLabel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lines != widget.lines) _prime();
+  }
+
+  void _prime() {
+    if (_frozen != null || !_ref) return;
+    final cached = BcvBasePrice.cachedRate;
+    if (cached != null && cached > 0) {
+      _liveRate = cached;
+      _loading = false;
+      return;
+    }
+    _loading = true;
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final rate = await BcvBasePrice.currentRate();
+      if (!mounted) return;
+      setState(() {
+        _liveRate = rate;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final frozen = _frozen;
+    final style = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: widget.theme.textSecondary,
+    );
+    if (frozen != null) return Text(formatBsLabel(frozen), style: style);
+    if (!_web || !_ref) {
+      return Text('Bs —',
+          style: style.copyWith(
+              fontWeight: FontWeight.w500, color: widget.theme.textMuted));
+    }
+    final rate = _liveRate;
+    if (rate == null || rate <= 0) {
+      return Text(_loading ? 'Bs …' : 'Sin tasa vigente',
+          style: style.copyWith(
+              fontWeight: FontWeight.w500, color: widget.theme.textMuted));
+    }
+    final total = widget.lines.fold<double>(0, (sum, line) {
+      return sum + (line.precioTotalBsUi ?? line.precioTotal * rate);
+    });
+    return Text(formatBsLabel(total), style: style);
   }
 }

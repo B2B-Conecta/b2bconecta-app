@@ -51,6 +51,23 @@ CatalogEditedPhoto normalizeCatalogPhoto(Uint8List bytes) =>
       lossless: true,
     ));
 
+/// Keeps the original bytes unless the photo is larger than 1600 px or 2 MB.
+bool catalogMasterNeedsFit(Uint8List bytes) {
+  if (bytes.length > 2 * 1024 * 1024) return true;
+  final info = img.findDecoderForData(bytes)?.startDecode(bytes);
+  if (info == null) return false;
+  return math.max(info.width, info.height) > 1600;
+}
+
+/// Downscales only. Never enlarges a small master. JPEG quality 90.
+Uint8List fitCatalogMasterBytes(Uint8List bytes) {
+  var photo = _decode(bytes);
+  if (math.max(photo.width, photo.height) > 1600) {
+    photo = _fit(photo, 1600);
+  }
+  return Uint8List.fromList(img.encodeJpg(photo, quality: 90));
+}
+
 CatalogEditedPhoto renderCatalogPhoto(CatalogPhotoEditRequest request) =>
     renderCatalogPhotoWithMask((request: request, mask: null));
 

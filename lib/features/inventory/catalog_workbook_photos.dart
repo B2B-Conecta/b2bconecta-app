@@ -100,6 +100,7 @@ class _WorkbookPhotoReader {
     }
   }
 
+  /// Original `xl/media` bytes. Not decoded or recompressed.
   Uint8List? _imageBytes(String path) {
     final previous = _media[path];
     if (previous != null) return previous;

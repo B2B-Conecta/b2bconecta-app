@@ -12,11 +12,13 @@ class ImporterSalesProductStat {
     required this.productId,
     required this.name,
     required this.units,
+    this.sku = '',
     this.revenue = 0,
   });
 
   final String productId;
   final String name;
+  final String sku;
   final int units;
   final double revenue;
 
@@ -26,6 +28,7 @@ class ImporterSalesProductStat {
       name: (json['name']?.toString().trim().isNotEmpty == true)
           ? json['name'].toString().trim()
           : 'Producto',
+      sku: json['sku']?.toString().trim() ?? '',
       units: _asInt(json['units']),
       revenue: _asDouble(json['revenue']),
     );
@@ -874,14 +877,30 @@ class _RankedProductLine extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              product.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (product.sku.trim().isNotEmpty)
+                                  Text(
+                                    'SKU ${product.sku.trim()}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 6),

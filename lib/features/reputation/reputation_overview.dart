@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -146,17 +148,77 @@ class _ReputationOverviewState extends State<ReputationOverview> {
   }
 
   void _showDetails(String title, Widget content) {
+    final theme = B2BThemeExtension.of(context);
+    final wide =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    Widget body(BuildContext ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 8, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: Icon(Icons.close, size: 18, color: theme.textSecondary),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: content,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!wide) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        backgroundColor: theme.dialogSurface,
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: SingleChildScrollView(child: body(ctx)),
+        ),
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        scrollable: true,
-        content: SizedBox(width: 480, child: content),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cerrar')),
-        ],
+      barrierColor: theme.textPrimary.withOpacity(0.35),
+      builder: (ctx) => Dialog(
+        backgroundColor: theme.dialogSurface,
+        surfaceTintColor: theme.dialogSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.borderSubtle),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 440,
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.8,
+          ),
+          child: SingleChildScrollView(child: body(ctx)),
+        ),
       ),
     );
   }
@@ -209,11 +271,13 @@ class _ReputationOverviewState extends State<ReputationOverview> {
             onPressed: () => _showDetails(
                 'Cómo se calcula',
                 Text(
-                  'La nota general usa las valoraciones recibidas, en una escala de 1 a 5. '
-                  'Se muestran hasta las últimas 100 cuando ese promedio está disponible. '
-                  'Cada criterio tiene su propio promedio y el cierre semanal corresponde '
-                  'solo a las valoraciones de esa semana.',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  'La nota general usa las valoraciones de 1 a 5. '
+                  'Se muestran hasta las últimas 100. '
+                  'Cada criterio y cada semana tienen su propio promedio.',
+                  style: TextStyle(
+                    color: B2BThemeExtension.of(context).textSecondary,
+                    height: 1.4,
+                  ),
                 )),
             child: const Text('Cómo se calcula'),
           ),

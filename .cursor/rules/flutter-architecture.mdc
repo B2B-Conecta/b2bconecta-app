@@ -1,5 +1,5 @@
 ---
-description: Arquitectura Flutter/Dart feature-first, Lucide y layouts responsivos
+description: Arquitectura Flutter/Dart feature-first y Lucide
 globs: lib/**/*.dart
 alwaysApply: false
 ---
@@ -33,10 +33,8 @@ Icon(LucideIcons.shoppingBag) // ✅
 Icon(Icons.shopping_bag)       // ❌ en UI nueva
 ```
 
-## Responsive Mobile / Web
+## UI web
 
-- Breakpoints: `AppBreakpoints` / layouts de feature (`AliadoCatalogLayout`, shells).
-- Misma pantalla, composición distinta: móvil (AppBar + bottom nav) vs desktop (rail/shell).
-- Evita anchos fijos frágiles; usa `LayoutBuilder`, `MediaQuery.sizeOf`, `Wrap`/`Grid` con `crossAxisCount` por ancho.
-- Textos: respeta `textScaler`; no asumas altura de ficha sin `cardHeight` / contenido medible.
-- Web: tras cambios de chrome UI, preferir **hot restart** (no solo hot reload).
+- Los cambios visuales siguen la regla de aislamiento web. No añadas ni reescribas la rama del panel móvil.
+- Textos de escritorio: `maxLines` + `TextOverflow.ellipsis` donde el ancho de columna pueda recortarlos.
+- Tras cambios de chrome en web, preferir **hot restart** (no solo hot reload).

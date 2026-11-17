@@ -65,8 +65,14 @@ class ShellUserMenu extends StatefulWidget {
     /// Si es true, el tap abre Ajustes/Perfil sin menú intermedio (admin).
     this.openSettingsOnTap = false,
 
+    /// Importador: el tap abre Perfil, sin lista de opciones.
+    this.openProfileOnTap = false,
+
     /// Resalta la tarjeta cuando Perfil/Ajustes está activo.
     this.selected = false,
+
+    /// Importador: el menú abre las pestañas de Perfil, sin Ajustes de admin.
+    this.importerAccountMenu = false,
   });
 
   final ProfileModel profile;
@@ -75,7 +81,9 @@ class ShellUserMenu extends StatefulWidget {
   final bool extended;
   final bool signingOut;
   final bool openSettingsOnTap;
+  final bool openProfileOnTap;
   final bool selected;
+  final bool importerAccountMenu;
 
   @override
   State<ShellUserMenu> createState() => _ShellUserMenuState();
@@ -121,6 +129,10 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
 
   Future<void> _openMenu() async {
     if (widget.signingOut) return;
+    if (widget.openProfileOnTap) {
+      widget.onAction(ShellUserMenuAction.profile);
+      return;
+    }
     if (widget.openSettingsOnTap) {
       widget.onAction(ShellUserMenuAction.accountSettings);
       return;
@@ -128,6 +140,7 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
     final action = await showShellUserAccountMenu(
       context: context,
       signingOut: widget.signingOut,
+      importerAccountMenu: widget.importerAccountMenu,
     );
     if (action != null && mounted) {
       widget.onAction(action);
@@ -283,6 +296,7 @@ class _ShellUserMenuState extends State<ShellUserMenu> {
 Future<ShellUserMenuAction?> showShellUserAccountMenu({
   required BuildContext context,
   bool signingOut = false,
+  bool importerAccountMenu = false,
 }) {
   final box = context.findRenderObject() as RenderBox?;
   final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
@@ -340,21 +354,39 @@ Future<ShellUserMenuAction?> showShellUserAccountMenu({
       side: BorderSide(color: theme.borderStrong),
     ),
     items: [
-      item(
-        ShellUserMenuAction.profile,
-        'Ajustes del sistema',
-        LucideGlyph.settings,
-      ),
-      item(
-        ShellUserMenuAction.accountSettings,
-        'Cuenta y seguridad',
-        LucideGlyph.user,
-      ),
-      item(
-        ShellUserMenuAction.notificationPrefs,
-        'Preferencias de notificaciones',
-        LucideGlyph.bell,
-      ),
+      if (importerAccountMenu) ...[
+        item(
+          ShellUserMenuAction.profile,
+          'Datos del perfil',
+          LucideGlyph.user,
+        ),
+        item(
+          ShellUserMenuAction.notificationPrefs,
+          'Alertas',
+          LucideGlyph.bell,
+        ),
+        item(
+          ShellUserMenuAction.accountSettings,
+          'Seguridad',
+          LucideGlyph.shieldCheck,
+        ),
+      ] else ...[
+        item(
+          ShellUserMenuAction.profile,
+          'Ajustes del sistema',
+          LucideGlyph.settings,
+        ),
+        item(
+          ShellUserMenuAction.accountSettings,
+          'Cuenta y seguridad',
+          LucideGlyph.user,
+        ),
+        item(
+          ShellUserMenuAction.notificationPrefs,
+          'Preferencias de notificaciones',
+          LucideGlyph.bell,
+        ),
+      ],
       const PopupMenuDivider(height: 10),
       item(
         ShellUserMenuAction.signOut,

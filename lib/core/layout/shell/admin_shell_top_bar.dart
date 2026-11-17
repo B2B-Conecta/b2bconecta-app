@@ -31,6 +31,7 @@ class AdminShellTopBar extends StatefulWidget implements PreferredSizeWidget {
     this.onOpenDrawer,
     this.onSearchSubmitted,
     this.onOpenGlobalSearch,
+    this.searchHint,
     this.searchFocusNode,
     this.signingOut = false,
     this.showThemeToggle = true,
@@ -52,6 +53,7 @@ class AdminShellTopBar extends StatefulWidget implements PreferredSizeWidget {
   final ValueChanged<String>? onSearchSubmitted;
   /// Abre la paleta de comandos (⌘K). Si es null, se usa [onSearchSubmitted].
   final VoidCallback? onOpenGlobalSearch;
+  final String? searchHint;
   final FocusNode? searchFocusNode;
   final bool signingOut;
   final bool showThemeToggle;
@@ -145,6 +147,7 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
                               alignment: Alignment.centerRight,
                               child: _GlobalSearchField(
                                 onOpen: _openGlobalSearch,
+                                hint: widget.searchHint,
                               ),
                             ),
                           ),
@@ -415,9 +418,10 @@ class _CrumbState extends State<_Crumb> {
 }
 
 class _GlobalSearchField extends StatelessWidget {
-  const _GlobalSearchField({required this.onOpen});
+  const _GlobalSearchField({required this.onOpen, this.hint});
 
   final VoidCallback onOpen;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -451,7 +455,7 @@ class _GlobalSearchField extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Buscar usuarios, pedidos, productos…',
+                    hint ?? 'Buscar usuarios, pedidos, productos…',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

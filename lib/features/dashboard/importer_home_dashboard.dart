@@ -272,7 +272,7 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
             Row(children: [
               Expanded(
                 child: Text(
-                  'Tu negocio, al día',
+                  'Resumen',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

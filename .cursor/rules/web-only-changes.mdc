@@ -1,0 +1,33 @@
+---
+description: Cambios de UI exclusivos de la versión Web/escritorio; el panel móvil queda intacto
+alwaysApply: true
+---
+
+# Aislamiento exclusivo Web — B2B Conecta
+
+Todo cambio de UI, layout, copy visible o comportamiento de pantalla se aplica **solo a la versión Web / escritorio**. El panel móvil no se toca salvo que el prompt lo autorice de forma explícita.
+
+## Alcance
+
+- Web / escritorio: shell de escritorio y la rama `MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu` (768).
+- Prohibido editar la rama móvil (`width < AppBreakpoints.mobileMenu`), sus bottom sheets, la navegación inferior y los widgets que solo renderiza esa rama.
+- `kIsWeb` no basta: el panel móvil también corre en el mismo build. El corte es el layout de escritorio, no la plataforma.
+
+## Componentes compartidos
+
+Si el archivo sirve a web y móvil, el cambio vive solo dentro de la condición de escritorio. La rama móvil se deja como está, aunque el código quede duplicado.
+
+```dart
+final desktop = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+// ✅
+child: desktop ? const WebOrderTable() : existingMobileCard,
+
+// ❌ reescribir existingMobileCard, el sheet móvil o el bottom nav para “acompañar” el cambio web
+```
+
+## Prohibido
+
+- Añadir o rediseñar layouts duales, tarjetas móviles o `showModalBottomSheet` para cubrir un pedido de web.
+- Refactorizar la rama móvil “de paso” al tocar un widget compartido.
+- Mover lógica de negocio de sitio si el único objetivo es la vista web.

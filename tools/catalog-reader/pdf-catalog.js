@@ -17,13 +17,13 @@ function textWords(items,viewport){
 function imageBoxes(ops,viewport){
   let matrix=viewport.transform;
   const stack=[], boxes=[];
-  function add(transform){
+  function add(transform,imageKey=null,inline=null){
     const points=[[0,0],[1,0],[0,1],[1,1]].map(point=>{Util.applyTransform(point,transform);return point;});
     const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
     const x=Math.max(0,Math.min(...xs)),y=Math.max(0,Math.min(...ys));
     const w=Math.min(viewport.width,Math.max(...xs))-x,h=Math.min(viewport.height,Math.max(...ys))-y;
     if(Math.min(w,h)<15||w*h>viewport.width*viewport.height*.78)return;
-    if(!boxes.some(box=>Math.abs(box.x-x)+Math.abs(box.y-y)+Math.abs(box.w-w)+Math.abs(box.h-h)<4))boxes.push({x,y,w,h});
+    if(!boxes.some(box=>Math.abs(box.x-x)+Math.abs(box.y-y)+Math.abs(box.w-w)+Math.abs(box.h-h)<4))boxes.push({x,y,w,h,imageKey,inline});
   }
   for(const [index,op] of ops.fnArray.entries()){
     const args=ops.argsArray[index];
@@ -32,10 +32,11 @@ function imageBoxes(ops,viewport){
     if(op===OPS.transform)matrix=Util.transform(matrix,args);
     if(op===OPS.paintFormXObjectBegin){stack.push(matrix);if(args[0])matrix=Util.transform(matrix,args[0]);}
     if(op===OPS.paintFormXObjectEnd)matrix=stack.pop()??viewport.transform;
-    if(op===OPS.paintImageXObject||op===OPS.paintInlineImageXObject)add(matrix);
+    if(op===OPS.paintImageXObject)add(matrix,args?.[0]??null);
+    if(op===OPS.paintInlineImageXObject)add(matrix,null,args?.[0]??null);
     if(op===OPS.paintImageXObjectRepeat){
-      const [,sx,sy,positions]=args;
-      for(let i=0;i<positions.length;i+=2)add(Util.transform(matrix,[sx,0,0,sy,positions[i],positions[i+1]]));
+      const [key,sx,sy,positions]=args;
+      for(let i=0;i<positions.length;i+=2)add(Util.transform(matrix,[sx,0,0,sy,positions[i],positions[i+1]]),key);
     }
   }
   return boxes;
@@ -56,11 +57,65 @@ function tsvWords(tsv,scale){
     return [{text:cells[11].trim(),x,y:y+h,w,h}];
   });
 }
+function pagePhotoScale(viewport){
+  const longest=Math.max(viewport.width,viewport.height)||1;
+  const dpi=300/72;
+  const cap=4096/longest;
+  return Math.max(Math.min(dpi,cap),Math.min(2.5,cap));
+}
+function paintNative(ctx,image){
+  if(image.bitmap){ctx.drawImage(image.bitmap,0,0);return image.kind===3;}
+  const src=image.data;
+  if(!src||image.kind!==2&&image.kind!==3)return null;
+  const rgba=ctx.createImageData(image.width,image.height);
+  if(image.kind===3)rgba.data.set(src.subarray?src.subarray(0,rgba.data.length):src);
+  else{
+    for(let i=0,j=0;i+2<src.length&&j+3<rgba.data.length;i+=3,j+=4){
+      rgba.data[j]=src[i];rgba.data[j+1]=src[i+1];rgba.data[j+2]=src[i+2];rgba.data[j+3]=255;
+    }
+  }
+  ctx.putImageData(rgba,0,0);
+  return image.kind===3;
+}
+async function canvasFile(canvas,name,alpha){
+  let source=canvas;
+  const longest=Math.max(canvas.width,canvas.height);
+  if(longest>1600){
+    const ratio=1600/longest;
+    source=document.createElement('canvas');
+    source.width=Math.max(1,Math.round(canvas.width*ratio));
+    source.height=Math.max(1,Math.round(canvas.height*ratio));
+    source.getContext('2d').drawImage(canvas,0,0,source.width,source.height);
+  }
+  const jpeg=!alpha;
+  const blob=await new Promise(resolve=>source.toBlob(resolve,jpeg?'image/jpeg':'image/png',jpeg?0.9:undefined));
+  if(source!==canvas)source.width=source.height=0;
+  if(!blob)return null;
+  return new File([blob],name.replace(/\.jpe?g$/i,jpeg?'.jpg':'.png'),{type:blob.type});
+}
+async function nativeFile(image,name){
+  if(!image?.width||!image?.height||image.width*image.height>LIMITS.pixels)return null;
+  if(Math.min(image.width,image.height)<18)return null;
+  const canvas=document.createElement('canvas');
+  canvas.width=image.width;canvas.height=image.height;
+  const ctx=canvas.getContext('2d',{alpha:true});
+  const alpha=paintNative(ctx,image);
+  if(alpha==null){canvas.width=canvas.height=0;return null;}
+  try{return await canvasFile(canvas,name,alpha);}
+  finally{canvas.width=canvas.height=0;}
+}
+async function embeddedFile(page,box,name){
+  if(box.inline?.width)return nativeFile(box.inline,name);
+  const key=box.imageKey;
+  if(key==null||!page.objs?.has?.(key))return null;
+  try{return nativeFile(page.objs.get(key),name);}
+  catch{return null;}
+}
 async function imageFile(canvas,box,scale,name){
   const crop=document.createElement('canvas');
   crop.width=Math.max(1,Math.round(box.w*scale));crop.height=Math.max(1,Math.round(box.h*scale));
   crop.getContext('2d').drawImage(canvas,box.x*scale,box.y*scale,box.w*scale,box.h*scale,0,0,crop.width,crop.height);
-  const blob=await new Promise(resolve=>crop.toBlob(resolve,'image/jpeg',.92));
+  const blob=await new Promise(resolve=>crop.toBlob(resolve,'image/jpeg',.9));
   crop.width=crop.height=0;
   if(!blob)throw Error('No se pudo extraer una foto del PDF.');
   return new File([blob],name,{type:'image/jpeg'});
@@ -95,17 +150,23 @@ function pdfPhotoExtractor(){
   return async (page,viewport,scale,boxes,name)=>{
     if(!boxes.length)return [];
     if(count+boxes.length>LIMITS.photos)throw Error('El PDF contiene más de 1.500 imágenes. Divide el documento.');
-    const canvas=await renderPage(page,viewport,scale),files=[];
+    let canvas=null;
+    const photoScale=pagePhotoScale(viewport),files=[];
     try{
       for(const [index,box] of boxes.entries()){
-        const file=await imageFile(canvas,box,scale,name(index,++count));
+        const label=name(index,++count);
+        let file=await embeddedFile(page,box,label);
+        if(!file){
+          canvas??=await renderPage(page,viewport,photoScale);
+          file=await imageFile(canvas,box,photoScale,label);
+        }
         bytes+=file.size;
         if(bytes>LIMITS.inventoryImageBytes)throw Error(`Las fotos extraídas del PDF superan ${LIMITS.inventoryImageBytes/1024**2} MiB. Divide el documento en lotes.`);
         files.push(file);
       }
       return files;
     }finally{
-      canvas.width=canvas.height=0;
+      if(canvas)canvas.width=canvas.height=0;
     }
   };
 }

@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/orders/shared/transaction_request_mode
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'aliado_promo_campaign_widgets.dart';
 
@@ -253,13 +254,8 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
     List<PromoCampaignModel> campaigns,
   ) async {
     final theme = B2BThemeExtension.of(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.dialogSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
+    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    Widget buildBody(BuildContext ctx) {
         return SafeArea(
           top: false,
           child: Padding(
@@ -358,7 +354,34 @@ class _ImporterActivePromoBannerState extends State<ImporterActivePromoBanner> {
             ),
           ),
         );
-      },
+    }
+
+    if (wide) {
+      await showDialog<void>(
+        context: context,
+        barrierColor: theme.textPrimary.withOpacity(0.45),
+        builder: (ctx) => Dialog(
+          backgroundColor: theme.dialogSurface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 480,
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+            ),
+            child: SingleChildScrollView(child: buildBody(ctx)),
+          ),
+        ),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: theme.dialogSurface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: buildBody,
     );
   }
 }

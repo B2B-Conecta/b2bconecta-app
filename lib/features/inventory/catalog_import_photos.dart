@@ -12,6 +12,19 @@ typedef CatalogPhotoTarget = ({
   bool available,
 });
 
+/// Código presente en el archivo, aunque la fila aún no pase la validación.
+class CatalogSkuChoice {
+  const CatalogSkuChoice({
+    required this.sku,
+    required this.name,
+    required this.rowIndex,
+  });
+
+  final String sku;
+  final String name;
+  final int rowIndex;
+}
+
 /// Keeps the reviewed assignment separate from the name in the ZIP.
 class CatalogPhotoDraft {
   const CatalogPhotoDraft({
@@ -65,6 +78,8 @@ class CatalogPhotoDraft {
     Map<String, CatalogPhotoTarget> targets, {
     List<CatalogPhotoDraft> existing = const [],
     int sourceRowOffset = 0,
+    bool trustAnchoredRow = false,
+    bool approveSuggestions = true,
   }) {
     final byRow = {
       for (final target in targets.values)
@@ -77,16 +92,27 @@ class CatalogPhotoDraft {
       }
     }
     return [
-      for (final photo in photos) _suggestWorkbookPhoto(photo, byRow, occupied),
+      for (final photo in photos)
+        _suggestWorkbookPhoto(
+          photo,
+          byRow,
+          occupied,
+          trustAnchoredRow: trustAnchoredRow,
+          approveSuggestions: approveSuggestions,
+        ),
     ];
   }
 
   static CatalogPhotoDraft _suggestWorkbookPhoto(
     CatalogSourcePhoto photo,
     Map<int, CatalogPhotoTarget> byRow,
-    Map<String, Set<int>> occupied,
-  ) {
-    final target = photo.singleRow ? byRow[photo.sourceRow] : null;
+    Map<String, Set<int>> occupied, {
+    bool trustAnchoredRow = false,
+    bool approveSuggestions = true,
+  }) {
+    final anchored = photo.sourceRow != null &&
+        (photo.singleRow || trustAnchoredRow);
+    final target = anchored ? byRow[photo.sourceRow] : null;
     final sku = target?.row.sku ?? '';
     final slots = occupied.putIfAbsent(sku.toLowerCase(), () => {});
     final slot = List.generate(kMaxProductImages, (i) => i + 1)
@@ -106,7 +132,8 @@ class CatalogPhotoDraft {
       sourceRowBinding: hasSuggestion ? target?.row.rowIndex : null,
       sku: hasSuggestion ? sku : '',
       slot: slot ?? 1,
-      approved: hasSuggestion && target?.available == true,
+      approved:
+          approveSuggestions && hasSuggestion && target?.available == true,
     );
   }
 

@@ -154,11 +154,13 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
     required this.request,
     this.embedded = false,
     this.showFiscalAddress = true,
+    this.showMapsButton = true,
   });
 
   final TransactionRequestModel request;
   final bool embedded;
   final bool showFiscalAddress;
+  final bool showMapsButton;
 
   static bool kycAprobadoPara(TransactionRequestModel r) =>
       r.aliadoKycStatus?.trim() == KycStatus.aprobado;
@@ -189,7 +191,7 @@ class TransactionRequestAliadoContactSection extends StatelessWidget {
       estado: showFiscalAddress ? r.aliadoEstado : null,
       ciudad: showFiscalAddress ? r.aliadoCiudad : null,
       direccion: showFiscalAddress ? r.aliadoDireccion : null,
-      fiscalMapsUrl: r.aliadoFiscalMapsUrl,
+      fiscalMapsUrl: showMapsButton ? r.aliadoFiscalMapsUrl : null,
       logoStoragePath: r.aliadoLogoStoragePath,
       kycStatus: r.aliadoKycStatus,
       catalogVerifiedAt: r.aliadoCatalogVerifiedAt,

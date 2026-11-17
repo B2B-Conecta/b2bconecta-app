@@ -30,10 +30,12 @@ class CatalogImportOrchestrator {
     Map<int, Map<String, String>> corrections = const {},
     Set<String> photoSkuKeys = const {},
     void Function(String skuKey)? onSourceSku,
+    void Function(int rowIndex, String sku, String name)? onCatalogRow,
     void Function(CatalogImportNormalizedRow row, bool canSavePhotos)?
         onPhotoCandidate,
     void Function(String skuKey)? onProductSaved,
     void Function(int processedRows, CatalogImportResult partial)? onProgress,
+    bool Function()? shouldCancel,
   }) async {
     final current = <String, Map<String, dynamic>>{};
     if (mapping.options.dryRun) {
@@ -54,6 +56,7 @@ class CatalogImportOrchestrator {
       mapping: mapping,
       corrections: corrections,
       onSourceSku: onSourceSku,
+      onCatalogRow: onCatalogRow,
     )) {
       processed += batch.validRows.length + batch.errors.length;
 
@@ -161,6 +164,7 @@ class CatalogImportOrchestrator {
       }
 
       onProgress?.call(processed, aggregate);
+      if (shouldCancel?.call() == true) return aggregate;
     }
 
     return aggregate;

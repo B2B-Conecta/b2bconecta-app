@@ -1,3 +1,7 @@
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../shared/order_detail_layout.dart';
 import '../shared/order_delivery_stepper.dart';
 import '../shared/order_list_colors.dart';
@@ -114,6 +118,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
     final showBody = workspaceDetail || expanded;
     if (workspaceDetail) {
       final colors = OrderListColors.of(context);
+      final web =
+          MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
       final tracking = OrderDetailSection(
         title: 'Seguimiento',
         icon: Icons.local_shipping_outlined,
@@ -140,12 +146,17 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       final products = OrderDetailSection(
           title: 'Productos',
           icon: Icons.shopping_bag_outlined,
-          child: TransactionRequestProductosDesgloseSection(
-              lines: lines,
-              compact: false,
-              viewer: PedidoDesgloseViewer.importador,
-              hideSectionTitle: true,
-              showPrecioHelp: false));
+          child: web
+              ? PedidoProductosWebTable(
+                  lines: lines,
+                  viewer: PedidoDesgloseViewer.importador,
+                )
+              : TransactionRequestProductosDesgloseSection(
+                  lines: lines,
+                  compact: false,
+                  viewer: PedidoDesgloseViewer.importador,
+                  hideSectionTitle: true,
+                  showPrecioHelp: false));
       final delivery = OrderDetailSection(
           title: 'Entrega',
           icon: Icons.location_on_outlined,
@@ -154,11 +165,20 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             TransactionRequestDestinoEntregaSection(
                 request: lines.first, hideSectionTitle: true),
-            if (deliveryActions != null) ...[
+            if (!web && deliveryActions != null) ...[
               const SizedBox(height: 12),
               deliveryActions!
             ],
           ]));
+      final shipping = web && deliveryActions != null
+          ? OrderDetailSection(
+              title: 'Costo de envío',
+              icon: Icons.local_shipping_outlined,
+              flat: true,
+              child: deliveryActions!)
+          : null;
+      final kycApproved =
+          TransactionRequestAliadoContactSection.kycAprobadoPara(lines.first);
       final contact = OrderDetailSection(
           title: 'Contacto',
           icon: Icons.storefront_outlined,
@@ -168,9 +188,20 @@ class ImporterExpandableOrderCard extends StatelessWidget {
             TransactionRequestAliadoContactSection(
                 request: lines.first,
                 embedded: true,
+                showMapsButton: !web,
                 showFiscalAddress: !lines.first.destinoEntregaUsaPerfil),
-            if (TransactionRequestAliadoContactSection.kycAprobadoPara(
-                lines.first))
+            if (web)
+              _ImporterContactActions(
+                mapsUrl: lines.first.aliadoFiscalMapsUrl,
+                showKyc: kycApproved,
+                onKyc: () => showImporterAliadoKycDetailSheet(
+                  context,
+                  aliado: TransactionRequestAliadoContactSection.kycModelPara(
+                    lines.first,
+                  ),
+                ),
+              )
+            else if (kycApproved)
               TextButton.icon(
                   onPressed: () => showImporterAliadoKycDetailSheet(context,
                       aliado:
@@ -240,6 +271,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
       ];
       final secondary = <Widget>[
         delivery,
+        if (shipping != null) shipping,
         contact,
         if (commission != null) commission,
         if (hasAfterSales) afterSales
@@ -298,6 +330,7 @@ class ImporterExpandableOrderCard extends StatelessWidget {
             mobileOrder: [
               ...primary.where((w) => !identical(w, payment)),
               delivery,
+              if (shipping != null) shipping,
               contact,
               payment,
               if (commission != null) commission,
@@ -825,6 +858,68 @@ class _OrderCreditNotice extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ImporterContactActions extends StatelessWidget {
+  const _ImporterContactActions({
+    required this.mapsUrl,
+    required this.showKyc,
+    required this.onKyc,
+  });
+
+  final String? mapsUrl;
+  final bool showKyc;
+  final VoidCallback onKyc;
+
+  Future<void> _openMaps() async {
+    final url = mapsUrl?.trim();
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final maps = mapsUrl?.trim();
+    final hasMaps = maps != null && maps.isNotEmpty;
+    if (!hasMaps && !showKyc) return const SizedBox.shrink();
+    Widget button(IconData icon, String label, VoidCallback onPressed) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: theme.brand,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
+            minimumSize: const Size(0, 40),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: Icon(icon, size: 18),
+          label: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasMaps)
+            button(Icons.map_outlined, 'Ver ubicación en Maps', _openMaps),
+          if (showKyc)
+            button(Icons.verified_user_outlined, 'Ver expediente KYC', onKyc),
+        ],
       ),
     );
   }

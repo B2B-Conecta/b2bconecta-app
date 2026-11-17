@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -150,6 +151,9 @@ void main() {
   });
 
   testWidgets('la ficha muestra Tomar foto mientras haya cupo', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -182,5 +186,38 @@ void main() {
     );
 
     expect(find.text('Tomar foto'), findsNothing);
+  });
+
+  testWidgets('tocar la foto del producto abre el zoom', (tester) async {
+    final bytes = base64Decode(
+      'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProductImageGalleryEditor(
+            slots: [
+              ProductImageEditSlot.pending(bytes, 'gif'),
+              ProductImageEditSlot.pending(bytes, 'gif'),
+            ],
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Image).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(find.byTooltip('Cerrar fotos'), findsOneWidget);
+    expect(find.byTooltip('Acercar foto'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('1 / 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Foto siguiente'));
+    await tester.pump();
+    expect(find.text('2 / 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

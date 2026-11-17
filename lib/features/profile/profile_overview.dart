@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
@@ -37,17 +38,74 @@ class ProfileOverview extends StatelessWidget {
   static const _twoColMin = 900.0;
 
   void _open(BuildContext context, String title, Widget child) {
+    final theme = B2BThemeExtension.of(context);
+    final wide =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    if (wide) {
+      showDialog<void>(
+        context: context,
+        barrierColor: theme.textPrimary.withOpacity(0.45),
+        builder: (ctx) => Dialog(
+          backgroundColor: theme.dialogSurface,
+          surfaceTintColor: theme.dialogSurface,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: theme.borderSubtle),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.86,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Cerrar',
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(Icons.close, color: theme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                    child: child,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push<void>(MaterialPageRoute(
       builder: (_) => Scaffold(
         appBar: AppBar(title: Text(title)),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: child,
-            ),
-          ),
+          child: child,
         ),
       ),
     ));
@@ -229,7 +287,7 @@ class ProfileOverview extends StatelessWidget {
                 context,
                 Icons.storefront_outlined,
                 'Configuración comercial',
-                'Pedido mínimo, pagos y transportistas',
+                'Pedido mínimo y pagos',
                 () => _open(
                   context,
                   'Configuración comercial',

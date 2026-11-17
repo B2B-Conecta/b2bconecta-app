@@ -294,8 +294,14 @@ class CatalogImportValidator {
     final stockRaw = readUntransformed(CatalogImportField.stock.key);
     final minQtyRaw = readUntransformed(CatalogImportField.minOrderQty.key);
 
-    final price = parseImportNumber(priceRaw);
-    final stock = _parseStock(stockRaw);
+    var price = parseImportNumber(priceRaw);
+    if (price == null && mapping.options.emptyPriceFill != null) {
+      price = mapping.options.emptyPriceFill;
+    }
+    final stock = _parseStock(
+      stockRaw,
+      emptyFill: mapping.options.emptyStockFill,
+    );
     final minOrderQty = _parseMinOrderQty(minQtyRaw);
 
     final saleRaw = readUntransformed(CatalogImportField.salePriceUsd.key);
@@ -457,8 +463,9 @@ class CatalogImportValidator {
     return double.tryParse(t);
   }
 
-  static int _parseStock(String? raw) {
+  static int _parseStock(String? raw, {int? emptyFill}) {
     if (raw == null || raw.trim().isEmpty) {
+      if (emptyFill != null) return emptyFill;
       throw const FormatException(
           'Stock vacío. Indica 0 si no hay existencias.');
     }

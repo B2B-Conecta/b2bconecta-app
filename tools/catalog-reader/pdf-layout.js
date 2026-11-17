@@ -197,7 +197,11 @@ export function pdfPhotoRows(boxes,records,photoColumn){
 }
 
 export function pdfPhotoRow(box,records,photoColumn){
+  if(!records.length)return null;
   const center=box.y+box.h/2;
+  const firstTop=Math.min(...records.map(row=>row.top??row.y-row.h/2));
+  // Logos y franjas del encabezado no son la foto del repuesto.
+  if(center<firstTop||box.w<18||box.h<18||box.w>box.h*4&&box.h<48)return null;
   if(photoColumn){
     const x=box.x+box.w/2;
     if(x<photoColumn[0]||x>=photoColumn[1])return null;
@@ -205,7 +209,9 @@ export function pdfPhotoRow(box,records,photoColumn){
       const overlap=Math.max(0,Math.min(box.y+box.h,row.bottom)-Math.max(box.y,row.top));
       return overlap/box.h>=.72?[i]:[];
     });
-    return candidates.length===1?candidates[0]:null;
+    if(candidates.length!==1)return null;
+    const row=records[candidates[0]];
+    return center>=row.top&&center<row.bottom?candidates[0]:null;
   }
   const sorted=records.map((row,i)=>({i,d:Math.abs(center-row.y+row.h/2)})).sort((a,b)=>a.d-b.d);
   if(!sorted.length||sorted[0].d>Math.max(12,box.h/2))return null;

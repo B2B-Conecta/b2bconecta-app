@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_panel.dart';
 
@@ -57,14 +58,54 @@ class _ImporterStoreCountCardState extends State<ImporterStoreCountCard> {
 
   Future<void> _openStores() async {
     final theme = B2BThemeExtension.of(context);
+    final mobile =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    const panel = ImporterKycApprovedAliadosPanel();
+    if (mobile) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: theme.dialogSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottom),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(ctx).height * 0.9,
+              ),
+              child: const SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(4, 8, 4, 16),
+                child: panel,
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
     await showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: theme.dialogSurface,
+        surfaceTintColor: theme.dialogSurface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.borderSubtle),
+        ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-          child: const ImporterKycApprovedAliadosPanel(initiallyExpanded: true),
+          constraints: BoxConstraints(
+            maxWidth: 560,
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.8,
+          ),
+          child: const SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
+            child: panel,
+          ),
         ),
       ),
     );

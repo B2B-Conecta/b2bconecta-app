@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'importer_sales_snapshot.dart';
 
@@ -12,12 +14,42 @@ Future<void> showImporterSalesProductSheet({
   required String kind,
   required int days,
 }) {
-  return showModalBottomSheet<void>(
+  final theme = B2BThemeExtension.of(context);
+  final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  if (!wide) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: theme.dialogSurface,
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.sizeOf(ctx).height * 0.88,
+        child: _ImporterSalesProductSheet(kind: kind, days: days),
+      ),
+    );
+  }
+  return showDialog<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (ctx) => _ImporterSalesProductSheet(kind: kind, days: days),
+    barrierColor: theme.textPrimary.withOpacity(0.45),
+    builder: (ctx) {
+      final height = MediaQuery.sizeOf(ctx).height;
+      return Dialog(
+        backgroundColor: theme.dialogSurface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 760,
+            maxHeight: height * 0.78,
+          ),
+          child: SizedBox(
+            width: 760,
+            height: height * 0.78,
+            child: _ImporterSalesProductSheet(kind: kind, days: days),
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -123,22 +155,21 @@ class _ImporterSalesProductSheetState extends State<_ImporterSalesProductSheet> 
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.sizeOf(context).height;
-    return SizedBox(
-      height: h * 0.88,
-      child: Column(
+    final theme = B2BThemeExtension.of(context);
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   _title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
+                    color: theme.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -148,7 +179,7 @@ class _ImporterSalesProductSheetState extends State<_ImporterSalesProductSheet> 
                       : '$_total resultados · últimos ${widget.days} días',
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: AppColors.textSecondary,
+                    color: theme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -156,7 +187,7 @@ class _ImporterSalesProductSheetState extends State<_ImporterSalesProductSheet> 
                   controller: _searchCtrl,
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: 'Buscar por nombre…',
+                    hintText: 'Buscar por nombre o SKU…',
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: _searchCtrl.text.isEmpty
                         ? null
@@ -232,7 +263,7 @@ class _ImporterSalesProductSheetState extends State<_ImporterSalesProductSheet> 
                                       AppColors.brandAccent.withOpacity(0.12),
                                   child: Text(
                                     '${i + 1}',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w900,
                                       color: AppColors.brandBlue,
@@ -243,11 +274,24 @@ class _ImporterSalesProductSheetState extends State<_ImporterSalesProductSheet> 
                                   p.name,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13.5,
+                                    color: theme.textPrimary,
                                   ),
                                 ),
+                                subtitle: p.sku.trim().isEmpty
+                                    ? null
+                                    : Text(
+                                        'SKU ${p.sku.trim()}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: theme.textSecondary,
+                                        ),
+                                      ),
                                 trailing: Text(
                                   trailing,
                                   style: TextStyle(
@@ -261,7 +305,6 @@ class _ImporterSalesProductSheetState extends State<_ImporterSalesProductSheet> 
                           ),
           ),
         ],
-      ),
     );
   }
 }

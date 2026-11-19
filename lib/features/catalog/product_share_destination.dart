@@ -3,12 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/product_detail_screen.dart';
+import '../inventory/importer_product_edit_screen.dart';
+import '../inventory/inventory_service.dart';
+import '../profile/profile_model.dart';
 
 /// Abre la ficha si el catálogo la deja ver. Si no, un aviso sin datos del producto.
 class ProductShareDestinationScreen extends StatefulWidget {
-  const ProductShareDestinationScreen({super.key, required this.productId});
+  const ProductShareDestinationScreen({
+    super.key,
+    required this.productId,
+    required this.viewer,
+  });
 
   final String productId;
+  final ProfileModel viewer;
 
   @override
   State<ProductShareDestinationScreen> createState() =>
@@ -28,6 +36,17 @@ class _ProductShareDestinationScreenState
   /// `true` si abrió la ficha, `false` si no está disponible, `null` si falló la red.
   Future<bool?> _load() async {
     try {
+      if (widget.viewer.isImportador) {
+        final owned =
+            await InventoryService.fetchMyProductById(widget.productId);
+        if (!mounted) return false;
+        if (owned != null && owned.ownerId == widget.viewer.id) {
+          Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
+            builder: (_) => ImporterProductEditScreen(initial: owned),
+          ));
+          return true;
+        }
+      }
       final part =
           await CatalogService.fetchCatalogProductById(widget.productId);
       if (!mounted) return false;
@@ -53,7 +72,7 @@ class _ProductShareDestinationScreenState
           return Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(title: const Text('Producto')),
-            body: Center(
+            body: const Center(
               child: CircularProgressIndicator(color: AppColors.brand),
             ),
           );

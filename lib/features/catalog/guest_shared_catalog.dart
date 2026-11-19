@@ -24,10 +24,12 @@ class GuestSharedProductScreen extends StatefulWidget {
     super.key,
     required this.productId,
     required this.onRegister,
+    this.onLogin,
   });
 
   final String productId;
   final VoidCallback onRegister;
+  final VoidCallback? onLogin;
 
   @override
   State<GuestSharedProductScreen> createState() =>
@@ -48,6 +50,7 @@ class _GuestSharedProductScreenState extends State<GuestSharedProductScreen> {
         builder: (_) => GuestSupplierStoreScreen(
           importerId: owner,
           onRegister: widget.onRegister,
+          onLogin: widget.onLogin,
         ),
       ),
     );
@@ -74,6 +77,7 @@ class _GuestSharedProductScreenState extends State<GuestSharedProductScreen> {
           part: part,
           guestPreview: true,
           onRegisterToOrder: widget.onRegister,
+          onLoginToOrder: widget.onLogin,
           onOpenStore: () => _openStore(part),
         );
       },
@@ -86,10 +90,12 @@ class GuestSupplierStoreScreen extends StatefulWidget {
     super.key,
     required this.importerId,
     required this.onRegister,
+    this.onLogin,
   });
 
   final String importerId;
   final VoidCallback onRegister;
+  final VoidCallback? onLogin;
 
   @override
   State<GuestSupplierStoreScreen> createState() =>
@@ -114,6 +120,7 @@ class _GuestSupplierStoreScreenState extends State<GuestSupplierStoreScreen> {
           part: part,
           guestPreview: true,
           onRegisterToOrder: widget.onRegister,
+          onLoginToOrder: widget.onLogin,
           onOpenStore: () => Navigator.of(context).pop(),
         ),
       ),

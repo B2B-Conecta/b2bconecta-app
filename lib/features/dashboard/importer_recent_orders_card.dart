@@ -84,7 +84,8 @@ class _ImporterRecentOrdersCardState extends State<ImporterRecentOrdersCard> {
                             padding: EdgeInsets.zero,
                             minimumSize: const Size(0, 36),
                           ),
-                          onPressed: MainShellTabController.navigateToPedidosTab,
+                          onPressed:
+                              MainShellTabController.navigateToPedidosTab,
                           child: const Text('Ver todos los pedidos'),
                         ),
                       ),
@@ -134,11 +135,13 @@ class _ImporterRecentOrdersCardState extends State<ImporterRecentOrdersCard> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text(
                       'Aún no hay pedidos recientes.',
-                      style: TextStyle(fontSize: 12, color: theme.textSecondary),
+                      style:
+                          TextStyle(fontSize: 12, color: theme.textSecondary),
                     ),
                   );
                 }
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < rows.length; i++)
                       _RecentOrderRow(
@@ -200,19 +203,29 @@ class _RecentOrderRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Row(
                       children: [
-                        _StatusChip(label: status),
-                        Text(
-                          amountLabel,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: theme.textPrimary,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                        Expanded(
+                          flex: 3,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: _StatusChip(label: status),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          flex: 2,
+                          child: Text(
+                            amountLabel,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: theme.textPrimary,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
                           ),
                         ),
                       ],

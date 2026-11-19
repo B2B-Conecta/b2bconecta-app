@@ -56,6 +56,11 @@ class MainShellTabController {
   static void registerImporterHomeReload(VoidCallback? reload) =>
       _refreshImporterHome = reload;
   static void notifyImporterHomeReload() => _refreshImporterHome?.call();
+
+  static VoidCallback? _refreshAliadoHome;
+  static void registerAliadoHomeReload(VoidCallback? reload) =>
+      _refreshAliadoHome = reload;
+  static void notifyAliadoHomeReload() => _refreshAliadoHome?.call();
   static void navigateToImporterInventory({String? filter}) {
     _goTo?.call(ImporterShellTabs.inventario);
     importerInventoryRequest.value = filter ?? 'todos';
@@ -137,6 +142,7 @@ class MainShellTabController {
     _goTo = null;
     _refreshImporterInventory = null;
     _refreshImporterHome = null;
+    _refreshAliadoHome = null;
     _openAliadoCatalog = null;
     _openReputation = null;
     _catalogRequest = null;

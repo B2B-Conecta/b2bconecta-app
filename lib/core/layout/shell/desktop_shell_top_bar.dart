@@ -17,6 +17,7 @@ class DesktopShellTopBar extends StatelessWidget {
     this.trailingActions = const [],
     this.leading,
     this.showBcvRate = true,
+    this.search,
   });
 
   final int unreadNotifications;
@@ -28,8 +29,11 @@ class DesktopShellTopBar extends StatelessWidget {
   /// P. ej. botón para volver a mostrar el menú lateral.
   final Widget? leading;
 
-  /// Pill de tasa BCV en vivo.
+  /// Pill de tasa BCV en vivo. En el minorista web la tasa vive en el sidebar.
   final bool showBcvRate;
+
+  /// Buscador del shell (tienda minorista). Null conserva la barra solo con acciones.
+  final Widget? search;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +60,15 @@ class DesktopShellTopBar extends StatelessWidget {
                 leading!,
                 const SizedBox(width: 8),
               ],
-              const Spacer(),
+              if (search != null)
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: search,
+                  ),
+                )
+              else
+                const Spacer(),
               if (showBcvRate) ...[
                 const BcvRateBadge(),
                 const SizedBox(width: 8),

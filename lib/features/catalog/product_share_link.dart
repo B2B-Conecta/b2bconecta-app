@@ -40,7 +40,8 @@ abstract final class ProductShareLink {
     final frag = uri.fragment.trim();
     if (frag.isNotEmpty) {
       final path = frag.startsWith('/') ? frag : '/$frag';
-      final fromFrag = idFromUri(Uri.parse('https://app.b2bconecta.com.ve$path'));
+      final fromFrag =
+          idFromUri(Uri.parse('https://app.b2bconecta.com.ve$path'));
       if (fromFrag != null) return fromFrag;
     }
     return null;
@@ -58,9 +59,10 @@ abstract final class ProductShareLink {
     if (uri == null) return;
     final id = idFromUri(uri);
     if (id == null) return;
-    pending.value = id;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKey, id);
+    // Notify only after persistence: the active host may consume it immediately.
+    pending.value = id;
   }
 
   static Future<void> restore() async {

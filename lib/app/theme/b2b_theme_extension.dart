@@ -232,3 +232,12 @@ class B2BThemeExtension extends ThemeExtension<B2BThemeExtension> {
     );
   }
 }
+
+/// Azules del hero de Inicio en escritorio. Los widgets no redefinen estos hex.
+abstract final class B2BBrandHero {
+  static const start = Color(0xFF0B57D0);
+  static const end = Color(0xFF0A2540);
+  static const foreground = Color(0xFFFFFFFF);
+  static const accent = Color(0xFFF3D48A);
+  static const accentInk = Color(0xFF0A2540);
+}

@@ -94,8 +94,9 @@ class _InventoryQrScreenState extends State<InventoryQrScreen> {
     } on FormatException catch (error) {
       if (mounted) _message(error.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         _message('No se pudo completar la operación. Intenta de nuevo.');
+      }
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -290,8 +291,9 @@ class _InventoryQrScreenState extends State<InventoryQrScreen> {
           _drafts.addAll(drafts);
           _notices.addAll(notices);
         });
-        if (drafts.isEmpty)
+        if (drafts.isEmpty) {
           _message('El lote no contiene imágenes utilizables.');
+        }
       });
 
   Future<void> _review() async {
@@ -422,6 +424,19 @@ class _InventoryQrScreenState extends State<InventoryQrScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const Text(
+                        'Una misma etiqueta sirve para gestionar tus productos '
+                        'desde Inventario y para que tus clientes vean su ficha '
+                        'al escanearla con la cámara del teléfono. La vista '
+                        'pública solo muestra productos publicados.',
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Las etiquetas anteriores siguen funcionando aquí. '
+                        'Descárgalas de nuevo para que también abran la ficha '
+                        'con la cámara del teléfono.',
+                      ),
+                      const SizedBox(height: 12),
                       Wrap(spacing: 8, runSpacing: 8, children: [
                         FilledButton.icon(
                           onPressed: ready && _selected.isNotEmpty
@@ -539,6 +554,7 @@ class _InventoryQrScreenState extends State<InventoryQrScreen> {
                   itemBuilder: (_, index) {
                     final part = visible[index];
                     return CheckboxListTile(
+                      key: ValueKey(part.id),
                       value: _selected.contains(part.id),
                       onChanged: ready
                           ? (selected) => setState(() {

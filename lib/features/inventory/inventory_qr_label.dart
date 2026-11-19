@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pdf;
 
 import '../../core/utils/excel_file_export.dart';
 import '../catalog/part_model.dart';
+import '../catalog/product_share_link.dart';
 
 abstract final class InventoryQrLabel {
   static const prefix = 'B2BINV1:';
@@ -14,11 +15,30 @@ abstract final class InventoryQrLabel {
     caseSensitive: false,
   );
 
-  static String encode(String productId) => '$prefix${productId.toLowerCase()}';
+  /// A single public link serves customers and the owner's inventory scanner.
+  static String encode(String productId) =>
+      ProductShareLink.urlFor(productId.trim().toLowerCase());
 
   static String? productId(String value) {
-    if (!value.startsWith(prefix)) return null;
-    final id = value.substring(prefix.length);
+    final text = value.trim();
+    if (!text.startsWith(prefix)) {
+      final uri = Uri.tryParse(text);
+      final origins = [
+        ProductShareLink.origin,
+        ProductShareLink.devOrigin,
+        'https://b2bconecta.com.ve',
+        'https://www.b2bconecta.com.ve',
+      ];
+      if (uri == null ||
+          uri.scheme != 'https' ||
+          !uri.hasAuthority ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty ||
+          !origins.contains(uri.origin)) return null;
+      return ProductShareLink.idFromUri(uri)?.toLowerCase();
+    }
+    // Printed internal labels remain usable inside Inventory.
+    final id = text.substring(prefix.length);
     return id.length == 36 && _id.hasMatch(id) ? id.toLowerCase() : null;
   }
 
@@ -68,8 +88,10 @@ abstract final class InventoryQrLabel {
             pdf.BarcodeWidget(
               barcode: pdf.Barcode.qrCode(),
               data: encode(part.id),
-              width: 76,
-              height: 76,
+              width: 88,
+              height: 88,
+              padding: const pdf.EdgeInsets.all(8),
+              backgroundColor: PdfColors.white,
               drawText: false,
             ),
             pdf.SizedBox(height: 6),

@@ -66,7 +66,10 @@ class _ProductShareLinkHostState extends State<ProductShareLinkHost> {
     if (productId != null) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => ProductShareDestinationScreen(productId: productId),
+          builder: (_) => ProductShareDestinationScreen(
+            productId: productId,
+            viewer: widget.viewer,
+          ),
         ),
       );
       return;

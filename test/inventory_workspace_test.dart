@@ -12,6 +12,7 @@ import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_home_dashboard.dart';
+import 'package:motolink_pro_app/features/dashboard/importer_recent_orders_card.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
 import 'package:motolink_pro_app/features/inventory/inventory_product_tile.dart';
@@ -21,6 +22,7 @@ import 'package:motolink_pro_app/features/inventory/importer_priority_actions.da
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   var rows = <Map<String, dynamic>>[];
+  var recentOrders = <Map<String, dynamic>>[];
   int? storeCount = 4;
   final requests = <http.Request>[];
   Map<String, dynamic> product(int i) => {
@@ -66,6 +68,9 @@ void main() {
             requests.add(request);
             if (request.url.path.endsWith('/importer_daily_store_notice')) {
               body = {'show': false, 'store_count': storeCount};
+            } else if (request.url.path.endsWith('/transaction_requests') &&
+                recentOrders.isNotEmpty) {
+              body = recentOrders;
             } else if (request.url.path.endsWith('/profiles')) {
               body = {
                 'id': 'supplier',
@@ -109,9 +114,53 @@ void main() {
   tearDownAll(() => Supabase.instance.dispose());
   setUp(() {
     rows = List.generate(3, product);
+    recentOrders = [];
     storeCount = 4;
     requests.clear();
   });
+
+  for (final layout in [(320.0, 1.0), (390.0, 1.0), (320.0, 1.6)]) {
+    testWidgets('recent orders fill the card at $layout', (tester) async {
+      tester.view.physicalSize = Size(layout.$1, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      recentOrders = [
+        for (final (index, name)
+            in ['Tienda A', 'Distribuidora con un nombre muy largo'].indexed)
+          {
+            'id': 'order-$index',
+            'importador_id': 'supplier',
+            'status': 'en_preparacion',
+            'precio_total': 477.24,
+            'aliado': {'business_name': name},
+          },
+      ];
+      await tester.pumpWidget(MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(layout.$2)),
+          child: const Scaffold(
+            body: Padding(
+              padding: EdgeInsets.all(16),
+              child: ImporterRecentOrdersCard(),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      final first = tester.getRect(find.text('Tienda A'));
+      final second =
+          tester.getRect(find.text('Distribuidora con un nombre muy largo'));
+      expect(first.left, 38);
+      expect(second.left, first.left);
+      final row = find
+          .ancestor(of: find.text('Tienda A'), matching: find.byType(InkWell))
+          .first;
+      expect(tester.getSize(row).width, layout.$1 - 60);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   test('metrics and real categories include rows beyond the server page limit',
       () async {

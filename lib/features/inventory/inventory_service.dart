@@ -707,7 +707,8 @@ class InventoryService {
           .select(fields)
           .eq('owner_id', uid);
       if (lastId != null) query = query.gt('id', lastId);
-      final rows = await query.order('id').limit(size);
+      // The cursor uses `id > lastId`, so pages must advance in ascending order.
+      final rows = await query.order('id', ascending: true).limit(size);
       if (rows.isEmpty) return;
       yield rows;
       lastId = rows.last['id'] as String;

@@ -18,6 +18,7 @@ import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'importer_catalog_seals.dart';
 import 'importer_store_profile_screen.dart';
 import 'product_share_sheet.dart';
+import 'product_share_link.dart';
 import 'store_supplier_chat.dart';
 import 'product_photo_gallery.dart';
 import 'product_variants.dart';
@@ -31,6 +32,7 @@ class ProductDetailScreen extends StatefulWidget {
     required this.part,
     this.guestPreview = false,
     this.onRegisterToOrder,
+    this.onLoginToOrder,
     this.onOpenStore,
   });
 
@@ -40,6 +42,7 @@ class ProductDetailScreen extends StatefulWidget {
   final bool guestPreview;
 
   final VoidCallback? onRegisterToOrder;
+  final VoidCallback? onLoginToOrder;
   final VoidCallback? onOpenStore;
 
   static String heroImageTag(PartModel p) => 'product-image-${p.id}';
@@ -259,8 +262,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   List<Widget> _detailAppBarActions() => [
-        if (_profile?.isAliado == true)
-          FavoriteHeartButton(productId: part.id),
+        if (_profile?.isAliado == true) FavoriteHeartButton(productId: part.id),
         if (_canShareProduct)
           IconButton(
             tooltip: 'Compartir producto',
@@ -356,8 +358,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   elevation: 2,
                   child: IconButton(
                     tooltip: 'Ampliar foto',
-                    onPressed: () =>
-                        _galleryKey.currentState?.openFullscreen(),
+                    onPressed: () => _galleryKey.currentState?.openFullscreen(),
                     style: IconButton.styleFrom(
                       foregroundColor: AppColors.white,
                       minimumSize: const Size(40, 40),
@@ -456,8 +457,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (part.isCatalogVerified || part.isCatalogFeatured) ...[
         const SizedBox(height: 8),
         ImporterCatalogSealsRow(
-            verified: part.isCatalogVerified,
-            featured: part.isCatalogFeatured),
+            verified: part.isCatalogVerified, featured: part.isCatalogFeatured),
       ],
       const SizedBox(height: 18),
       ProductDetailInformation(
@@ -511,14 +511,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool get _showsOrderBar =>
       widget.guestPreview || _profile == null || _canOrder;
 
+  Future<void> _authenticateForProduct(VoidCallback action) async {
+    await ProductShareLink.capture(Uri.parse(ProductShareLink.urlFor(part.id)));
+    if (mounted) action();
+  }
+
   Widget _buildActionButtons({bool compact = false}) {
     if (widget.guestPreview) {
-      return FilledButton(
-        onPressed: widget.onRegisterToOrder,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-        child: const Text('Regístrate para pedir'),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton(
+            onPressed: widget.onRegisterToOrder == null
+                ? null
+                : () => _authenticateForProduct(widget.onRegisterToOrder!),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text('Regístrate para comprar'),
+          ),
+          if (widget.onLoginToOrder != null)
+            TextButton(
+              onPressed: () => _authenticateForProduct(widget.onLoginToOrder!),
+              child: const Text('Iniciar sesión'),
+            ),
+        ],
       );
     }
     if (_profile == null) {

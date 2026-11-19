@@ -100,12 +100,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     unawaited(
       AdAttributionStorage.captureFromUri(widget.launchUri ?? Uri.base),
     );
-    unawaited(ProductShareLink.capture(widget.launchUri ?? Uri.base));
-    unawaited(ImporterStoreShareLink.capture(widget.launchUri ?? Uri.base));
+    if (!ProductShareLink.suppressGuestPreview) {
+      unawaited(ProductShareLink.capture(widget.launchUri ?? Uri.base));
+      unawaited(ImporterStoreShareLink.capture(widget.launchUri ?? Uri.base));
+    }
     if (!kIsWeb) {
       unawaited(() async {
         final initial = await AppLinks().getInitialLink();
-        if (initial != null) {
+        if (initial != null && !ProductShareLink.suppressGuestPreview) {
           await ProductShareLink.capture(initial);
           await ImporterStoreShareLink.capture(initial);
         }
@@ -212,14 +214,19 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _authCallbackTimeoutTimer = null;
   }
 
-  /// Sale de la ficha pública hacia `/registro` sin dejar la ruta del producto encima.
-  void _openRegisterFromGuest() {
+  void _openRegisterFromGuest() => _openAuthFromGuest(register: true);
+
+  void _openLoginFromGuest() => _openAuthFromGuest(register: false);
+
+  /// Preserves the pending product while leaving its public preview.
+  void _openAuthFromGuest({required bool register}) {
     ProductShareLink.suppressGuestPreview = true;
     _guestLeftForAuth = true;
-    _registerAfterGuest = true;
+    _registerAfterGuest = register;
     final nav = Navigator.of(context);
     nav.popUntil((route) => route.isFirst);
-    if (ModalRoute.of(context)?.settings.name == PublicAuthRoute.path) {
+    if (!register ||
+        ModalRoute.of(context)?.settings.name == PublicAuthRoute.path) {
       if (mounted) setState(() {});
       return;
     }
@@ -448,8 +455,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         !_bootstrapResolved) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _bootstrapResolved) return;
-        final pending =
-            await AuthRecoveryStorage.peekPendingPasswordRecovery();
+        final pending = await AuthRecoveryStorage.peekPendingPasswordRecovery();
         if (pending) {
           _awaitingPasswordRecovery = true;
         }
@@ -525,8 +531,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshSessionIfLoggedIn() async {
-    final token =
-        Supabase.instance.client.auth.currentSession?.refreshToken;
+    final token = Supabase.instance.client.auth.currentSession?.refreshToken;
     if (token == null || token.isEmpty) return;
     try {
       await Supabase.instance.client.auth.refreshSession();
@@ -590,6 +595,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         key: ValueKey('guest_product_$sharedProductId'),
         productId: sharedProductId,
         onRegister: _openRegisterFromGuest,
+        onLogin: _openLoginFromGuest,
       );
     }
 
@@ -603,6 +609,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         key: ValueKey('guest_store_$sharedStoreId'),
         importerId: sharedStoreId,
         onRegister: _openRegisterFromGuest,
+        onLogin: _openLoginFromGuest,
       );
     }
 

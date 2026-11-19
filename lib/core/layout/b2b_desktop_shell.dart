@@ -39,6 +39,7 @@ class B2bDesktopShell extends StatelessWidget {
     this.navBadges,
     this.resolveNavBadge,
     this.onOpenGlobalSearch,
+    this.shellSearch,
   });
 
   final int selectedIndex;
@@ -92,6 +93,9 @@ class B2bDesktopShell extends StatelessWidget {
   final ShellNavBadge? Function(Object? key)? resolveNavBadge;
   final VoidCallback? onOpenGlobalSearch;
 
+  /// Buscador del top bar (solo tienda minorista web).
+  final Widget? shellSearch;
+
   @override
   Widget build(BuildContext context) {
     return DesktopNavigationShell(
@@ -124,6 +128,7 @@ class B2bDesktopShell extends StatelessWidget {
       navBadges: navBadges,
       resolveNavBadge: resolveNavBadge,
       onOpenGlobalSearch: onOpenGlobalSearch,
+      shellSearch: shellSearch,
     );
   }
 }

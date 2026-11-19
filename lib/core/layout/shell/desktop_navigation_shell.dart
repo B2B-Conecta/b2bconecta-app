@@ -53,6 +53,7 @@ class DesktopNavigationShell extends StatefulWidget {
     this.onSearchSubmitted,
     this.onOpenGlobalSearch,
     this.showGlobalSearch = true,
+    this.shellSearch,
     this.breadcrumbsOverride,
     this.onBreadcrumbBack,
     this.contentOverride,
@@ -115,6 +116,9 @@ class DesktopNavigationShell extends StatefulWidget {
 
   /// Si false, oculta el campo de búsqueda del top bar corporate (p. ej. aliado).
   final bool showGlobalSearch;
+
+  /// Buscador real del shell web de la tienda minorista.
+  final Widget? shellSearch;
 
   /// Índice del [IndexedStack]. Si es null, usa [selectedIndex].
   /// Permite Perfil fuera del rail (footer) sin desalinear destinos.
@@ -298,6 +302,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                             onOpenGlobalSearch: widget.onOpenGlobalSearch,
                             searchHint: widget.searchHint,
                             showGlobalSearch: widget.showGlobalSearch,
+                            searchOverride: widget.shellSearch,
                             onMessagesTap: widget.onMessagesTap,
                             unreadMessages: widget.unreadMessages,
                             trailingActions: widget.trailingActions,
@@ -327,6 +332,8 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                             onMessagesTap: widget.onMessagesTap,
                             unreadMessages: widget.unreadMessages,
                             trailingActions: widget.trailingActions,
+                            showBcvRate: !widget.showBcvFooter,
+                            search: widget.shellSearch,
                           ),
                         if (widget.contentOverride == null)
                           ListenableBuilder(

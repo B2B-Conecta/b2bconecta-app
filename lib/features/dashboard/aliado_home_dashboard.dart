@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import '../../app/main_shell_tab.dart';
 import '../../app/theme/app_theme.dart';
+import '../../app/theme/b2b_theme_extension.dart';
 import '../../core/widgets/ios_chrome.dart';
 import '../../core/data/supabase_service.dart';
 import '../../core/widgets/bandeja_sheet.dart';
@@ -15,8 +16,9 @@ import '../cart/cart_service.dart';
 import '../cart/cart_product_actions.dart';
 import '../cart/catalog_cart_bar.dart';
 import '../catalog/aliado_catalog_categories.dart';
-import '../catalog/aliado_product_card.dart';
 import '../catalog/aliado_promo_campaign_widgets.dart';
+import '../catalog/favorite_heart_button.dart';
+import '../catalog/product_stock_summary.dart';
 import '../catalog/catalog_category_icon.dart';
 import '../catalog/catalog_product_price_display.dart';
 import '../catalog/catalog_service.dart';
@@ -37,6 +39,7 @@ import 'aliado_home_service.dart';
 import 'aliado_home_header.dart';
 
 part 'aliado_home_mobile.dart';
+part 'aliado_home_web.dart';
 
 /// Descubrimiento y recompra. El catálogo conserva búsqueda y filtros completos.
 class AliadoHomeDashboard extends StatefulWidget {
@@ -71,6 +74,11 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
   void initState() {
     super.initState();
     _data = _load();
+    if (widget.embedInDesktopShell) {
+      MainShellTabController.registerAliadoHomeReload(() {
+        _refresh();
+      });
+    }
   }
 
   Future<AliadoHomeData> _load() => (widget.loader ?? AliadoHomeService.load)();
@@ -99,6 +107,9 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
 
   @override
   void dispose() {
+    if (widget.embedInDesktopShell) {
+      MainShellTabController.registerAliadoHomeReload(null);
+    }
     _search.dispose();
     super.dispose();
   }
@@ -192,407 +203,8 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
   Widget build(BuildContext context) {
     AppColors.brightness = Theme.of(context).brightness;
     if (!widget.embedInDesktopShell) return _mobile();
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(children: [
-        Expanded(
-            child: RefreshIndicator(
-                onRefresh: _refresh,
-                child: FutureBuilder<AliadoHomeData>(
-                    future: _data,
-                    builder: (context, snapshot) {
-                      final data = snapshot.data;
-                      return CustomScrollView(
-                          key: const PageStorageKey('aliado-inicio'),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: [
-                            SliverPadding(
-                                padding: EdgeInsets.fromLTRB(16,
-                                    widget.embedInDesktopShell ? 0 : 18, 16, 0),
-                                sliver: SliverToBoxAdapter(
-                                    child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                      Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Expanded(
-                                                child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                  Text(
-                                                      '¿Qué necesita tu negocio?',
-                                                      style: TextStyle(
-                                                          fontSize: 22,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          height: 1.2)),
-                                                  SizedBox(height: 6),
-                                                  Text(
-                                                      'Encuentra repuestos y repón lo que más vendes.'),
-                                                ])),
-                                            IconButton(
-                                                tooltip: 'Actualizar Inicio',
-                                                onPressed: _refresh,
-                                                icon: const LucideIcon(
-                                                    LucideGlyph.refreshCw)),
-                                          ]),
-                                      const SizedBox(height: 16),
-                                      TextField(
-                                          controller: _search,
-                                          onSubmitted: (_) => _searchCatalog(),
-                                          textInputAction:
-                                              TextInputAction.search,
-                                          decoration: InputDecoration(
-                                              hintText:
-                                                  'Repuesto, marca o código…',
-                                              prefixIcon: Padding(
-                                                padding:
-                                                    const EdgeInsets.only(
-                                                        left: 14, right: 6),
-                                                child: LucideIcon(
-                                                  LucideGlyph.search,
-                                                  size: 18,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                              ),
-                                              prefixIconConstraints:
-                                                  const BoxConstraints(
-                                                minWidth: 40,
-                                                minHeight: 40,
-                                                maxWidth: 44,
-                                                maxHeight: 44,
-                                              ),
-                                              filled: true,
-                                              fillColor: AppColors.fieldFill,
-                                              suffixIcon: IconButton(
-                                                  tooltip:
-                                                      'Buscar en el catálogo',
-                                                  onPressed: _searchCatalog,
-                                                  icon: const _HomeAngle()),
-                                              border: OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  borderSide: BorderSide(
-                                                      color: AppColors
-                                                          .borderSubtle)),
-                                              enabledBorder: OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  borderSide: BorderSide(
-                                                      color: AppColors
-                                                          .borderSubtle)))),
-                                    ]))),
-                            if (snapshot.connectionState !=
-                                ConnectionState.done)
-                              const SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: Center(
-                                      child: CircularProgressIndicator())),
-                            if (snapshot.hasError ||
-                                (data?.errors.isNotEmpty ?? false))
-                              SliverPadding(
-                                  padding: const EdgeInsets.all(16),
-                                  sliver: SliverToBoxAdapter(
-                                      child: Wrap(
-                                          spacing: 8,
-                                          crossAxisAlignment:
-                                              WrapCrossAlignment.center,
-                                          children: [
-                                        Text(snapshot.hasError
-                                            ? 'No pudimos cargar Inicio.'
-                                            : 'No pudimos cargar ${data!.errors.join(', ')}.'),
-                                        TextButton(
-                                            onPressed: _refresh,
-                                            child: const Text('Reintentar')),
-                                      ]))),
-                            if (data != null) ...[
-                              if (data.promotions.isNotEmpty)
-                                SliverPadding(
-                                    padding: const EdgeInsets.only(top: 16),
-                                    sliver: SliverToBoxAdapter(
-                                        child: AliadoPromoBannerCarousel(
-                                            campaigns: data.promotions,
-                                            compact: widget.embedInDesktopShell,
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 16),
-                                            onPromoCampaignSelected: _promotion,
-                                            onViewAll: () =>
-                                                showAliadoActivePromotionsSheet(
-                                                    context: context,
-                                                    campaigns: data.promotions,
-                                                    onPromoCampaignSelected:
-                                                        _promotion)))),
-                              if (data.buyAgain.isNotEmpty)
-                                _products(
-                                    'Compra de nuevo',
-                                    'Tus compras, con precio y stock actuales.',
-                                    data.buyAgain,
-                                    action: 'Mis pedidos',
-                                    onAction: MainShellTabController
-                                        .navigateToPedidosTab)
-                              else if (data.errors.isEmpty)
-                                SliverPadding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 22, 16, 0),
-                                    sliver: SliverToBoxAdapter(
-                                        child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                          const Text(
-                                              'Tu próxima compra comienza aquí',
-                                              style: TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.w700)),
-                                          const SizedBox(height: 6),
-                                          const Text(
-                                              'Explora el catálogo. Aquí podrás volver a comprar tus repuestos.'),
-                                          TextButton.icon(
-                                              onPressed: _catalog,
-                                              icon: const _HomeAngle(size: 18),
-                                              label: const Text(
-                                                  'Explorar catálogo')),
-                                        ]))),
-                              if (data.categories.isNotEmpty)
-                                SliverPadding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 24, 16, 0),
-                                    sliver: SliverToBoxAdapter(
-                                        child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.stretch,
-                                            children: [
-                                          _heading(
-                                              'Explora por categoría',
-                                              'Ver todas',
-                                              () => _categories(data)),
-                                          const SizedBox(height: 10),
-                                          LayoutBuilder(
-                                              builder: (context, constraints) {
-                                            final count =
-                                                MediaQuery.textScalerOf(context)
-                                                            .scale(14) >
-                                                        19
-                                                    ? 2
-                                                    : 4;
-                                            final width =
-                                                (constraints.maxWidth -
-                                                        (count - 1) * 8) /
-                                                    count;
-                                            return Wrap(
-                                                spacing: 8,
-                                                runSpacing: 10,
-                                                children: [
-                                                  for (final group in data
-                                                      .categories
-                                                      .take(4))
-                                                    SizedBox(
-                                                        width: width,
-                                                        child: _CategoryShortcut(
-                                                            label: group.label,
-                                                            onTap: () =>
-                                                                _openCategory(
-                                                                    group))),
-                                                ]);
-                                          }),
-                                        ]))),
-                              if (data.bestSellers.isNotEmpty)
-                                _products(
-                                    'Más vendidos',
-                                    'Pedidos entregados en los últimos 30 días.',
-                                    data.bestSellers)
-                              else if (data.errors.isEmpty)
-                                const SliverPadding(
-                                    padding: EdgeInsets.fromLTRB(16, 24, 16, 0),
-                                    sliver: SliverToBoxAdapter(
-                                        child: Text(
-                                            'Los más vendidos aparecerán cuando haya entregas recientes.'))),
-                              SliverPadding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 24, 16, 24),
-                                  sliver: SliverToBoxAdapter(
-                                      child: Align(
-                                          alignment: Alignment.center,
-                                          child: OutlinedButton.icon(
-                                              onPressed: _catalog,
-                                              icon: const LucideIcon(
-                                                  LucideGlyph.grid,
-                                                  size: 18),
-                                              label: const Text(
-                                                  'Explorar todo el catálogo'))))),
-                            ],
-                          ]);
-                    }))),
-        CatalogCartBar(onOpen: _cart)
-      ]),
-    );
+    return _webHome();
   }
-
-  Widget _heading(String title, String action, VoidCallback onAction) =>
-      Row(children: [
-        Expanded(
-            child: Text(title,
-                style: const TextStyle(
-                    fontSize: 19, fontWeight: FontWeight.w700))),
-        TextButton(onPressed: onAction, child: Text(action)),
-      ]);
-
-  Widget _products(String title, String subtitle, List<PartModel> products,
-          {String? action, VoidCallback? onAction}) =>
-      SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-          sliver: SliverToBoxAdapter(
-              child: _HomeProductRail(
-                  title: title,
-                  subtitle: subtitle,
-                  action: action,
-                  onAction: onAction,
-                  products: products,
-                  profile: widget.profile)));
-}
-
-class _HomeProductRail extends StatefulWidget {
-  const _HomeProductRail(
-      {required this.title,
-      required this.subtitle,
-      this.action,
-      this.onAction,
-      required this.products,
-      required this.profile});
-  final String title;
-  final String subtitle;
-  final String? action;
-  final VoidCallback? onAction;
-  final List<PartModel> products;
-  final ProfileModel profile;
-  @override
-  State<_HomeProductRail> createState() => _HomeProductRailState();
-}
-
-class _HomeProductRailState extends State<_HomeProductRail> {
-  final _scroll = ScrollController();
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  void _move(double direction) {
-    if (!_scroll.hasClients) return;
-    final position = _scroll.position;
-    _scroll.animateTo(
-        (_scroll.offset + direction * position.viewportDimension)
-            .clamp(0.0, position.maxScrollExtent),
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic);
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      LayoutBuilder(builder: (context, constraints) {
-        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        final logicalWidth =
-            (constraints.maxWidth + 32) / (scale < 1 ? 1 : scale);
-        final columns = logicalWidth >= 1250
-            ? 5
-            : logicalWidth >= 900
-                ? 4
-                : logicalWidth >= 640
-                    ? 3
-                    : logicalWidth >= 360
-                        ? 2
-                        : 1;
-        final width = columns == 1
-            ? constraints.maxWidth * .86
-            : (constraints.maxWidth - (columns - 1) * 10) / columns;
-        final railExtent = widget.products.length * width +
-            (widget.products.length - 1) * 10 -
-            constraints.maxWidth;
-        return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(children: [
-                Expanded(
-                    child: Text(widget.title,
-                        style: const TextStyle(
-                            fontSize: 19, fontWeight: FontWeight.w700))),
-                if (widget.action != null)
-                  TextButton(
-                      onPressed: widget.onAction, child: Text(widget.action!)),
-                if (constraints.maxWidth >= 600 &&
-                    widget.products.length > columns)
-                  AnimatedBuilder(
-                      animation: _scroll,
-                      builder: (context, _) {
-                        final offset =
-                            _scroll.hasClients ? _scroll.offset : 0.0;
-                        final hasPrevious = offset > 0;
-                        final hasNext = offset < railExtent - .5;
-                        return Row(mainAxisSize: MainAxisSize.min, children: [
-                          IconButton(
-                              tooltip: 'Productos anteriores',
-                              onPressed: hasPrevious ? () => _move(-1) : null,
-                              icon: _HomeAngle(
-                                  reverse: true, enabled: hasPrevious)),
-                          IconButton(
-                              tooltip: 'Más productos',
-                              onPressed: hasNext ? () => _move(1) : null,
-                              icon: _HomeAngle(enabled: hasNext)),
-                        ]);
-                      }),
-              ]),
-              const SizedBox(height: 4),
-              Text(widget.subtitle,
-                  style:
-                      TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                  controller: _scroll,
-                  scrollDirection: Axis.horizontal,
-                  child: IntrinsicHeight(
-                      child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                        for (final product in widget.products) ...[
-                          if (product != widget.products.first)
-                            const SizedBox(width: 10),
-                          SizedBox(
-                              width: width,
-                              child: HeroMode(
-                                  enabled: false,
-                                  child: AliadoProductCard(
-                                    part: product,
-                                    profile: widget.profile,
-                                    compact: true,
-                                    onTap: () => CatalogRouteLock.push(
-                                        context,
-                                        MaterialPageRoute<void>(
-                                            builder: (_) => ProductDetailScreen(
-                                                part: product))),
-                                    onImporterTap: product.ownerId == null
-                                        ? null
-                                        : () => CatalogRouteLock.push(
-                                            context,
-                                            MaterialPageRoute<void>(
-                                                builder: (_) =>
-                                                    ImporterStoreProfileScreen(
-                                                        importerId:
-                                                            product.ownerId!,
-                                                        viewer:
-                                                            widget.profile))),
-                                  ))),
-                        ],
-                      ]))),
-            ]);
-      });
 }
 
 class _HomeAngle extends StatelessWidget {

@@ -5,7 +5,9 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'aliado_catalog_layout.dart';
+import 'aliado_catalog_web_panel.dart';
 import 'catalog_cart_price.dart';
 import 'catalog_cart_button.dart';
 import 'favorite_heart_button.dart';
@@ -29,12 +31,16 @@ class AliadoProductCard extends StatelessWidget {
       required this.part,
       required this.profile,
       this.compact = false,
+      this.webChrome = false,
       this.showDistanceChips = false,
       this.onTap,
       this.onImporterTap});
   final PartModel part;
   final ProfileModel profile;
   final bool compact;
+
+  /// Proporción y botón de la grilla de escritorio. El móvil deja esto en falso.
+  final bool webChrome;
   final bool showDistanceChips;
   final VoidCallback? onTap;
   final VoidCallback? onImporterTap;
@@ -155,7 +161,10 @@ class AliadoProductCard extends StatelessWidget {
                                   ])))),
                       if (profile.isAliado) ...[
                         const SizedBox(height: 10),
-                        CatalogCartButton(part: part, profile: profile),
+                        if (webChrome)
+                          AliadoCatalogWebAddButton(part: part, profile: profile)
+                        else
+                          CatalogCartButton(part: part, profile: profile),
                       ] else if (onTap != null) ...[
                         const SizedBox(height: 10),
                         FilledButton(
@@ -187,11 +196,16 @@ class AliadoProductCard extends StatelessWidget {
                       Padding(
                           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                           child: AspectRatio(
-                              aspectRatio: AliadoCatalogLayout.cardImageAspect,
+                              aspectRatio: webChrome
+                                  ? 1.7
+                                  : AliadoCatalogLayout.cardImageAspect,
                               child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: ColoredBox(
-                                      color: AppColors.photoFrameFor(brightness),
+                                      color: webChrome
+                                          ? B2BThemeExtension.of(context)
+                                              .inputFill
+                                          : AppColors.photoFrameFor(brightness),
                                       child: Stack(
                                           fit: StackFit.expand,
                                           children: [
@@ -264,15 +278,18 @@ class AliadoProductCard extends StatelessWidget {
   Widget _productPhoto() {
     final url = part.coverImageUrl?.trim();
     if (url == null || url.isEmpty) return const _PhotoPlaceholder();
-    return Image.network(
+    return Padding(
+      padding: EdgeInsets.all(webChrome ? 10 : 0),
+      child: Image.network(
       url,
-      fit: BoxFit.cover,
+      fit: webChrome ? BoxFit.contain : BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
       excludeFromSemantics: true,
       errorBuilder: (_, __, ___) => const _PhotoPlaceholder(failed: true),
       loadingBuilder: (_, image, progress) =>
           progress == null ? image : const _PhotoPlaceholder(loading: true),
+    ),
     );
   }
 }

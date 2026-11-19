@@ -21,10 +21,12 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/admin/admin_catalog_coverage.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/app/theme/sync_app_colors_to_theme.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'aliado_catalog_layout.dart';
 import 'aliado_catalog_filters_sheet.dart';
+import 'aliado_catalog_web_panel.dart';
 import 'aliado_promo_campaign_widgets.dart';
 import 'importer_store_profile_screen.dart';
 import 'package:motolink_pro_app/features/inventory/importer_inventory_dashboard.dart';
@@ -101,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen>
   int? _minOwnerRatingCount;
   bool _onlyWithCommercialDiscount = false;
   bool _onlyEnvioIncluido = false;
+  bool _desktopFiltersVisible = true;
   double? _allySortLat;
   double? _allySortLng;
 
@@ -189,6 +192,10 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _openFiltersFromInicio() async {
+    if (widget.embedInDesktopShell) {
+      if (mounted) setState(() => _desktopFiltersVisible = true);
+      return;
+    }
     try {
       final importers = await _importersFuture;
       if (mounted && widget.isActiveTab) {
@@ -303,7 +310,12 @@ class _HomeScreenState extends State<HomeScreen>
       context: context,
       selected: _catalogSortMode,
     );
-    if (!mounted || next == null || next == _catalogSortMode) return;
+    if (!mounted || next == null) return;
+    await _applyCatalogSort(next);
+  }
+
+  Future<void> _applyCatalogSort(CatalogSortMode next) async {
+    if (next == _catalogSortMode) return;
     setState(() => _catalogSortMode = next);
     if (next == CatalogSortMode.nearest) {
       final ok = await _ensureGpsForNearestSort();
@@ -828,6 +840,361 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  List<String> _desktopCategoryLabels() {
+    const preferred = ['Accesorios', 'Frenos', 'Motor', 'Transmisión'];
+    final present = _categoryGroups.map((group) => group.label).toSet();
+    final ordered = <String>[
+      for (final label in preferred)
+        if (present.isEmpty || present.contains(label)) label,
+      for (final group in _categoryGroups)
+        if (!preferred.contains(group.label)) group.label,
+    ];
+    return [kAliadoCatalogAllCategoriesLabel, ...ordered];
+  }
+
+  void _setDesktopCategory(String label) {
+    if (label == _selectedCategoryLabel) return;
+    setState(() => _selectedCategoryLabel = label);
+    _applyFiltersFromUi();
+  }
+
+  void _toggleDesktopImporter(String id) {
+    setState(() {
+      if (!_selectedImporterIds.add(id)) _selectedImporterIds.remove(id);
+    });
+    _applyFiltersFromUi();
+  }
+
+  void _openDesktopStore(String id) {
+    CatalogRouteLock.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ImporterStoreProfileScreen(
+          importerId: id,
+          viewer: widget.profile,
+        ),
+      ),
+    );
+  }
+
+  Widget _desktopCatalogBody(List<ImporterOption> importers) {
+    final theme = B2BThemeExtension.of(context);
+    final draft = _currentFiltersDraft();
+    final query = _searchController.text.trim();
+    final showReset = draft.hasAnyPanelFilter ||
+        _onlyEnvioIncluido ||
+        query.isNotEmpty;
+    final names = {for (final importer in importers) importer.id: importer.businessName};
+    final chips = <Widget>[
+      if (query.isNotEmpty)
+        AliadoCatalogWebChip(
+          label: query,
+          onDeleted: () {
+            _searchController.clear();
+            _applyFiltersFromUi();
+          },
+        ),
+      if (draft.hasCategoryFilter)
+        AliadoCatalogWebChip(
+          label: _selectedCategoryLabel,
+          onDeleted: () => _setDesktopCategory(kAliadoCatalogAllCategoriesLabel),
+        ),
+      if (_onlyWithCommercialDiscount)
+        AliadoCatalogWebChip(
+          label: 'Promociones USD',
+          onDeleted: () {
+            setState(() => _onlyWithCommercialDiscount = false);
+            _applyFiltersFromUi();
+          },
+        ),
+      if (_onlyEnvioIncluido)
+        AliadoCatalogWebChip(
+          label: 'Envío incluido',
+          onDeleted: () {
+            setState(() => _onlyEnvioIncluido = false);
+            _applyFiltersFromUi();
+          },
+        ),
+      if (_minPriceController.text.trim().isNotEmpty)
+        AliadoCatalogWebChip(
+          label: 'Mín. ${_minPriceController.text.trim()} REF',
+          onDeleted: () {
+            _minPriceController.clear();
+            _applyFiltersFromUi();
+          },
+        ),
+      if (_maxPriceController.text.trim().isNotEmpty)
+        AliadoCatalogWebChip(
+          label: 'Máx. ${_maxPriceController.text.trim()} REF',
+          onDeleted: () {
+            _maxPriceController.clear();
+            _applyFiltersFromUi();
+          },
+        ),
+      for (final id in _selectedImporterIds)
+        AliadoCatalogWebChip(
+          label: names[id] ?? 'Proveedor',
+          onDeleted: () => _toggleDesktopImporter(id),
+        ),
+      if (_ownerEstadoFilterController.text.trim().isNotEmpty)
+        AliadoCatalogWebChip(
+          label: _ownerEstadoFilterController.text.trim(),
+          onDeleted: () {
+            _ownerEstadoFilterController.clear();
+            _applyFiltersFromUi();
+          },
+        ),
+      if (_ownerCiudadFilterController.text.trim().isNotEmpty)
+        AliadoCatalogWebChip(
+          label: _ownerCiudadFilterController.text.trim(),
+          onDeleted: () {
+            _ownerCiudadFilterController.clear();
+            _applyFiltersFromUi();
+          },
+        ),
+      if (_minOwnerRatingAvg != null)
+        AliadoCatalogWebChip(
+          label: '≥ ${_minOwnerRatingAvg!.toStringAsFixed(1)} ★',
+          onDeleted: () {
+            setState(() => _minOwnerRatingAvg = null);
+            _applyFiltersFromUi();
+          },
+        ),
+      if (_minOwnerRatingCount != null)
+        AliadoCatalogWebChip(
+          label: '≥ $_minOwnerRatingCount valoraciones',
+          onDeleted: () {
+            setState(() => _minOwnerRatingCount = null);
+            _applyFiltersFromUi();
+          },
+        ),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final filtersOpen = _desktopFiltersVisible && constraints.maxWidth >= 720;
+      final gridWidth = constraints.maxWidth - (filtersOpen ? 272 : 0);
+      final columns = AliadoCatalogLayout.crossAxisCount(
+        gridWidth,
+        textScale: MediaQuery.textScalerOf(context).scale(14) / 14,
+      );
+      _catalogCrossAxisCount = columns;
+      final sidebar = AliadoCatalogWebSidebar(
+        categories: _desktopCategoryLabels(),
+        selectedCategory: _selectedCategoryLabel,
+        onCategory: _setDesktopCategory,
+        usdPromo: _onlyWithCommercialDiscount,
+        shippingIncluded: _onlyEnvioIncluido,
+        onUsdPromo: (value) {
+          setState(() => _onlyWithCommercialDiscount = value);
+          _applyFiltersFromUi();
+        },
+        onShippingIncluded: (value) {
+          setState(() => _onlyEnvioIncluido = value);
+          _applyFiltersFromUi();
+        },
+        minPrice: _minPriceController,
+        maxPrice: _maxPriceController,
+        onPrice: _applyFiltersFromUi,
+        importers: importers,
+        selectedImporterIds: _selectedImporterIds,
+        onToggleImporter: _toggleDesktopImporter,
+        onOpenStore: _openDesktopStore,
+        estado: _ownerEstadoFilterController,
+        ciudad: _ownerCiudadFilterController,
+        onLocation: _applyFiltersFromUi,
+        minRating: _minOwnerRatingAvg,
+        onRating: (value) {
+          setState(() => _minOwnerRatingAvg = value);
+          _applyFiltersFromUi();
+        },
+        minRatingCount: _minOwnerRatingCount,
+        onRatingCount: (value) {
+          setState(() => _minOwnerRatingCount = value);
+          _applyFiltersFromUi();
+        },
+      );
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (filtersOpen) SizedBox(width: 272, child: sidebar),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AliadoCatalogWebToolbar(
+                      resultLabel:
+                          '${_catalogTotal ?? _loadedParts.length} repuestos encontrados',
+                      chips: chips,
+                      filtersOpen: _desktopFiltersVisible,
+                      onToggleFilters: () => setState(
+                        () => _desktopFiltersVisible = !_desktopFiltersVisible,
+                      ),
+                      sortMode: _catalogSortMode,
+                      onSort: _applyCatalogSort,
+                      showReset: showReset,
+                      onReset: _clearFilters,
+                    ),
+                    if (_catalogSortMode == CatalogSortMode.featured)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.warningBg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Text(
+                              'Orden Destacados: primero los proveedores con sello dorado por alto volumen.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.35,
+                                color: theme.warningFg,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Expanded(
+                      child: FutureBuilder<List<PartModel>>(
+                        future: _partsFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                                  ConnectionState.waiting &&
+                              _loadedParts.isEmpty) {
+                            return CatalogGridSkeleton(
+                              maxWidth: gridWidth,
+                              horizontalPadding: 16,
+                            );
+                          }
+                          if (snapshot.hasError) {
+                            return ListView(
+                              padding: const EdgeInsets.all(24),
+                              children: [
+                                const SizedBox(height: 80),
+                                Text(
+                                  'No se pudieron cargar los repuestos.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: theme.textPrimary),
+                                ),
+                              ],
+                            );
+                          }
+                          final parts = _loadedParts;
+                          if (parts.isEmpty) {
+                            return ListView(
+                              padding: const EdgeInsets.all(24),
+                              children: [
+                                const SizedBox(height: 80),
+                                Text(
+                                  _activeFilters.hasAnyFilter
+                                      ? 'No encontramos repuestos con esa búsqueda.'
+                                      : 'No hay repuestos disponibles.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: theme.textSecondary),
+                                ),
+                                const SizedBox(height: 12),
+                                Center(
+                                  child: TextButton.icon(
+                                    onPressed: _clearFilters,
+                                    icon: const Icon(Icons.restart_alt),
+                                    label: const Text('Ver todos los repuestos'),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          if (_hasMoreProducts && !_isLoadingMore) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              _onCatalogScroll();
+                            });
+                          }
+                          return CustomScrollView(
+                            controller: _catalogScrollController,
+                            slivers: [
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                                sliver: SliverCatalogCardRows(
+                                  columns: columns,
+                                  spacing: 14,
+                                  itemCount: parts.length,
+                                  itemBuilder: (context, index) {
+                                    final part = parts[index];
+                                    return AliadoProductCard(
+                                      part: part,
+                                      profile: widget.profile,
+                                      compact: true,
+                                      webChrome: true,
+                                      showDistanceChips: _activeFilters
+                                          .sortByDistanceFromReference,
+                                      onTap: () {
+                                        CatalogRouteLock.push(
+                                          context,
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => ProductDetailScreen(
+                                              part: part,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      onImporterTap: (part.ownerId
+                                                  ?.trim()
+                                                  .isNotEmpty ??
+                                              false)
+                                          ? () => _openDesktopStore(
+                                              part.ownerId!.trim())
+                                          : null,
+                                    );
+                                  },
+                                ),
+                              ),
+                              if (_isLoadingMore)
+                                const SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(bottom: 24),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: CatalogCartBar(
+              onOpen: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => CartScreen(profile: widget.profile),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // IndexedStack reutiliza el State: hay que depender del Theme para redibujar.
@@ -971,6 +1338,10 @@ class _HomeScreenState extends State<HomeScreen>
               final openFilters = bootstrapSnapshot.hasError
                   ? null
                   : () => _openCatalogFiltersSheet(importers);
+
+              if (widget.embedInDesktopShell) {
+                return _desktopCatalogBody(importers);
+              }
 
               final browse = CatalogBrowseLayout(
                 heading: useBrandedHeader

@@ -445,15 +445,14 @@ void main() {
       expect(find.text('Compra de nuevo'), findsOneWidget);
       expect(find.text('12.00 REF'), findsWidgets);
       expect(find.text('10.00 USD'), findsWidgets);
-      await tester.enterText(find.byType(TextField), 'aceite');
-      await tester.testTextInput.receiveAction(TextInputAction.search);
+      expect(find.bySemanticsLabel('Explora el catálogo'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      await tester.tap(find.bySemanticsLabel('Explora el catálogo'));
       await tester.pump();
       expect(tab, AliadoShellTabs.catalogo);
       expect(
-          MainShellTabController.consumeAliadoCatalogRequest()!
-              .filters
-              .searchQuery,
-          'aceite');
+          MainShellTabController.consumeAliadoCatalogRequest()!.filters.searchQuery,
+          isNull);
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Aceites'));

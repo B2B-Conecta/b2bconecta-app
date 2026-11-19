@@ -30,6 +30,7 @@ import 'package:motolink_pro_app/core/layout/admin_mobile_nav.dart';
 import 'package:motolink_pro_app/core/layout/admin_shell_drawer.dart';
 import 'package:motolink_pro_app/core/layout/b2b_desktop_shell.dart';
 import 'package:motolink_pro_app/core/layout/responsive_scaffold.dart';
+import 'package:motolink_pro_app/core/layout/shell/aliado_shell_search.dart';
 import 'package:motolink_pro_app/core/layout/shell/admin_shell_badges.dart';
 import 'package:motolink_pro_app/core/layout/shell/admin_shell_top_bar.dart';
 import 'package:motolink_pro_app/core/layout/shell/shell_body_navigator.dart';
@@ -113,6 +114,8 @@ class _MainShellState extends State<MainShell> {
   bool _adminSettingsOpen = false;
   AdminSettingsTab _adminSettingsTab = AdminSettingsTab.perfil;
   bool _entrepreneurWelcomeScheduled = false;
+  final _aliadoSearchFocus = FocusNode();
+  final _aliadoSearch = AliadoShellSearchController();
 
   @override
   void initState() {
@@ -207,6 +210,7 @@ class _MainShellState extends State<MainShell> {
     _adminShellBadges?.dispose();
     _importerShellBadges?.dispose();
     _notifications.dispose();
+    _aliadoSearchFocus.dispose();
     MainShellTabController.registerAdminSettingsOpen(null);
     MainShellTabController.unregister();
     super.dispose();
@@ -1248,6 +1252,7 @@ class _MainShellState extends State<MainShell> {
     bool railSelectionActive = true,
     bool accountFooterSelected = false,
     List<AdminShellBreadcrumb>? breadcrumbsOverride,
+    Widget? shellSearch,
   }) {
     final railIndex = railSelectionActive
         ? _tabIndex.clamp(0, destinations.isEmpty ? 0 : destinations.length - 1)
@@ -1301,6 +1306,7 @@ class _MainShellState extends State<MainShell> {
                 navBadges: navBadges,
                 resolveNavBadge: resolveNavBadge,
                 accountOpensMenu: accountOpensMenu,
+                shellSearch: shellSearch,
                 importerAccountMenu: role == AppHomeRole.importador,
                 searchHint: role == AppHomeRole.importador
                     ? 'Buscar pedidos, SKU o tiendas…'
@@ -1408,11 +1414,29 @@ class _MainShellState extends State<MainShell> {
             railBadgeLabel: entrepreneur
                 ? 'Panel Minorista-Emprendedor'
                 : 'Panel tienda minorista',
-            trailingActions: [_aliadoCartTopBarAction()],
+            trailingActions: [
+              const IconButton(
+                tooltip: 'Actualizar Inicio',
+                onPressed: MainShellTabController.notifyAliadoHomeReload,
+                icon: LucideIcon(LucideGlyph.refreshCw, size: 18),
+              ),
+              _aliadoCartTopBarAction(),
+            ],
             chrome: entrepreneur
                 ? DesktopShellChrome.darkCorporate
                 : DesktopShellChrome.light,
-            showBcvFooter: entrepreneur,
+            showGlobalSearch: true,
+            showBcvFooter: true,
+            onOpenGlobalSearch: () {
+              _aliadoSearchFocus.requestFocus();
+              _aliadoSearch.open();
+            },
+            shellSearch: AliadoShellSearch(
+              focusNode: _aliadoSearchFocus,
+              controller: _aliadoSearch,
+              profile: _profile,
+              showFilters: _tabIndex != AliadoShellTabs.inicio,
+            ),
             onOpenProfile: _openAliadoProfileTab,
             pageIndex: _tabIndex,
             railSelectionActive: !onProfile,

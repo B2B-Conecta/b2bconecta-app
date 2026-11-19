@@ -38,6 +38,7 @@ class AdminShellTopBar extends StatefulWidget implements PreferredSizeWidget {
     this.showUserAvatar = false,
     this.onBreadcrumbBack,
     this.showGlobalSearch = true,
+    this.searchOverride,
     this.onMessagesTap,
     this.unreadMessages = 0,
     this.trailingActions = const [],
@@ -65,6 +66,9 @@ class AdminShellTopBar extends StatefulWidget implements PreferredSizeWidget {
 
   /// Búsqueda global (admin). Los paneles B2B pueden ocultarla.
   final bool showGlobalSearch;
+
+  /// Sustituye el campo ⌘K (tienda minorista web). No lo usa el panel móvil.
+  final Widget? searchOverride;
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final List<Widget> trailingActions;
@@ -139,7 +143,16 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
                           onBack: widget.onBreadcrumbBack,
                         ),
                       ),
-                      if (widget.showGlobalSearch) ...[
+                      if (widget.searchOverride != null) ...[
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: widget.searchOverride,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ] else if (widget.showGlobalSearch) ...[
                         if (showSearch) ...[
                           const SizedBox(width: 12),
                           Flexible(
@@ -201,7 +214,7 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
             ),
           );
 
-    if (!widget.showGlobalSearch) return bar;
+    if (!widget.showGlobalSearch && widget.searchOverride == null) return bar;
 
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{

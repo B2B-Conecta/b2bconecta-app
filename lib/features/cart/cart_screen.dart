@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -14,6 +15,10 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_cart_price.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
@@ -24,6 +29,8 @@ import 'cart_suggestions.dart';
 import 'cart_suggestions_section.dart';
 import 'importer_min_order.dart';
 import 'min_order_currency.dart';
+
+part 'cart_screen_web.dart';
 
 /// Carrito multi-importador: agrupa por importador y confirma un solo pedido maestro.
 class CartScreen extends StatefulWidget {
@@ -95,6 +102,20 @@ class _CartScreenState extends State<CartScreen> {
   final Map<String, Timer> _suggestionConfirmTimers = {};
   final GlobalKey _summaryKey = GlobalKey();
   double _summaryHeight = 420;
+
+  void _selectDesktopCurrency(int index) {
+    setState(() => _pagoMoneda = _PagoMoneda.values[index]);
+  }
+
+  void _setDesktopCredit(String ownerId, bool useCredit) {
+    setState(() {
+      if (useCredit) {
+        _creditOptOut.remove(ownerId);
+      } else {
+        _creditOptOut.add(ownerId);
+      }
+    });
+  }
 
   void _syncSummaryHeight() {
     final box = _summaryKey.currentContext?.findRenderObject() as RenderBox?;
@@ -599,6 +620,9 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu) {
+      return _buildDesktopCartScreen(this);
+    }
     final tasa = _tasa;
     final grossRef = _cart.totalRef();
     final appliedCredit = _appliedCredit;

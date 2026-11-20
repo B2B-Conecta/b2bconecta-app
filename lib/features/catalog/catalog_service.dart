@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
+import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -182,6 +183,17 @@ class CatalogService {
 
   static Future<int> _fetchProductsCount({CatalogFilters? filters}) async {
     final f = filters ?? CatalogFilters.empty;
+    final classified = f.productIds;
+    if (classified.length > _maxInFilterIds) {
+      var total = 0;
+      for (var i = 0; i < classified.length; i += _maxInFilterIds) {
+        final end = (i + _maxInFilterIds).clamp(0, classified.length);
+        total += await _fetchProductsCount(
+          filters: f.copyWith(productIds: classified.sublist(i, end)),
+        );
+      }
+      return total;
+    }
     final searchPlan = await _resolveCatalogSearch(f);
     if (searchPlan.isEmptyResult) return 0;
     final embed = _catalogProfileSelect(f);
@@ -794,6 +806,30 @@ class CatalogService {
     required _CatalogSearchPlan searchPlan,
     required int rowCap,
   }) async {
+    final classified = filters.productIds;
+    if (classified.length > _maxInFilterIds) {
+      final out = <dynamic>[];
+      final seen = <String>{};
+      for (var i = 0;
+          i < classified.length && out.length < rowCap;
+          i += _maxInFilterIds) {
+        final end = (i + _maxInFilterIds).clamp(0, classified.length);
+        final rows = await _fetchCatalogProductRows(
+          embed: embed,
+          filters: filters.copyWith(productIds: classified.sublist(i, end)),
+          searchPlan: searchPlan,
+          rowCap: rowCap - out.length,
+        );
+        for (final row in rows) {
+          if (row is! Map) continue;
+          final id = row['id']?.toString() ?? '';
+          if (id.isNotEmpty && !seen.add(id)) continue;
+          out.add(row);
+          if (out.length >= rowCap) break;
+        }
+      }
+      return out;
+    }
     final ids = searchPlan.productIds;
     if (ids == null || ids.length <= _maxInFilterIds) {
       dynamic query =
@@ -1040,13 +1076,26 @@ class CatalogService {
       for (final value in filters.categoryAnyOf)
         if (value.trim().isNotEmpty) value.trim(),
     ];
-    if (anyOf.length > 1) {
+    final single =
+        (anyOf.length == 1 ? anyOf.first : filters.category)?.trim();
+    if (filters.productIds.isNotEmpty) {
+      q = q.inFilter('id', filters.productIds);
+    } else if (filters.includeBlankCategory) {
+      final values = [
+        ...anyOf,
+        if (anyOf.isEmpty && single != null && single.isNotEmpty) single,
+      ];
+      final listed = values
+          .map((value) => '"${value.replaceAll('"', '')}"')
+          .join(',');
+      final match = listed.isEmpty
+          ? 'category.is.null,category.eq.'
+          : 'category.in.($listed),category.is.null,category.eq.';
+      q = q.or(match);
+    } else if (anyOf.length > 1) {
       q = q.inFilter('category', anyOf);
-    } else {
-      final cat = (anyOf.length == 1 ? anyOf.first : filters.category)?.trim();
-      if (cat != null && cat.isNotEmpty) {
-        q = q.eq('category', cat);
-      }
+    } else if (single != null && single.isNotEmpty) {
+      q = q.eq('category', single);
     }
     final minAvg = filters.minOwnerRatingAvg;
     if (minAvg != null && minAvg > 0) {
@@ -1098,6 +1147,40 @@ class CatalogService {
       );
       if (profile.id.isEmpty) return null;
       return profile;
+    });
+  }
+
+  /// Productos activos con stock, para contar familias en la web.
+  /// Misma visibilidad que el listado: activos, stock > 0 y cubren el mínimo.
+  static Future<List<WebCatalogStockItem>> fetchWebCatalogStockIndex() {
+    return retryOnJwtIssuedAtFuture(() async {
+      const page = 400;
+      final out = <WebCatalogStockItem>[];
+      for (var from = 0; from < 4000; from += page) {
+        final rows = await SupabaseAccess.client
+            .from('products')
+            .select('id, name, description, sku, category')
+            .eq('is_active', true)
+            .gt('stock', 0)
+            .eq('stock_covers_min_order', true)
+            .order('id')
+            .range(from, from + page - 1);
+        final list = rows as List<dynamic>;
+        for (final row in list) {
+          if (row is! Map) continue;
+          final id = row['id']?.toString().trim() ?? '';
+          if (id.isEmpty) continue;
+          out.add(WebCatalogStockItem(
+            id: id,
+            name: row['name']?.toString() ?? '',
+            description: row['description']?.toString() ?? '',
+            sku: row['sku']?.toString() ?? '',
+            category: row['category']?.toString() ?? '',
+          ));
+        }
+        if (list.length < page) break;
+      }
+      return out;
     });
   }
 

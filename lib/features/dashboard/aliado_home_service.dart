@@ -29,6 +29,8 @@ class AliadoHomeData {
     this.buyAgain = const [],
     this.bestSellers = const [],
     this.categories = const [],
+    this.categoryLabels = const [],
+    this.stockIndex = const [],
     this.promotions = const [],
     this.newArrivals = const [],
     this.suppliers = const [],
@@ -38,6 +40,27 @@ class AliadoHomeData {
   final List<PartModel> buyAgain;
   final List<PartModel> bestSellers;
   final List<AliadoCatalogCategoryGroup> categories;
+
+  /// Textos distintos de `products.category`. Inicio web los reclasifica.
+  final List<String> categoryLabels;
+
+  /// Productos activos con stock. Solo lo llena Inicio web.
+  final List<WebCatalogStockItem> stockIndex;
+
+  AliadoHomeData withWebStock(List<WebCatalogStockItem> stockIndex) {
+    return AliadoHomeData(
+      buyAgain: buyAgain,
+      bestSellers: bestSellers,
+      categories: categories,
+      categoryLabels: categoryLabels,
+      stockIndex: stockIndex,
+      promotions: promotions,
+      newArrivals: newArrivals,
+      suppliers: suppliers,
+      activeOrders: activeOrders,
+      errors: errors,
+    );
+  }
   final List<PromoCampaignModel> promotions;
   final List<PartModel> newArrivals;
   final List<ImporterOption> suppliers;
@@ -111,11 +134,14 @@ abstract final class AliadoHomeService {
           for (final id in ids)
             if (byId[id] != null) byId[id]!,
         ].take(6).toList();
+    final listedCategories = await categories;
     return AliadoHomeData(
       buyAgain: resolve(selected.buyAgain),
       bestSellers: resolve(selected.bestSellers),
-      categories:
-          prioritizeHomeCategories(catalogCategoryFamilies(await categories)),
+      categories: prioritizeHomeCategories(
+        catalogCategoryFamilies(listedCategories),
+      ),
+      categoryLabels: listedCategories,
       promotions: await promotions,
       newArrivals: await arrivals,
       suppliers: await suppliers,

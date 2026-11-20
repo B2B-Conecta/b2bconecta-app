@@ -155,9 +155,12 @@ List<PartModel> constrainCatalogPartsToFilters(
     }
     if (filters.onlyActiveProducts && !p.isActive) return false;
     final value = (p.category ?? '').trim();
-    if (categories.isNotEmpty) {
+    if (filters.productIds.isEmpty && categories.isNotEmpty) {
       if (!categories.contains(value)) return false;
-    } else if (cat != null && cat.isNotEmpty && value != cat) {
+    } else if (filters.productIds.isEmpty &&
+        cat != null &&
+        cat.isNotEmpty &&
+        value != cat) {
       return false;
     }
     if (filters.onlyEnvioIncluido &&

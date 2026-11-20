@@ -8,8 +8,10 @@ import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
+import 'aliado_catalog_categories.dart';
 import 'aliado_catalog_reputation_filter_presets.dart';
 import 'catalog_filters.dart';
+import 'catalog_taxonomy.dart';
 import 'catalog_sort_mode.dart';
 import 'part_model.dart';
 import 'variant_cart_picker_sheet.dart';
@@ -19,6 +21,7 @@ class AliadoCatalogWebSidebar extends StatefulWidget {
   const AliadoCatalogWebSidebar({
     super.key,
     required this.categories,
+    this.categoryTree = const [],
     required this.selectedCategory,
     required this.onCategory,
     required this.usdPromo,
@@ -42,6 +45,9 @@ class AliadoCatalogWebSidebar extends StatefulWidget {
   });
 
   final List<String> categories;
+
+  /// Árbol completo de familias. Si viene vacío, se usan los chips [categories].
+  final List<AliadoCatalogCategoryGroup> categoryTree;
   final String selectedCategory;
   final ValueChanged<String> onCategory;
   final bool usdPromo;
@@ -103,18 +109,24 @@ class _AliadoCatalogWebSidebarState extends State<AliadoCatalogWebSidebar> {
           const SizedBox(height: 12),
           _Section(
             title: 'Categoría',
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final label in widget.categories)
-                  _ChoiceChip(
-                    label: label,
-                    selected: widget.selectedCategory == label,
-                    onTap: () => widget.onCategory(label),
+            child: widget.categoryTree.isEmpty
+                ? Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final label in widget.categories)
+                        _ChoiceChip(
+                          label: label,
+                          selected: widget.selectedCategory == label,
+                          onTap: () => widget.onCategory(label),
+                        ),
+                    ],
+                  )
+                : _CategoryTree(
+                    families: widget.categoryTree,
+                    selected: widget.selectedCategory,
+                    onSelect: widget.onCategory,
                   ),
-              ],
-            ),
           ),
           _Section(
             title: 'Condiciones rápidas',
@@ -486,6 +498,187 @@ class AliadoCatalogWebAddButton extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CategoryTree extends StatefulWidget {
+  const _CategoryTree({
+    required this.families,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<AliadoCatalogCategoryGroup> families;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  State<_CategoryTree> createState() => _CategoryTreeState();
+}
+
+class _CategoryTreeState extends State<_CategoryTree> {
+  final _open = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _revealSelection();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CategoryTree oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) _revealSelection();
+  }
+
+  void _revealSelection() {
+    final selected = widget.selected;
+    for (final family in widget.families) {
+      if (family.label == selected ||
+          family.children.any((child) => child.label == selected)) {
+        _open.add(family.label);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _TreeRow(
+          label: kAliadoCatalogAllCategoriesLabel,
+          selected: widget.selected == kAliadoCatalogAllCategoriesLabel,
+          onTap: () => widget.onSelect(kAliadoCatalogAllCategoriesLabel),
+        ),
+        for (final family in widget.families) ...[
+          _TreeRow(
+            label: catalogCategoryDisplayLabel(family.label),
+            selected: widget.selected == family.label,
+            opened: _open.contains(family.label),
+            hasChildren: family.children.isNotEmpty,
+            unavailable: !family.hasInventory,
+            onTap: () => widget.onSelect(family.label),
+            onToggle: family.children.isEmpty
+                ? null
+                : () => setState(() {
+                      if (!_open.add(family.label)) _open.remove(family.label);
+                    }),
+          ),
+          if (_open.contains(family.label))
+            for (final child in family.children)
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: _TreeRow(
+                  label: categoryLeaf(child.label),
+                  selected: widget.selected == child.label,
+                  unavailable: !child.hasInventory,
+                  onTap: () => widget.onSelect(child.label),
+                ),
+              ),
+        ],
+        if (widget.families.any((family) => !family.hasInventory))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Sin disponibilidad: hoy no hay productos publicados.',
+              style: TextStyle(fontSize: 11, height: 1.3, color: theme.textMuted),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TreeRow extends StatelessWidget {
+  const _TreeRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.unavailable = false,
+    this.hasChildren = false,
+    this.opened = false,
+    this.onToggle,
+  });
+
+  final String label;
+  final bool selected;
+  final bool unavailable;
+  final bool hasChildren;
+  final bool opened;
+  final VoidCallback onTap;
+  final VoidCallback? onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final fg = selected ? B2BBrandHero.start : theme.textPrimary;
+    return Material(
+      color: selected ? theme.brandContainer : theme.surfaceCard.withOpacity(0),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+          child: Row(
+            children: [
+              if (hasChildren)
+                InkWell(
+                  onTap: onToggle,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: LucideIcon(
+                      opened ? LucideGlyph.chevronDown : LucideGlyph.chevronRight,
+                      size: 14,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(width: 18),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: unavailable && !selected ? theme.textSecondary : fg,
+                  ),
+                ),
+              ),
+              if (unavailable)
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: theme.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: theme.borderSubtle),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Text(
+                        'Sin disponibilidad',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: theme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

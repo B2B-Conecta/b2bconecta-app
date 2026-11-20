@@ -1435,7 +1435,6 @@ class _MainShellState extends State<MainShell> {
               focusNode: _aliadoSearchFocus,
               controller: _aliadoSearch,
               profile: _profile,
-              showFilters: _tabIndex != AliadoShellTabs.inicio,
             ),
             onOpenProfile: _openAliadoProfileTab,
             pageIndex: _tabIndex,

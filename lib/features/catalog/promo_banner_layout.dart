@@ -12,6 +12,15 @@ abstract final class PromoBannerSpec {
   static const Size desktopRecommended = Size(2100, 300);
   static const Size mobileRecommended = Size(1500, 500);
 
+  /// Marco de la valla en Inicio Web y en el editor de escritorio.
+  static const double webFrameWidth = 1320;
+  static const double webFrameHeight = 493;
+  static const double webFrameAspect = webFrameWidth / webFrameHeight;
+  static const Size webFrameSize = Size(webFrameWidth, webFrameHeight);
+
+  /// Alto mínimo del recorte web: [desktopMinWidth] a [webFrameAspect].
+  static const int webFrameMinHeight = 449;
+
   /// Mínimos tras el recorte (evita pixelado en pantallas densas).
   static const int desktopMinWidth = 1200;
   static const int desktopMinHeight = 171; // floor(1200 / 7)
@@ -69,15 +78,18 @@ String? promoBannerResolutionError({
   required int width,
   required int height,
   required bool mobile,
+  int? minWidth,
+  int? minHeight,
+  Size? recommended,
 }) {
-  final minW = PromoBannerSpec.minWidth(mobile: mobile);
-  final minH = PromoBannerSpec.minHeight(mobile: mobile);
+  final minW = minWidth ?? PromoBannerSpec.minWidth(mobile: mobile);
+  final minH = minHeight ?? PromoBannerSpec.minHeight(mobile: mobile);
   if (width < minW || height < minH) {
     final slot = mobile ? 'móvil' : 'escritorio';
-    return 'La imagen $slot queda en ${width}×$height px. '
-        'Use al menos ${minW}×${minH}px (recomendado '
-        '${PromoBannerSpec.recommended(mobile: mobile).width.toInt()}×'
-        '${PromoBannerSpec.recommended(mobile: mobile).height.toInt()}).';
+    final size = recommended ?? PromoBannerSpec.recommended(mobile: mobile);
+    return 'La imagen $slot queda en $width×$height px. '
+        'Use al menos $minW×${minH}px (recomendado '
+        '${size.width.toInt()}×${size.height.toInt()}).';
   }
   return null;
 }

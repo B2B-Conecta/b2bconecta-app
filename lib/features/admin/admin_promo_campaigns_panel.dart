@@ -16,6 +16,8 @@ import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
+part 'admin_promo_campaign_editor_web.dart';
+
 String _formatPromoDate(DateTime d) {
   final local = d.toLocal();
   return formatEsShortDateTime(
@@ -88,6 +90,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
     final saved = await showAdaptiveAdminSheet<bool>(
       context: context,
       showDragHandle: false,
+      desktopMaxWidth: 920,
       builder: (ctx, _) => _PromoCampaignEditorSheet(
         existing: existing,
         importers: _importers,
@@ -622,21 +625,50 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     }
 
     if (!mounted) return;
-    final cropped = await showPromoBannerCropSheet(
-      context: context,
-      imageBytes: checked.bytes,
-      mobile: mobile,
-    );
-    if (cropped == null || !mounted) return;
-
-    setState(() {
-      _uploading = true;
-      _uploadError = null;
-    });
+    final desktopEditor = isAdminDesktopLayout(context);
+    final PromoBannerCropResult prepared;
+    if (desktopEditor) {
+      setState(() {
+        _uploading = true;
+        _uploadError = null;
+      });
+      try {
+        await Future<void>.delayed(Duration.zero);
+        final size = mobile
+            ? PromoBannerSpec.mobileRecommended
+            : PromoBannerSpec.webFrameSize;
+        prepared = fitPromoBannerImage(
+          checked.bytes,
+          width: size.width.toInt(),
+          height: size.height.toInt(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _uploading = false;
+          _uploadError = e
+              .toString()
+              .replaceFirst(RegExp(r'^(Exception|FormatException): '), '');
+        });
+        return;
+      }
+    } else {
+      final cropped = await showPromoBannerCropSheet(
+        context: context,
+        imageBytes: checked.bytes,
+        mobile: mobile,
+      );
+      if (cropped == null || !mounted) return;
+      prepared = cropped;
+      setState(() {
+        _uploading = true;
+        _uploadError = null;
+      });
+    }
     try {
       final uploaded = await SupabaseService.uploadPromoCampaignImage(
-        bytes: cropped.bytes,
-        fileExtension: cropped.extension,
+        bytes: prepared.bytes,
+        fileExtension: prepared.extension,
         campaignId: widget.existing?.id,
       );
       if (!mounted) return;
@@ -644,13 +676,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
         if (mobile) {
           _mobileImagePath = uploaded.path;
           _mobileImageUrl = uploaded.publicUrl;
-          _mobileImageWidth = cropped.width;
-          _mobileImageHeight = cropped.height;
+          _mobileImageWidth = prepared.width;
+          _mobileImageHeight = prepared.height;
         } else {
           _imagePath = uploaded.path;
           _imageUrl = uploaded.publicUrl;
-          _imageWidth = cropped.width;
-          _imageHeight = cropped.height;
+          _imageWidth = prepared.width;
+          _imageHeight = prepared.height;
         }
         _uploadError = null;
       });
@@ -845,8 +877,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
 
   void _close() => Navigator.of(context).pop();
 
+  void _desktopSet(VoidCallback fn) => setState(fn);
+
   @override
   Widget build(BuildContext context) {
+    if (isAdminDesktopLayout(context)) {
+      return buildDesktopPromoEditor(context);
+    }
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 8, 20, bottom + 20),

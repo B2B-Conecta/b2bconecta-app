@@ -63,10 +63,13 @@ class AliadoProductCard extends StatelessWidget {
     final radius = BorderRadius.circular(AliadoCatalogLayout.cardRadius);
     const supplierBlue = Color(0xFF004BDD);
     const navy = Color(0xFF0A1F44);
+    final theme = B2BThemeExtension.of(context);
     return Material(
-        color: AppColors.card,
+        color: webChrome ? theme.surfaceCard : AppColors.card,
         shape: RoundedRectangleBorder(
-            borderRadius: radius, side: BorderSide(color: AppColors.divider)),
+            borderRadius: radius,
+            side: BorderSide(
+                color: webChrome ? theme.borderSubtle : AppColors.divider)),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -193,19 +196,20 @@ class AliadoProductCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (webChrome)
+                        _webPhoto(
+                          B2BThemeExtension.of(context),
+                          shippingIncluded: shippingIncluded,
+                        )
+                      else
                       Padding(
                           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                           child: AspectRatio(
-                              aspectRatio: webChrome
-                                  ? 1.7
-                                  : AliadoCatalogLayout.cardImageAspect,
+                              aspectRatio: AliadoCatalogLayout.cardImageAspect,
                               child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: ColoredBox(
-                                      color: webChrome
-                                          ? B2BThemeExtension.of(context)
-                                              .inputFill
-                                          : AppColors.photoFrameFor(brightness),
+                                      color: AppColors.photoFrameFor(brightness),
                                       child: Stack(
                                           fit: StackFit.expand,
                                           children: [
@@ -275,21 +279,96 @@ class AliadoProductCard extends StatelessWidget {
         ));
   }
 
+  /// Cabecera web: la foto usa el mismo fondo que la tarjeta y un divisor sutil.
+  Widget _webPhoto(B2BThemeExtension theme, {required bool shippingIncluded}) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        border: Border(bottom: BorderSide(color: theme.borderSubtle)),
+      ),
+      child: SizedBox(
+        height: 160,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Hero(
+                tag: ProductDetailScreen.heroImageTag(part),
+                child: _productPhoto(),
+              ),
+            ),
+            if (part.isCatalogVerified || part.isCatalogFeatured)
+              Positioned(
+                top: 8,
+                left: 8,
+                right: 52,
+                child: ImporterCatalogSealsRow(
+                  verified: part.isCatalogVerified,
+                  featured: part.isCatalogFeatured,
+                  compact: true,
+                  spacing: 4,
+                ),
+              ),
+            if (profile.isAliado)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: FavoriteHeartButton(productId: part.id),
+              ),
+            if (part.hasWarranty)
+              Positioned(
+                top: part.isCatalogVerified || part.isCatalogFeatured ? 32 : 8,
+                left: 8,
+                right: 52,
+                child: const Align(
+                  alignment: Alignment.centerLeft,
+                  child: ProductWarrantySeal(compact: true),
+                ),
+              ),
+            if (shippingIncluded || part.variantChoices.isNotEmpty)
+              Positioned(
+                left: 6,
+                right: 6,
+                bottom: 6,
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    if (part.variantChoices.isNotEmpty)
+                      _VariantOptionsChip(count: part.variantChoices.length),
+                    if (shippingIncluded) const _ShippingIncludedChip(),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _productPhoto() {
     final url = part.coverImageUrl?.trim();
-    if (url == null || url.isEmpty) return const _PhotoPlaceholder();
-    return Padding(
-      padding: EdgeInsets.all(webChrome ? 10 : 0),
-      child: Image.network(
+    if (url == null || url.isEmpty) {
+      return webChrome
+          ? const SizedBox.expand()
+          : const _PhotoPlaceholder();
+    }
+    return Image.network(
       url,
       fit: webChrome ? BoxFit.contain : BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
       excludeFromSemantics: true,
-      errorBuilder: (_, __, ___) => const _PhotoPlaceholder(failed: true),
-      loadingBuilder: (_, image, progress) =>
-          progress == null ? image : const _PhotoPlaceholder(loading: true),
-    ),
+      errorBuilder: (_, __, ___) => webChrome
+          ? const SizedBox.expand()
+          : const _PhotoPlaceholder(failed: true),
+      loadingBuilder: (_, image, progress) => progress == null
+          ? image
+          : webChrome
+              ? const SizedBox.expand()
+              : const _PhotoPlaceholder(loading: true),
     );
   }
 }

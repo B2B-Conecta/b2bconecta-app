@@ -85,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen>
   Set<String> _selectedImporterIds = {};
   String _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel;
   List<AliadoCatalogCategoryGroup> _categoryGroups = const [];
+  List<AliadoCatalogCategoryGroup> _desktopCategoryTree = const [];
 
   late final TextEditingController _searchController;
   late final TextEditingController _minPriceController;
@@ -231,14 +232,31 @@ class _HomeScreenState extends State<HomeScreen>
       maxP = t;
     }
     final userQ = _searchController.text.trim();
-    final categoryValues = _categoryValuesFor(_selectedCategoryLabel);
+    final desktopIds = widget.embedInDesktopShell
+        ? webProductIdsForSelection(_desktopCategoryTree, _selectedCategoryLabel)
+        : const <String>[];
+    final categoryValues = desktopIds.isNotEmpty
+        ? const <String>[]
+        : widget.embedInDesktopShell
+            ? catalogValuesForSelection(
+                _desktopCategoryTree.isEmpty
+                    ? _categoryGroups
+                    : _desktopCategoryTree,
+                _selectedCategoryLabel,
+              )
+            : _categoryValuesFor(_selectedCategoryLabel);
     final oe = _ownerEstadoFilterController.text.trim();
     final oc = _ownerCiudadFilterController.text.trim();
     final useNearest = _catalogSortMode == CatalogSortMode.nearest;
     return CatalogFilters(
       searchQuery: userQ.isEmpty ? null : userQ,
-      category: categoryValues.length == 1 ? categoryValues.first : null,
-      categoryAnyOf: categoryValues.length > 1 ? categoryValues : const [],
+      category: desktopIds.isNotEmpty
+          ? _selectedCategoryLabel
+          : (categoryValues.length == 1 ? categoryValues.first : null),
+      categoryAnyOf: desktopIds.isNotEmpty
+          ? const []
+          : (categoryValues.length > 1 ? categoryValues : const []),
+      productIds: desktopIds,
       ownerIds: _selectedImporterIds.toList(),
       ownerEstado: oe.isEmpty ? null : oe,
       ownerCiudad: oc.isEmpty ? null : oc,
@@ -326,6 +344,81 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
     _applyFiltersFromUi();
+  }
+
+  void _showWholeFamily() {
+    final label = _selectedCategoryLabel.trim();
+    final family = categoryFamily(label);
+    if (family.isEmpty ||
+        family == label ||
+        !catalogTaxonomy.containsKey(family)) {
+      _clearFilters();
+      return;
+    }
+    setState(() => _selectedCategoryLabel = family);
+    _applyFiltersFromUi();
+  }
+
+  Widget _desktopCatalogEmpty(B2BThemeExtension theme) {
+    final label = _selectedCategoryLabel.trim();
+    final filtered = label.isNotEmpty &&
+        label != kAliadoCatalogAllCategoriesLabel;
+    final family = categoryFamily(label);
+    final child = filtered &&
+        family != label &&
+        catalogTaxonomy.containsKey(family);
+    final title = filtered
+        ? 'No hay inventario actual en ${catalogCategoryDisplayLabel(label)}.'
+        : 'No hay repuestos disponibles.';
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 64),
+        LucideIcon(LucideGlyph.package, size: 28, color: theme.textMuted),
+        const SizedBox(height: 12),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: theme.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          filtered
+              ? 'Por ahora no hay productos publicados con stock en esta selección.'
+              : 'Cuando haya repuestos publicados, aparecerán aquí.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: theme.textSecondary, height: 1.35),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (child)
+              OutlinedButton(
+                onPressed: _showWholeFamily,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: B2BBrandHero.start,
+                  side: const BorderSide(color: B2BBrandHero.start),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text('Ver toda la familia ${catalogCategoryDisplayLabel(family)}'),
+              ),
+            TextButton(
+              onPressed: _clearFilters,
+              child: const Text('Restablecer filtros'),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   void _clearFilters() {
@@ -655,8 +748,22 @@ class _HomeScreenState extends State<HomeScreen>
       final rows = await SupabaseService.fetchAliadoCatalogCategories();
       if (!mounted) return;
       final groups = catalogCategoryFamilies(rows);
+      var desktop = webStoreCategoryFamilies(rows, includeEmpty: true);
+      if (widget.embedInDesktopShell) {
+        try {
+          final stock = await SupabaseService.fetchWebCatalogStockIndex();
+          if (stock.isNotEmpty) {
+            desktop = webStoreCategoryFamiliesFromStock(
+              stock,
+              includeEmpty: true,
+            );
+          }
+        } catch (_) {}
+      }
+      if (!mounted) return;
       setState(() {
         _categoryGroups = groups;
+        _desktopCategoryTree = desktop;
       });
     } catch (_) {}
   }
@@ -979,6 +1086,7 @@ class _HomeScreenState extends State<HomeScreen>
       _catalogCrossAxisCount = columns;
       final sidebar = AliadoCatalogWebSidebar(
         categories: _desktopCategoryLabels(),
+        categoryTree: _desktopCategoryTree,
         selectedCategory: _selectedCategoryLabel,
         onCategory: _setDesktopCategory,
         usdPromo: _onlyWithCommercialDiscount,
@@ -1088,27 +1196,7 @@ class _HomeScreenState extends State<HomeScreen>
                           }
                           final parts = _loadedParts;
                           if (parts.isEmpty) {
-                            return ListView(
-                              padding: const EdgeInsets.all(24),
-                              children: [
-                                const SizedBox(height: 80),
-                                Text(
-                                  _activeFilters.hasAnyFilter
-                                      ? 'No encontramos repuestos con esa búsqueda.'
-                                      : 'No hay repuestos disponibles.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: theme.textSecondary),
-                                ),
-                                const SizedBox(height: 12),
-                                Center(
-                                  child: TextButton.icon(
-                                    onPressed: _clearFilters,
-                                    icon: const Icon(Icons.restart_alt),
-                                    label: const Text('Ver todos los repuestos'),
-                                  ),
-                                ),
-                              ],
-                            );
+                            return _desktopCatalogEmpty(theme);
                           }
                           if (_hasMoreProducts && !_isLoadingMore) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {

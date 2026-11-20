@@ -251,6 +251,25 @@ final _productRules = <(RegExp, String)>[
   (RegExp(r'\bcadenas?\b'), 'Transmisión / Cadenas'),
   (RegExp(r'\bcoronas?\b'), 'Transmisión / Coronas'),
   (RegExp(r'\bpinon(es)?\b'), 'Transmisión / Piñones'),
+  (RegExp(r'\brolineras?\b'), 'Cauchos y ruedas / Rodamientos de rueda'),
+  (RegExp(r'\bfusileras?\b'), 'Eléctrico e iluminación / Fusibles y relés'),
+  (RegExp(r'\bmagnetos?\b'), 'Eléctrico e iluminación'),
+  (
+    RegExp(r'\bpurificadores?\b.*\baire\b'),
+    'Admisión y combustible / Filtros de aire'
+  ),
+  (
+    RegExp(r'\b(diagframa|diafragma)s?\b'),
+    'Admisión y combustible / Carburadores e inyección'
+  ),
+  (RegExp(r'\bguardafangos?\b'), 'Accesorios'),
+  (RegExp(r'\bcola trasera\b|\bcolas traseras\b'), 'Accesorios'),
+  (
+    RegExp(r'\b(tornilleria|broches?|abrazaderas?|herramientas?)\b'),
+    'Accesorios'
+  ),
+  (RegExp(r'\bchavetas?\b'), 'Transmisión'),
+  (RegExp(r'\bcochinitos?\b'), 'Transmisión'),
 ];
 
 /// Resolves published category values and old links without changing their filters.
@@ -259,15 +278,31 @@ String? canonicalCatalogCategory(String? category) {
   return _canonicalByKey[key] ?? _aliases[key];
 }
 
-/// Resolves an old import label and refines broad categories using the item name.
-/// Explicit canonical paths win. Unrecognised inputs can be reviewed by the seller.
-String? classifyCatalogProduct(String? category, String name) {
+/// Resolves an old import label and refines broad categories using the item.
+/// Un path canónico completo gana. Si la categoría es solo la familia, el
+/// nombre, el SKU y la descripción afinan la subcategoría, en ese orden.
+/// Si nada coincide, la familia es Accesorios.
+String? classifyCatalogProduct(
+  String? category,
+  String name, {
+  String? description,
+  String? sku,
+}) {
   final canonical = canonicalCatalogCategory(category);
-  if (canonical != null && categoryFamily(canonical) != canonical)
+  if (canonical != null && categoryFamily(canonical) != canonical) {
     return canonical;
-  final key = _categoryKey(name);
-  for (final (pattern, path) in _productRules) {
-    if (pattern.hasMatch(key)) return path;
   }
-  return canonical;
+  for (final text in [name, sku ?? '', description ?? '']) {
+    final key = _categoryKey(text);
+    if (key.isEmpty) continue;
+    for (final (pattern, path) in _productRules) {
+      if (pattern.hasMatch(key)) return path;
+    }
+  }
+  if (canonical != null) return canonical;
+  final categoryKey = _categoryKey(category ?? '');
+  for (final (pattern, path) in _productRules) {
+    if (pattern.hasMatch(categoryKey)) return path;
+  }
+  return 'Accesorios';
 }

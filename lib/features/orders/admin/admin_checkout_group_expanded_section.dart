@@ -31,6 +31,7 @@ class AdminCheckoutGroupExpandedSection extends StatefulWidget {
     this.onEliminarPedido,
     this.deleteBusyId,
     this.morosidadFooter,
+    this.includeTracking = true,
   });
 
   final List<TransactionRequestModel> lines;
@@ -41,6 +42,9 @@ class AdminCheckoutGroupExpandedSection extends StatefulWidget {
   final void Function(TransactionRequestModel line)? onEliminarPedido;
   final String? deleteBusyId;
   final Widget? morosidadFooter;
+
+  /// El detalle web ya muestra la barra y los hitos. El acordeón de la lista los conserva.
+  final bool includeTracking;
 
   @override
   State<AdminCheckoutGroupExpandedSection> createState() =>
@@ -109,6 +113,7 @@ class _AdminCheckoutGroupExpandedSectionState
           anularBusyId: widget.anularBusyId,
           onEliminarPedido: widget.onEliminarPedido,
           deleteBusyId: widget.deleteBusyId,
+          includeTracking: widget.includeTracking,
         ),
         if (widget.morosidadFooter != null) ...[
           const SizedBox(height: 12),
@@ -232,6 +237,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
     this.anularBusyId,
     this.onEliminarPedido,
     this.deleteBusyId,
+    this.includeTracking = true,
   });
 
   final List<TransactionRequestModel> chunk;
@@ -245,6 +251,7 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
   final String? anularBusyId;
   final void Function(TransactionRequestModel line)? onEliminarPedido;
   final String? deleteBusyId;
+  final bool includeTracking;
 
   @override
   Widget build(BuildContext context) {
@@ -329,18 +336,20 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: kOrderCardSectionGap),
-        OrderCardCollapsibleSection(
-          title: 'Seguimiento',
-          subtitle: orderCardTimelineSubtitle(anchor),
-          initiallyExpanded: orderCardTimelineInitiallyExpanded(anchor),
-          child: CourierTimelineWidget(
-            request: anchor,
-            compact: true,
-            viewerRole: AppHomeRole.administrador,
-            showHeading: false,
+        if (includeTracking) ...[
+          const SizedBox(height: kOrderCardSectionGap),
+          OrderCardCollapsibleSection(
+            title: 'Seguimiento',
+            subtitle: orderCardTimelineSubtitle(anchor),
+            initiallyExpanded: orderCardTimelineInitiallyExpanded(anchor),
+            child: CourierTimelineWidget(
+              request: anchor,
+              compact: true,
+              viewerRole: AppHomeRole.administrador,
+              showHeading: false,
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: kOrderCardSectionGap),
         if (onAnularMotolink != null &&
                 chunk.any((r) => r.motolinkPuedeAnularComoAdmin)) ...[

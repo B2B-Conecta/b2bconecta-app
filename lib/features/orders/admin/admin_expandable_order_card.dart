@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_eligibility.dart';
 import 'admin_checkout_group_master_header.dart';
 import 'package:motolink_pro_app/features/orders/shared/courier_timeline_widget.dart';
@@ -18,6 +19,14 @@ import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 
 /// Alias de producto del detalle de pedido admin (`/admin/orders/detail`).
 typedef OrderDetailModule = AdminExpandableOrderCard;
+
+String _adminHistoryLineLabel(TransactionRequestModel line) {
+  final supplier = (line.ownerBusinessName ?? '').trim();
+  final product = (line.productName ?? '').trim();
+  if (supplier.isEmpty) return product.isEmpty ? 'Partida' : product;
+  if (product.isEmpty) return supplier;
+  return '$supplier · $product';
+}
 
 /// Ficha compacta admin: una línea o carrito completo (`checkout_group_id`).
 class AdminExpandableOrderCard extends StatelessWidget {
@@ -62,7 +71,6 @@ class AdminExpandableOrderCard extends StatelessWidget {
         context,
         lines: lines,
         isCheckoutGroup: isCheckoutGroup,
-        r: r,
       );
     }
 
@@ -141,10 +149,14 @@ class AdminExpandableOrderCard extends StatelessWidget {
     BuildContext context, {
     required List<TransactionRequestModel> lines,
     required bool isCheckoutGroup,
-    required TransactionRequestModel r,
   }) {
     final theme = B2BThemeExtension.of(context);
-    // Columna izq (~60%): timeline → pagos/gestión → productos.
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final sameShipping = lines.every((l) => l.status == lines.first.status);
+    final historyLines = sameShipping ? [lines.first] : lines;
+    // Escritorio: una sola barra de fases y los hitos. El panel estrecho
+    // conserva el historial plegado.
     final tracking = OrderDetailSection(
       title: 'Seguimiento',
       icon: Icons.local_shipping_outlined,
@@ -153,36 +165,64 @@ class AdminExpandableOrderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OrderDeliveryStepper(lines: lines),
-          const SizedBox(height: 4),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: theme.borderSubtle),
-            child: ExpansionTile(
-              key: PageStorageKey('admin-history-${r.id}'),
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(top: 4, bottom: 2),
-              initiallyExpanded: false,
-              title: Text(
-                'Historial del envío',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: theme.textSecondary,
-                ),
-              ),
-              children: [
-                for (final line in lines)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CourierTimelineWidget(
-                      request: line,
-                      compact: true,
-                      viewerRole: AppHomeRole.administrador,
-                      showHeading: lines.length > 1,
+          if (desktop) ...[
+            const SizedBox(height: 12),
+            for (var i = 0; i < historyLines.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              if (historyLines.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    _adminHistoryLineLabel(historyLines[i]),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: theme.textPrimary,
                     ),
                   ),
-              ],
+                ),
+              CourierTimelineWidget(
+                request: historyLines[i],
+                compact: true,
+                viewerRole: AppHomeRole.administrador,
+                showHeading: false,
+                embedded: true,
+                showProgressBar: false,
+              ),
+            ],
+          ] else ...[
+            const SizedBox(height: 4),
+            Theme(
+              data: Theme.of(context)
+                  .copyWith(dividerColor: theme.borderSubtle),
+              child: ExpansionTile(
+                key: PageStorageKey('admin-history-${lines.first.id}'),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: 4, bottom: 2),
+                initiallyExpanded: false,
+                title: Text(
+                  'Historial del envío',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: theme.textSecondary,
+                  ),
+                ),
+                children: [
+                  for (final line in lines)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: CourierTimelineWidget(
+                        request: line,
+                        compact: true,
+                        viewerRole: AppHomeRole.administrador,
+                        showHeading: lines.length > 1,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

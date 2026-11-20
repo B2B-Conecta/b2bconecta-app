@@ -7,6 +7,16 @@ String formatEsShortDateTime(DateTime? utcOrLocal) {
   return '${formatEsShortDate(d)} $h:$min';
 }
 
+/// Fecha `dd/MM/yyyy` y hora de 12 horas (`3:06 PM`). El panel móvil sigue en 24 h.
+String formatEsShortDateTime12h(DateTime? utcOrLocal) {
+  if (utcOrLocal == null) return '—';
+  final d = utcOrLocal.isUtc ? utcOrLocal.toLocal() : utcOrLocal;
+  final suffix = d.hour >= 12 ? 'PM' : 'AM';
+  final hour12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final min = d.minute.toString().padLeft(2, '0');
+  return '${formatEsShortDate(d)} $hour12:$min $suffix';
+}
+
 String formatEsShortDate(DateTime utcOrLocal) {
   final d = utcOrLocal.toLocal();
   final day = d.day.toString().padLeft(2, '0');

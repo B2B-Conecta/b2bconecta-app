@@ -24,6 +24,8 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.ownerPagoSoloDivisas = false,
     this.bcvRate,
     this.usdColor,
+    this.refColor,
+    this.bsColor,
   });
   final double listPriceUsd;
   final double? salePriceUsd;
@@ -37,6 +39,8 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final bool ownerPagoSoloDivisas;
   final double? bcvRate;
   final Color? usdColor;
+  final Color? refColor;
+  final Color? bsColor;
 
   @override
   Widget build(BuildContext context) {
@@ -90,13 +94,14 @@ class CatalogProductPriceDisplay extends StatelessWidget {
             ),
             if (!ownerPagoSoloDivisas) ...[
               const SizedBox(height: 3),
-              amount(list, 'REF', secondarySize, AppColors.textPrimary),
+              amount(
+                  list, 'REF', secondarySize, refColor ?? AppColors.textPrimary),
               _BasePriceBsLine(
                   refUsd: list,
                   fontSize: 12,
                   compact: true,
                   rate: bcvRate,
-                  color: const Color(0xFF0A1F44)),
+                  color: bsColor ?? const Color(0xFF0A1F44)),
             ],
           ]);
     }

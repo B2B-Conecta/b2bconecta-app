@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
@@ -25,7 +26,10 @@ import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica_badge.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_custom_fields_section.dart';
+import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
+import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/catalog/store_supplier_chat.dart';
+import 'package:motolink_pro_app/features/catalog/variant_cart_picker_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 /// Acceso a datos de la vitrina. En la app usa [SupabaseService]; en tests se inyecta.
@@ -137,6 +141,7 @@ class _ImporterStoreProfileScreenState
   bool _hasMore = true;
   int? _matchingTotal;
   String? _selectedCategory;
+  bool _desktopStore = false;
   int _viewPage = 0;
   int _viewPageSize = listPageSizeOptions.first;
   int _loadGen = 0;
@@ -144,9 +149,16 @@ class _ImporterStoreProfileScreenState
   int get _pagerTotal =>
       listPagerTotal(loaded: _parts.length, matching: _matchingTotal);
 
+  List<AliadoCatalogCategoryGroup> _webFamilies() => [
+        for (final family in webStoreCategoryFamilies(_categories))
+          if (family.hasInventory) family,
+      ];
+
   CatalogFilters get _filters {
     final values = catalogValuesForSelection(
-        catalogCategoryFamilies(_categories), _selectedCategory);
+      _desktopStore ? _webFamilies() : catalogCategoryFamilies(_categories),
+      _selectedCategory,
+    );
     return CatalogFilters.importerStore(
       importerId: widget.importerId,
       category: values.length == 1 ? values.single : null,
@@ -375,15 +387,37 @@ class _ImporterStoreProfileScreenState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _desktopStore =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final hPad = AliadoCatalogLayout.horizontalPadding(width);
+    final desktop = _desktopStore;
+    final hPad = desktop ? 40.0 : AliadoCatalogLayout.horizontalPadding(width);
     const maxW = AppBreakpoints.adminContentMaxWidth;
+    final theme = B2BThemeExtension.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: desktop ? theme.background : AppColors.background,
       appBar: AppBar(
-        title: Text(_profile?.displayName ?? 'Mayorista'),
+        backgroundColor: desktop ? theme.surfaceCard : null,
+        foregroundColor: desktop ? theme.textPrimary : null,
+        surfaceTintColor: desktop ? theme.surfaceCard : null,
+        elevation: desktop ? 0 : null,
+        title: Text(
+          _profile?.displayName ?? 'Mayorista',
+          style: desktop
+              ? TextStyle(
+                  color: theme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                )
+              : null,
+        ),
         actions: [
           IconButton(
             tooltip: 'Compartir QR',
@@ -408,13 +442,13 @@ class _ImporterStoreProfileScreenState
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxW),
-          child: _body(hPad),
+          child: _body(hPad, desktop: desktop),
         ),
       ),
     );
   }
 
-  Widget _body(double hPad) {
+  Widget _body(double hPad, {required bool desktop}) {
     if (_loadingProfile) {
       return const Center(
         key: Key('importer-store-loading'),
@@ -468,12 +502,17 @@ class _ImporterStoreProfileScreenState
       controller: _scrollController,
       slivers: [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
-          sliver: SliverToBoxAdapter(child: _header(profile)),
+          padding: EdgeInsets.fromLTRB(hPad, desktop ? 20 : 12, hPad, 0),
+          sliver: SliverToBoxAdapter(
+            child: desktop ? _webHeader(profile) : _header(profile),
+          ),
         ),
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
-          sliver: SliverToBoxAdapter(child: _categoryChips()),
+          padding: EdgeInsets.fromLTRB(
+              hPad, desktop ? 22 : 12, hPad, desktop ? 16 : 8),
+          sliver: SliverToBoxAdapter(
+            child: desktop ? _webCategoryChips() : _categoryChips(),
+          ),
         ),
         if (_error != null && _parts.isEmpty)
           SliverFillRemaining(
@@ -515,17 +554,33 @@ class _ImporterStoreProfileScreenState
             sliver: SliverToBoxAdapter(
               child: LayoutBuilder(
                 builder: (context, gridConstraints) {
+                  Widget cardAt(BuildContext context, int index) {
+                    final part = visibleParts[index];
+                    return desktop
+                        ? _WebStoreProductCard(
+                            part: part,
+                            profile: widget.viewer,
+                            showHeart: widget.viewer.isAliado,
+                            onTap: () => _openProduct(part),
+                          )
+                        : _StoreProductCard(
+                            part: part,
+                            showHeart: widget.viewer.isAliado,
+                            onTap: () => _openProduct(part),
+                          );
+                  }
+
+                  if (desktop) {
+                    return _WebStoreCardGrid(
+                      maxWidth: gridConstraints.maxWidth,
+                      itemCount: visibleParts.length,
+                      itemBuilder: cardAt,
+                    );
+                  }
                   return AliadoCatalogCardWrap(
                     maxWidth: gridConstraints.maxWidth,
                     itemCount: visibleParts.length,
-                    itemBuilder: (context, index) {
-                      final part = visibleParts[index];
-                      return _StoreProductCard(
-                        part: part,
-                        showHeart: widget.viewer.isAliado,
-                        onTap: () => _openProduct(part),
-                      );
-                    },
+                    itemBuilder: cardAt,
                   );
                 },
               ),
@@ -793,6 +848,289 @@ class _ImporterStoreProfileScreenState
       ],
     );
   }
+
+  Widget _webHeader(ImporterStoreProfile profile) {
+    final theme = B2BThemeExtension.of(context);
+    final rating = profile.ratingAvg;
+    final count = profile.ratingCount ?? 0;
+    final metodos = profile.pagoMetodoLabelsEs;
+    final address = profile.direccion?.trim() ?? '';
+    final rif = profile.rif?.trim() ?? '';
+    final phone = profile.phone?.trim() ?? '';
+    final maps = profile.fiscalMapsUrl?.trim() ?? '';
+    final logo = profile.logoStoragePath?.trim() ?? '';
+    final showRating = rating != null && count > 0;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: theme.textPrimary.withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ColoredBox(color: theme.brand, child: const SizedBox(height: 3)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ImporterCatalogLogo(storagePath: logo, size: 72),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile.displayName,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                height: 1.15,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                            if (profile.locationLine.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                profile.locationLine,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.textSecondary,
+                                ),
+                              ),
+                            ],
+                            if (profile.isCatalogVerified ||
+                                profile.isCatalogFeatured) ...[
+                              const SizedBox(height: 10),
+                              ImporterCatalogSealsRow(
+                                verified: profile.isCatalogVerified,
+                                featured: profile.isCatalogFeatured,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (showRating || profile.hasMinOrder) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (showRating)
+                          _WebFactPill(
+                            glyph: LucideGlyph.star,
+                            label:
+                                '${rating.toStringAsFixed(1)} · $count valoración${count == 1 ? '' : 'es'}',
+                            background: theme.warningBg,
+                            foreground: theme.warningFg,
+                          ),
+                        if (profile.hasMinOrder)
+                          _WebFactPill(
+                            glyph: LucideGlyph.package,
+                            label: profile.minOrderLabelEs,
+                            background: theme.surfaceSubtle,
+                            foreground: theme.textPrimary,
+                            border: theme.borderSubtle,
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (address.isNotEmpty ||
+                      rif.isNotEmpty ||
+                      phone.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Divider(height: 1, thickness: 1, color: theme.borderSubtle),
+                    const SizedBox(height: 14),
+                    if (address.isNotEmpty)
+                      _WebMetaLine(
+                        glyph: LucideGlyph.building2,
+                        text: address,
+                      ),
+                    if (rif.isNotEmpty)
+                      _WebMetaLine(
+                        glyph: LucideGlyph.fileText,
+                        text: 'RIF $rif',
+                      ),
+                    if (phone.isNotEmpty)
+                      _WebMetaLine(
+                        glyph: LucideGlyph.smartphone,
+                        text: phone,
+                        onTap: () => _openPhone(phone),
+                      ),
+                  ],
+                  if (metodos.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        LucideIcon(
+                          LucideGlyph.creditCard,
+                          size: 15,
+                          color: theme.textSecondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          profile.pagoSoloDivisas
+                              ? 'Pago en divisas'
+                              : 'Métodos de pago',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final metodo in metodos)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.brandContainer,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              metodo,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: theme.brand,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (maps.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.brand,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: () => _openMaps(maps),
+                        icon: LucideIcon(
+                          LucideGlyph.landmark,
+                          size: 16,
+                          color: theme.brand,
+                        ),
+                        label: const Text('Ver ubicación'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _webCategoryChips() {
+    final theme = B2BThemeExtension.of(context);
+    final families = _webFamilies();
+    final selected = canonicalCatalogCategory(_selectedCategory);
+    final family = selected == null ? null : categoryFamily(selected);
+    AliadoCatalogCategoryGroup? openGroup;
+    for (final group in families) {
+      if (group.label == family && group.children.isNotEmpty) {
+        openGroup = group;
+      }
+    }
+    final opened = openGroup;
+    final children = [
+      for (final child
+          in opened?.children ?? const <AliadoCatalogCategoryGroup>[])
+        if (child.hasInventory) child,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Align(
+          alignment: Alignment.center,
+          child: Text(
+            'Catálogo',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: theme.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _WebFilterChip(
+              label: 'Todos',
+              selected: _selectedCategory == null,
+              onSelected: (_) => _selectCategory(null),
+            ),
+            for (final group in families)
+              _WebFilterChip(
+                label: catalogCategoryDisplayLabel(group.label),
+                selected: family == group.label,
+                onSelected: (_) => _selectCategory(group.label),
+              ),
+          ],
+        ),
+        if (opened != null && children.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _WebFilterChip(
+                label: 'Toda la categoría',
+                selected: selected == opened.label,
+                onSelected: (_) => _selectCategory(opened.label),
+              ),
+              for (final child in children)
+                _WebFilterChip(
+                  label: categoryLeaf(child.label),
+                  selected: selected == child.label,
+                  onSelected: (_) => _selectCategory(child.label),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _StoreFactChip extends StatelessWidget {
@@ -1040,6 +1378,520 @@ class _StoreImagePlaceholder extends StatelessWidget {
         Icons.image_outlined,
         size: 32,
         color: AppColors.textMuted,
+      ),
+    );
+  }
+}
+
+class _WebFactPill extends StatelessWidget {
+  const _WebFactPill({
+    required this.glyph,
+    required this.label,
+    required this.background,
+    required this.foreground,
+    this.border,
+  });
+
+  final LucideGlyph glyph;
+  final String label;
+  final Color background;
+  final Color foreground;
+  final Color? border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: border == null ? null : Border.all(color: border!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LucideIcon(glyph, size: 14, color: foreground),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: foreground,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WebMetaLine extends StatelessWidget {
+  const _WebMetaLine({
+    required this.glyph,
+    required this.text,
+    this.onTap,
+  });
+
+  final LucideGlyph glyph;
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final tappable = onTap != null;
+    final color = tappable ? theme.brand : theme.textSecondary;
+    final row = Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LucideIcon(glyph, size: 16, color: theme.brand),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!tappable) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: row,
+    );
+  }
+}
+
+class _WebFilterChip extends StatefulWidget {
+  const _WebFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+
+  @override
+  State<_WebFilterChip> createState() => _WebFilterChipState();
+}
+
+class _WebFilterChipState extends State<_WebFilterChip> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final selected = widget.selected;
+    final background = selected
+        ? theme.brand
+        : (_hover ? theme.brandContainer : theme.surfaceCard);
+    final foreground = selected
+        ? Theme.of(context).colorScheme.onPrimary
+        : (_hover ? theme.brand : theme.textPrimary);
+    final border = selected || _hover ? theme.brand : theme.borderStrong;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: ChoiceChip(
+        label: Text(widget.label),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: widget.onSelected,
+        selectedColor: background,
+        backgroundColor: background,
+        labelStyle: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: foreground,
+        ),
+        side: BorderSide(color: border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+}
+
+class _WebStoreProductCard extends StatefulWidget {
+  const _WebStoreProductCard({
+    required this.part,
+    required this.profile,
+    required this.onTap,
+    required this.showHeart,
+  });
+
+  final PartModel part;
+  final ProfileModel profile;
+  final VoidCallback onTap;
+  final bool showHeart;
+
+  @override
+  State<_WebStoreProductCard> createState() => _WebStoreProductCardState();
+}
+
+class _WebStoreProductCardState extends State<_WebStoreProductCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final part = widget.part;
+    final cover = part.coverImageUrl;
+    final radius = BorderRadius.circular(16);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: theme.surfaceCard,
+          borderRadius: radius,
+          border: Border.all(
+            color: _hover ? theme.brand : theme.borderSubtle,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.textPrimary.withOpacity(_hover ? 0.08 : 0.04),
+              blurRadius: _hover ? 16 : 8,
+              offset: Offset(0, _hover ? 8 : 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: theme.surfaceCard,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: radius,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          cover != null && cover.isNotEmpty
+                              ? Image.network(
+                                  cover,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _WebStoreImagePlaceholder(theme: theme),
+                                )
+                              : _WebStoreImagePlaceholder(theme: theme),
+                          if (part.hasWarranty)
+                            const Positioned(
+                              top: 6,
+                              left: 6,
+                              child: ProductWarrantySeal(compact: true),
+                            ),
+                          if (widget.showHeart)
+                            Positioned(
+                              right: 6,
+                              bottom: 6,
+                              child: FavoriteHeartButton(
+                                productId: part.id,
+                                compact: true,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        part.nombre,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        categoryLeaf(
+                          catalogCategoryDisplayLabel(
+                            classifyCatalogProduct(
+                                    part.category, part.nombre) ??
+                                (part.category ?? ''),
+                          ),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: theme.brand,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      CatalogProductPriceDisplay(
+                        listPriceUsd: part.precio,
+                        salePriceUsd: part.salePriceUsd,
+                        quantity: part.minOrderQtyEffective,
+                        ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
+                        discountRules: part.discountRules,
+                        campaignDiscountPercent:
+                            part.activeCampaignDiscountPercent,
+                        catalogGrid: true,
+                        showPromotionChips: false,
+                        usdColor: theme.successFg,
+                        refColor: theme.textPrimary,
+                        bsColor: theme.textSecondary,
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: EnvioPoliticaBadge(
+                          tipo: part.ownerEnvioTipo,
+                          compact: true,
+                        ),
+                      ),
+                      if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo))
+                        const SizedBox(height: 8),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${part.stockForSale} en stock',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: theme.successFg,
+                              ),
+                            ),
+                            TextSpan(
+                              text: ' · ${part.minOrderQtyLabelEs}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: theme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (productCustomFieldsDisplayEntries(
+                        part.customFields,
+                        aliadoView: true,
+                      ).isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        ProductCustomFieldsAliadoChips(
+                          customFields: part.customFields,
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      _WebStoreCartButton(
+                        part: part,
+                        profile: widget.profile,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WebStoreCartButton extends StatelessWidget {
+  const _WebStoreCartButton({
+    required this.part,
+    required this.profile,
+  });
+
+  final PartModel part;
+  final ProfileModel profile;
+
+  Future<void> _add(BuildContext context, CartService cart) async {
+    if (part.variantChoices.isNotEmpty) {
+      await showVariantCartPickerSheet(
+        context: context,
+        part: part,
+        profile: profile,
+        cart: cart,
+      );
+      return;
+    }
+    final added = CartProductActions.addMinimum(
+      part: part,
+      profile: profile,
+      cart: cart,
+    );
+    if (added < 1 || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Agregado al carrito: ${part.nombre} · $added uds.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final onBrand = Theme.of(context).colorScheme.onPrimary;
+    return ListenableBuilder(
+      listenable: CartService.instance,
+      builder: (context, _) {
+        final cart = CartService.instance;
+        final blocked = CartProductActions.blockReason(
+          part: part,
+          profile: profile,
+          cart: cart,
+        );
+        final line = CartProductActions.lineFor(part, cart);
+        final inCart = line != null;
+        final minimum = part.minOrderQtyEffective;
+        final label = inCart
+            ? 'En el carrito · ${line.quantity}'
+            : blocked != null
+                ? 'No disponible'
+                : 'Agregar al carrito';
+        final background = inCart ? theme.successBg : theme.brand;
+        final foreground = inCart ? theme.successFg : onBrand;
+        final hint = blocked ??
+            (inCart
+                ? '${line.quantity} uds. en el carrito. Mínimo $minimum.'
+                : 'Agrega $minimum uds., el mínimo de este producto.');
+        return Tooltip(
+          message: hint,
+          child: FilledButton.icon(
+            onPressed:
+                blocked != null || inCart ? null : () => _add(context, cart),
+            style: FilledButton.styleFrom(
+              backgroundColor: background,
+              foregroundColor: foreground,
+              disabledBackgroundColor: background,
+              disabledForegroundColor: foreground,
+              minimumSize: const Size.fromHeight(40),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            icon: LucideIcon(
+              inCart ? LucideGlyph.circleCheck : LucideGlyph.shoppingCart,
+              size: 16,
+              color: foreground,
+            ),
+            label: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Grilla compacta de la vitrina web. La foto queda baja para dejar
+/// nombre, categoría y USD / REF / Bs dentro de la ficha.
+class _WebStoreCardGrid extends StatelessWidget {
+  const _WebStoreCardGrid({
+    required this.maxWidth,
+    required this.itemCount,
+    required this.itemBuilder,
+  });
+
+  final double maxWidth;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+
+  static const imageHeight = 96.0;
+  static const bodyHeight = 276.0;
+  static const spacing = 12.0;
+
+  static int columnsFor(double width) {
+    if (width >= 1280) return 5;
+    if (width >= 1000) return 4;
+    return 3;
+  }
+
+  static double childAspectRatio(double tileWidth) {
+    final width = tileWidth <= 0 ? 1.0 : tileWidth;
+    return width / (imageHeight + bodyHeight);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cols = columnsFor(maxWidth);
+    final tileWidth =
+        cols <= 1 ? maxWidth : (maxWidth - spacing * (cols - 1)) / cols;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: cols,
+        mainAxisSpacing: spacing,
+        crossAxisSpacing: spacing,
+        childAspectRatio: childAspectRatio(tileWidth),
+      ),
+      itemCount: itemCount,
+      itemBuilder: itemBuilder,
+    );
+  }
+}
+
+class _WebStoreImagePlaceholder extends StatelessWidget {
+  const _WebStoreImagePlaceholder({required this.theme});
+
+  final B2BThemeExtension theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: theme.surfaceSubtle,
+      child: Center(
+        child: LucideIcon(
+          LucideGlyph.image,
+          size: 28,
+          color: theme.textMuted,
+        ),
       ),
     );
   }

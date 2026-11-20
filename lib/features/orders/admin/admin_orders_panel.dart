@@ -1109,8 +1109,9 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
 
   Widget _buildExpandedFooter(
     BuildContext context,
-    List<TransactionRequestModel> group,
-  ) {
+    List<TransactionRequestModel> group, {
+    bool includeTracking = true,
+  }) {
     if (group.length > 1) {
       final morosoFooter = _showMorosoChip && adminCheckoutGroupEsMoroso(group)
           ? AdminAliadoMorosidadActions(
@@ -1138,6 +1139,7 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
         onEliminarPedido: (r) => _eliminarPedido(context, r),
         deleteBusyId: _deletePedidoBusyId,
         morosidadFooter: morosoFooter,
+        includeTracking: includeTracking,
       );
     }
 
@@ -1367,6 +1369,8 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
     List<TransactionRequestModel> group,
   ) {
     final expandKey = checkoutGroupExpandKey(group);
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     return AdminExpandableOrderCard(
       key: ValueKey<String>('admin-order-detail-card-$expandKey'),
       workspaceDetail: true,
@@ -1375,7 +1379,11 @@ class _AdminOrdersPanelState extends State<AdminOrdersPanel> {
       expanded: true,
       onToggle: () => setState(() => _expandedRequestId = null),
       statusLabel: adminCheckoutGroupStatusLabel(group),
-      expandedFooter: _buildExpandedFooter(context, group),
+      expandedFooter: _buildExpandedFooter(
+        context,
+        group,
+        includeTracking: !desktop,
+      ),
       onRequestMutated: _load,
     );
   }

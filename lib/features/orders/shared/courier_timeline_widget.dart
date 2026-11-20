@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'b2b_orders_panel_layout.dart';
 import 'order_list_colors.dart';
@@ -124,6 +125,13 @@ String _listoParaDespachoSubtitle(TransactionRequestModel r) {
   return 'Listo para despacho; adjunte factura si aún no lo hizo antes de marcar en tránsito.';
 }
 
+/// Escritorio: `20/11/2026 3:06 PM`. El panel estrecho conserva la hora de 24 h.
+String _timelineStamp(BuildContext context, DateTime? at) {
+  final desktop =
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  return desktop ? formatEsShortDateTime12h(at) : formatEsShortDateTime(at);
+}
+
 /// Línea de tiempo visual estilo courier (FedEx/DHL) para el ciclo logístico del pedido.
 class CourierTimelineWidget extends StatelessWidget {
   const CourierTimelineWidget({
@@ -137,6 +145,9 @@ class CourierTimelineWidget extends StatelessWidget {
 
     /// Dentro de una sección colapsable: sin caja blanca ni sombra extra.
     this.embedded = false,
+
+    /// La barra lineal. En el detalle web ya la cubre el stepper de fases.
+    this.showProgressBar = true,
   });
 
   final TransactionRequestModel request;
@@ -150,6 +161,9 @@ class CourierTimelineWidget extends StatelessWidget {
 
   /// Sin decoración exterior cuando ya está dentro de otra tarjeta.
   final bool embedded;
+
+  /// Si es false, solo se listan los hitos (la barra vive en el stepper).
+  final bool showProgressBar;
 
   Future<void> _openMaps(BuildContext context, String url) async {
     final uri = Uri.tryParse(url.trim());
@@ -175,7 +189,7 @@ class CourierTimelineWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = request;
     if (r.status == TransactionRequestStatus.rechazado) {
-      return _rejectedCard(r, showHeading: showHeading);
+      return _rejectedCard(context, r, showHeading: showHeading);
     }
     final theme = OrderListColors.of(context).theme;
 
@@ -241,13 +255,15 @@ class CourierTimelineWidget extends StatelessWidget {
     final timelineBody = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProgressBar(
-          steps: steps,
-          compact: compact,
-          progressValue: barProgress,
-          showStepIcons: !embedded,
-        ),
-        SizedBox(height: compact ? 10 : 14),
+        if (showProgressBar) ...[
+          _ProgressBar(
+            steps: steps,
+            compact: compact,
+            progressValue: barProgress,
+            showStepIcons: !embedded,
+          ),
+          SizedBox(height: compact ? 10 : 14),
+        ],
         ...List.generate(steps.length, (i) {
           final s = steps[i];
           return Column(
@@ -312,7 +328,11 @@ class CourierTimelineWidget extends StatelessWidget {
     );
   }
 
-  Widget _rejectedCard(TransactionRequestModel r, {required bool showHeading}) {
+  Widget _rejectedCard(
+    BuildContext context,
+    TransactionRequestModel r, {
+    required bool showHeading,
+  }) {
     final cancel = r.canceladoPorAliado;
     final cancelImp = r.canceladoPorImportador;
     final m = r.aliadoCancelacionMotivo;
@@ -350,15 +370,15 @@ class CourierTimelineWidget extends StatelessWidget {
                       child: Text(
                         anulM
                             ? 'Pedido anulado por B2B Conecta · '
-                                '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
+                                '${_timelineStamp(context, r.atRechazado ?? r.updatedAt)}'
                             : (cancelImp
                                 ? 'Pedido cancelado por proveedor · '
-                                    '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
+                                    '${_timelineStamp(context, r.atRechazado ?? r.updatedAt)}'
                                 : (cancel
                                     ? 'Solicitud cancelada · '
-                                        '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}'
+                                        '${_timelineStamp(context, r.atRechazado ?? r.updatedAt)}'
                                     : 'Pedido rechazado · '
-                                        '${formatEsShortDateTime(r.atRechazado ?? r.updatedAt)}')),
+                                        '${_timelineStamp(context, r.atRechazado ?? r.updatedAt)}')),
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
@@ -551,7 +571,7 @@ class _StepRow extends StatelessWidget {
               if (s.at != null) ...[
                 const SizedBox(height: 2),
                 Text(
-                  formatEsShortDateTime(s.at),
+                  _timelineStamp(context, s.at),
                   style: TextStyle(
                     fontSize: subSize,
                     fontWeight: FontWeight.w600,

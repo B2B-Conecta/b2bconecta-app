@@ -393,9 +393,7 @@ class CatalogImportValidator {
       stock: stock,
       minOrderQty: minOrderQty,
       description: _nullable(readField(CatalogImportField.description.key)),
-      category: rawCategory == null
-          ? null
-          : classifyCatalogProduct(rawCategory, name) ?? rawCategory,
+      category: classifyCatalogProduct(rawCategory, name) ?? 'Accesorios',
       compatibility: _nullable(readField(CatalogImportField.compatibility.key)),
       imageUrl: _nullable(readField(CatalogImportField.imageUrl.key)),
       salePriceUsd: sale,

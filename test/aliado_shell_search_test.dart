@@ -27,12 +27,7 @@ void main() {
     final typed = MainShellTabController.consumeAliadoCatalogRequest()!;
     expect(typed.filters.searchQuery, 'bujia');
     expect(typed.openFilters, isFalse);
-
-    await tester.tap(find.byTooltip('Filtros rápidos'));
-    await tester.pump();
-    final filters = MainShellTabController.consumeAliadoCatalogRequest()!;
-    expect(filters.filters.searchQuery, 'bujia');
-    expect(filters.openFilters, isTrue);
+    expect(find.byTooltip('Filtros rápidos'), findsNothing);
   });
 
   testWidgets('focus shows suggestions and enter selects the highlighted one',

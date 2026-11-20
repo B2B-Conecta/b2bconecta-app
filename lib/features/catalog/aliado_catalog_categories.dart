@@ -9,6 +9,8 @@ class AliadoCatalogCategoryGroup {
     required this.label,
     required this.values,
     this.children = const [],
+    this.hasInventory = true,
+    this.productIds = const [],
   });
 
   /// Texto que ve el aliado en el filtro.
@@ -17,6 +19,12 @@ class AliadoCatalogCategoryGroup {
   /// Valores reales de `products.category` que entran en el grupo.
   final List<String> values;
   final List<AliadoCatalogCategoryGroup> children;
+
+  /// Hay productos publicados de esta familia o subcategoría.
+  final bool hasInventory;
+
+  /// Productos activos con stock que caen en este nodo. Solo lo llena la web.
+  final List<String> productIds;
 }
 
 /// Construye familias y subcategorías solo con valores presentes en vitrina.
@@ -45,6 +53,172 @@ List<AliadoCatalogCategoryGroup> catalogCategoryFamilies(Iterable<String> raw) {
           ],
         ),
   ];
+}
+
+/// Familias de la tienda web. Un texto vacío, desconocido o de proveedor
+/// entra en una familia de [catalogTaxonomy]; si no hay match, en Accesorios.
+List<AliadoCatalogCategoryGroup> webStoreCategoryFamilies(
+  Iterable<String> raw, {
+  bool includeEmpty = false,
+}) {
+  final familyValues = <String, Set<String>>{};
+  final childValues = <String, Set<String>>{};
+  for (final value in raw) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) continue;
+    final path = classifyCatalogProduct(trimmed, trimmed) ?? 'Accesorios';
+    final family = categoryFamily(path);
+    final resolvedFamily =
+        catalogTaxonomy.containsKey(family) ? family : 'Accesorios';
+    final resolvedPath =
+        resolvedFamily == family ? path : 'Accesorios';
+    (familyValues[resolvedFamily] ??= <String>{}).add(trimmed);
+    if (resolvedPath != resolvedFamily) {
+      (childValues[resolvedPath] ??= <String>{}).add(trimmed);
+    }
+  }
+
+  return [
+    for (final entry in catalogTaxonomy.entries)
+      if (includeEmpty || (familyValues[entry.key]?.isNotEmpty ?? false))
+        AliadoCatalogCategoryGroup(
+          label: entry.key,
+          hasInventory: familyValues[entry.key]?.isNotEmpty ?? false,
+          values: [
+            ...(familyValues[entry.key] ?? const <String>{}),
+            if (includeEmpty && (familyValues[entry.key]?.isEmpty ?? true))
+              entry.key,
+          ],
+          children: [
+            for (final child in entry.value)
+              if (includeEmpty ||
+                  childValues.containsKey(categoryPath(entry.key, child)))
+                AliadoCatalogCategoryGroup(
+                  label: categoryPath(entry.key, child),
+                  hasInventory: childValues
+                      .containsKey(categoryPath(entry.key, child)),
+                  values: childValues[categoryPath(entry.key, child)]
+                          ?.toList() ??
+                      [categoryPath(entry.key, child)],
+                ),
+          ],
+        ),
+  ];
+}
+
+/// Producto publicado que la web usa para contar y filtrar por taxonomía.
+class WebCatalogStockItem {
+  const WebCatalogStockItem({
+    required this.id,
+    required this.name,
+    this.description = '',
+    this.sku = '',
+    this.category = '',
+  });
+
+  final String id;
+  final String name;
+  final String description;
+  final String sku;
+  final String category;
+
+  String get resolvedPath =>
+      classifyCatalogProduct(
+        category,
+        name,
+        description: description,
+        sku: sku,
+      ) ??
+      'Accesorios';
+}
+
+/// Familias web contadas con la misma clasificación que el listado.
+List<AliadoCatalogCategoryGroup> webStoreCategoryFamiliesFromStock(
+  Iterable<WebCatalogStockItem> items, {
+  bool includeEmpty = false,
+}) {
+  final familyItems = <String, List<WebCatalogStockItem>>{};
+  final childItems = <String, List<WebCatalogStockItem>>{};
+  for (final item in items) {
+    final path = item.resolvedPath;
+    final family = categoryFamily(path);
+    final resolvedFamily =
+        catalogTaxonomy.containsKey(family) ? family : 'Accesorios';
+    final resolvedPath = resolvedFamily == family ? path : 'Accesorios';
+    (familyItems[resolvedFamily] ??= []).add(item);
+    if (resolvedPath != resolvedFamily) {
+      (childItems[resolvedPath] ??= []).add(item);
+    }
+  }
+
+  List<String> idsOf(List<WebCatalogStockItem> rows) =>
+      [for (final row in rows) row.id];
+
+  List<String> storedCategories(
+    List<WebCatalogStockItem> rows,
+    String fallback,
+  ) {
+    final values = <String>[];
+    for (final row in rows) {
+      final value = row.category.trim();
+      if (value.isEmpty || values.contains(value)) continue;
+      values.add(value);
+    }
+    return values.isEmpty ? [fallback] : values;
+  }
+
+  return [
+    for (final entry in catalogTaxonomy.entries)
+      if (includeEmpty || (familyItems[entry.key]?.isNotEmpty ?? false))
+        AliadoCatalogCategoryGroup(
+          label: entry.key,
+          hasInventory: familyItems[entry.key]?.isNotEmpty ?? false,
+          productIds: idsOf(familyItems[entry.key] ?? const []),
+          values: storedCategories(
+            familyItems[entry.key] ?? const [],
+            entry.key,
+          ),
+          children: [
+            for (final child in entry.value)
+              if (includeEmpty ||
+                  (childItems[categoryPath(entry.key, child)]?.isNotEmpty ??
+                      false))
+                AliadoCatalogCategoryGroup(
+                  label: categoryPath(entry.key, child),
+                  hasInventory: childItems[categoryPath(entry.key, child)]
+                          ?.isNotEmpty ??
+                      false,
+                  productIds: idsOf(
+                    childItems[categoryPath(entry.key, child)] ?? const [],
+                  ),
+                  values: storedCategories(
+                    childItems[categoryPath(entry.key, child)] ?? const [],
+                    categoryPath(entry.key, child),
+                  ),
+                ),
+          ],
+        ),
+  ];
+}
+
+/// IDs clasificados en la familia o subcategoría elegida. Vacío = sin recorte.
+List<String> webProductIdsForSelection(
+  List<AliadoCatalogCategoryGroup> families,
+  String? selection,
+) {
+  if (selection == null ||
+      selection.trim().isEmpty ||
+      selection == kAliadoCatalogAllCategoriesLabel) {
+    return const [];
+  }
+  final canonical = canonicalCatalogCategory(selection) ?? selection;
+  for (final family in families) {
+    if (family.label == canonical) return family.productIds;
+    for (final child in family.children) {
+      if (child.label == canonical) return child.productIds;
+    }
+  }
+  return const [];
 }
 
 List<String> catalogValuesForSelection(

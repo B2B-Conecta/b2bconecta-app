@@ -16,10 +16,14 @@ class OwnerAccountDossier extends StatelessWidget {
     this.title,
     this.showAuthEmail = true,
     this.isSelf = false,
+    this.roleLabel,
   });
 
   final ProfileModel profile;
   final String? title;
+
+  /// Sustituye la etiqueta de rol. Si es null, se usa [ProfileRoleLabels].
+  final String? roleLabel;
 
   /// Mostrar correo de acceso (Auth / ficha). En Cuentas admin: true.
   final bool showAuthEmail;
@@ -60,7 +64,9 @@ class OwnerAccountDossier extends StatelessWidget {
         _PlainRow(
           label: 'Rol',
           value: [
-            ProfileRoleLabels.labelEs(profile.role),
+            roleLabel?.trim().isNotEmpty == true
+                ? roleLabel!.trim()
+                : ProfileRoleLabels.labelEs(profile.role),
             if (isSelf) 'su cuenta',
           ].join(' · '),
         ),

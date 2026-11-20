@@ -23,6 +23,7 @@ import 'package:motolink_pro_app/core/layout/b2b_data_table_shell.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/widgets/admin_crud_toast.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/admin_account_dossier_rail_web.dart';
 import 'package:motolink_pro_app/features/admin/admin_standard_filter_bar.dart';
 import 'package:motolink_pro_app/features/admin/add_user_modal.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
@@ -465,6 +466,22 @@ class _AdminAccountManagementPanelState
     );
   }
 
+  Future<void> _applyB2bRole(ProfileModel p, String next) async {
+    final role = p.role?.trim().toLowerCase();
+    if (_busyId == p.id || next == role) return;
+    final done = await _runBusy(p, () async {
+      await SupabaseService.ownerSetProfileRole(
+        profileId: p.id,
+        role: next,
+      );
+    });
+    if (!mounted || !done) return;
+    AdminCrudToast.success(
+      context,
+      'Rol actualizado a «${ProfileRoleLabels.labelEs(next)}».',
+    );
+  }
+
   /// Única acción del panel lateral: alternar Minorista ↔ Mayorista.
   Widget _previewRoleToggle(ProfileModel p) {
     final role = p.role?.trim().toLowerCase();
@@ -697,66 +714,24 @@ class _AdminAccountManagementPanelState
             if (preview != null) ...[
               const VerticalDivider(width: 1),
               SizedBox(
-                width: 380,
-                child: Material(
-                  color: AdminUsersChrome.cardColor,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              preview.businessName?.trim().isNotEmpty == true
-                                  ? preview.businessName!.trim()
-                                  : (preview.email ?? 'Sin nombre'),
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AdminUsersChrome.titleColor,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Cerrar',
-                            onPressed: () =>
-                                setState(() => _previewProfileId = null),
-                            icon: LucideIcon(
-                              LucideGlyph.close,
-                              size: 18,
-                              color: AdminUsersChrome.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      OwnerAccountDossier(
-                        profile: preview,
-                        isSelf: preview.id == widget.viewer.id,
-                      ),
-                      OwnerEntrepreneurControlPanel(
-                        profile: preview,
-                        onChanged: () {
-                          unawaited(_load());
-                        },
-                        onDeactivate: _canOperate(preview)
-                            ? () => _deactivate(preview)
-                            : null,
-                        onHardDelete: widget.viewer.isOwner
-                            ? () => _hardDelete(preview)
-                            : null,
-                      ),
-                      OwnerAccountKycDossierSection(
-                        profile: preview,
-                        viewerRole: widget.viewer.role,
-                        onChanged: () {
-                          if (mounted) setState(() {});
-                        },
-                      ),
-                      _previewRoleToggle(preview),
-                    ],
-                  ),
+                width: 400,
+                child: AdminAccountDossierRailWeb(
+                  profile: preview,
+                  isSelf: preview.id == widget.viewer.id,
+                  viewerRole: widget.viewer.role,
+                  canChangeRole: _canChangeRole(preview),
+                  busy: _busyId == preview.id,
+                  onClose: () => setState(() => _previewProfileId = null),
+                  onSetRole: (role) => _applyB2bRole(preview, role),
+                  onChanged: () {
+                    unawaited(_load());
+                  },
+                  onDeactivate: _canOperate(preview)
+                      ? () => _deactivate(preview)
+                      : null,
+                  onHardDelete: widget.viewer.isOwner
+                      ? () => _hardDelete(preview)
+                      : null,
                 ),
               ),
             ],

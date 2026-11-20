@@ -16,6 +16,8 @@ import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
+part 'admin_promo_campaign_editor_web.dart';
+
 String _formatPromoDate(DateTime d) {
   final local = d.toLocal();
   return formatEsShortDateTime(
@@ -88,6 +90,7 @@ class _AdminPromoCampaignsPanelState extends State<AdminPromoCampaignsPanel> {
     final saved = await showAdaptiveAdminSheet<bool>(
       context: context,
       showDragHandle: false,
+      desktopMaxWidth: 920,
       builder: (ctx, _) => _PromoCampaignEditorSheet(
         existing: existing,
         importers: _importers,
@@ -845,8 +848,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
 
   void _close() => Navigator.of(context).pop();
 
+  void _desktopSet(VoidCallback fn) => setState(fn);
+
   @override
   Widget build(BuildContext context) {
+    if (isAdminDesktopLayout(context)) {
+      return buildDesktopPromoEditor(context);
+    }
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 8, 20, bottom + 20),

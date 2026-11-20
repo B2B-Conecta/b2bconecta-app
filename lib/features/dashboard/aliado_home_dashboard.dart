@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../core/layout/app_breakpoints.dart';
 import '../../core/widgets/aliado_header_search.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -28,6 +32,7 @@ import '../catalog/catalog_route_lock.dart';
 import '../catalog/importer_store_profile_screen.dart';
 import '../catalog/part_model.dart';
 import '../catalog/product_detail_screen.dart';
+import '../catalog/promo_banner_layout.dart';
 import '../catalog/promo_campaign_model.dart';
 import '../catalog/recent_product_views.dart';
 import '../catalog/store_supplier_chat.dart';
@@ -81,7 +86,16 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
     }
   }
 
-  Future<AliadoHomeData> _load() => (widget.loader ?? AliadoHomeService.load)();
+  Future<AliadoHomeData> _load() async {
+    final data = await (widget.loader ?? AliadoHomeService.load)();
+    if (!widget.embedInDesktopShell || widget.loader != null) return data;
+    try {
+      final stock = await CatalogService.fetchWebCatalogStockIndex();
+      return data.withWebStock(stock);
+    } catch (_) {
+      return data;
+    }
+  }
 
   @override
   void didUpdateWidget(covariant AliadoHomeDashboard oldWidget) {
@@ -126,10 +140,55 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
   void _promotion(PromoCampaignModel campaign) =>
       MainShellTabController.navigateToAliadoCatalog(campaign: campaign);
 
-  void _openCategory(AliadoCatalogCategoryGroup group) => _catalog(
-      CatalogFilters(category: group.label, categoryAnyOf: group.values));
+  void _openCategory(
+    AliadoCatalogCategoryGroup group, {
+    bool includeBlankCategory = false,
+  }) =>
+      _catalog(CatalogFilters(
+        category: group.label,
+        categoryAnyOf:
+            group.productIds.isEmpty ? group.values : const [],
+        productIds: group.productIds,
+        includeBlankCategory:
+            includeBlankCategory && group.productIds.isEmpty,
+      ));
 
-  void _categories(AliadoHomeData data) => showModalBottomSheet<void>(
+  bool get _categorySheetIsDesktop =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+  Widget _categorySheetTitle(String text, {required bool inStock, String? badge}) {
+    if (!_categorySheetIsDesktop || inStock) return Text(text);
+    return Row(
+      children: [
+        Flexible(
+          child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
+        _WebStockBadge(label: badge ?? 'Sin stock'),
+      ],
+    );
+  }
+
+  String? _categorySheetNote({required bool inStock, required bool child}) {
+    if (!_categorySheetIsDesktop || inStock) return null;
+    return child
+        ? '0 disponibles. No hay inventario en esta subcategoría por ahora.'
+        : 'No hay inventario disponible por ahora.';
+  }
+
+  void _categories(
+    AliadoHomeData data, {
+    List<AliadoCatalogCategoryGroup>? groups,
+    bool includeBlankAccessories = false,
+  }) {
+    if (widget.embedInDesktopShell) {
+      _showWebCategoryDialog(
+        groups: groups ?? data.categories,
+        includeBlankAccessories: includeBlankAccessories,
+      );
+      return;
+    }
+    showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -154,18 +213,37 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                       ])),
                   Expanded(
                       child: ListView(children: [
-                    for (final group in data.categories)
+                    for (final group in groups ?? data.categories)
                       if (group.children.isEmpty)
                         ListTile(
                           leading: CatalogCategoryIcon(
                             art: CatalogCategoryArt.forLabel(group.label),
                             size: 24,
                           ),
-                          title: Text(catalogCategoryDisplayLabel(group.label)),
+                          title: _categorySheetTitle(
+                            catalogCategoryDisplayLabel(group.label),
+                            inStock: group.hasInventory,
+                          ),
+                          subtitle: _categorySheetNote(
+                                    inStock: group.hasInventory,
+                                    child: false,
+                                  ) ==
+                                  null
+                              ? null
+                              : Text(
+                                  _categorySheetNote(
+                                    inStock: group.hasInventory,
+                                    child: false,
+                                  )!,
+                                ),
                           trailing: const _HomeAngle(),
                           onTap: () {
                             Navigator.pop(sheetContext);
-                            _openCategory(group);
+                            _openCategory(
+                              group,
+                              includeBlankCategory: includeBlankAccessories &&
+                                  group.label == 'Accesorios',
+                            );
                           },
                         )
                       else
@@ -174,7 +252,10 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                             art: CatalogCategoryArt.forLabel(group.label),
                             size: 24,
                           ),
-                          title: Text(catalogCategoryDisplayLabel(group.label)),
+                          title: _categorySheetTitle(
+                            catalogCategoryDisplayLabel(group.label),
+                            inStock: group.hasInventory,
+                          ),
                           children: [
                             for (final option in [group, ...group.children])
                               ListTile(
@@ -185,12 +266,36 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                                     ? const CatalogCategoryIcon(
                                         art: CatalogCategoryArt.oil, size: 20)
                                     : null,
-                                title: Text(identical(option, group)
-                                    ? 'Ver todo en ${catalogCategoryDisplayLabel(group.label)}'
-                                    : categoryLeaf(option.label)),
+                                title: _categorySheetTitle(
+                                  identical(option, group)
+                                      ? 'Ver todo en ${catalogCategoryDisplayLabel(group.label)}'
+                                      : categoryLeaf(option.label),
+                                  inStock: option.hasInventory,
+                                  badge: identical(option, group)
+                                      ? 'Sin stock'
+                                      : '0 disponibles',
+                                ),
+                                subtitle: _categorySheetNote(
+                                          inStock: option.hasInventory,
+                                          child: !identical(option, group),
+                                        ) ==
+                                        null
+                                    ? null
+                                    : Text(
+                                        _categorySheetNote(
+                                          inStock: option.hasInventory,
+                                          child: !identical(option, group),
+                                        )!,
+                                      ),
                                 onTap: () {
                                   Navigator.pop(sheetContext);
-                                  _openCategory(option);
+                                  _openCategory(
+                                    option,
+                                    includeBlankCategory:
+                                        includeBlankAccessories &&
+                                            identical(option, group) &&
+                                            group.label == 'Accesorios',
+                                  );
                                 },
                               ),
                           ],
@@ -198,6 +303,7 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                   ])),
                 ]),
           )));
+  }
 
   @override
   Widget build(BuildContext context) {

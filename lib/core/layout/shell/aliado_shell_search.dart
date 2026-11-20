@@ -37,7 +37,6 @@ class AliadoShellSearch extends StatefulWidget {
   const AliadoShellSearch({
     super.key,
     required this.focusNode,
-    this.showFilters = true,
     this.profile,
     this.controller,
     this.recentSearches,
@@ -45,9 +44,6 @@ class AliadoShellSearch extends StatefulWidget {
   });
 
   final FocusNode focusNode;
-
-  /// El botón de filtros no se muestra en Inicio.
-  final bool showFilters;
 
   final ProfileModel? profile;
   final AliadoShellSearchController? controller;
@@ -541,8 +537,8 @@ class _AliadoShellSearchState extends State<AliadoShellSearch> {
     return Align(
       alignment: Alignment.topLeft,
       child: ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: widget.showFilters ? 648 : 600,
+      constraints: const BoxConstraints(
+        maxWidth: 600,
         maxHeight: 44,
       ),
       child: Row(
@@ -637,27 +633,6 @@ class _AliadoShellSearchState extends State<AliadoShellSearch> {
             ),
           ),
         ),
-        if (widget.showFilters) ...[
-          const SizedBox(width: 8),
-          Tooltip(
-            message: 'Filtros rápidos',
-            child: FilledButton(
-              onPressed: () => _search(openFilters: true),
-              style: FilledButton.styleFrom(
-                backgroundColor: B2BBrandHero.start,
-                foregroundColor: B2BBrandHero.foreground,
-                minimumSize: const Size(40, 40),
-                padding: EdgeInsets.zero,
-                shape: const CircleBorder(),
-              ),
-              child: const LucideIcon(
-                LucideGlyph.slidersHorizontal,
-                size: 18,
-                color: B2BBrandHero.foreground,
-              ),
-            ),
-          ),
-        ],
       ]),
       ),
     );

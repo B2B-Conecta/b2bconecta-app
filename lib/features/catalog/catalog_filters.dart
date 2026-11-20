@@ -21,6 +21,8 @@ class CatalogFilters {
     this.onlyEnvioIncluido = false,
     this.category,
     this.categoryAnyOf = const [],
+    this.productIds = const [],
+    this.includeBlankCategory = false,
     this.brandField,
   });
 
@@ -76,6 +78,13 @@ class CatalogFilters {
 
   /// Varias escrituras de la misma categoría (singular, plural o typo).
   final List<String> categoryAnyOf;
+
+  /// Productos ya clasificados por la web. Si viene lleno, manda sobre
+  /// [category] y [categoryAnyOf].
+  final List<String> productIds;
+
+  /// Incluye productos con categoría vacía. Solo lo pide Inicio web en Accesorios.
+  final bool includeBlankCategory;
   final MapEntry<String, String>? brandField;
 
   static const CatalogFilters empty = CatalogFilters(onlyActiveProducts: true);
@@ -119,6 +128,7 @@ class CatalogFilters {
         onlyEnvioIncluido ||
         (category != null && category!.trim().isNotEmpty) ||
         categoryAnyOf.isNotEmpty ||
+        productIds.isNotEmpty ||
         brandField != null ||
         sortMode != CatalogSortMode.defaultMode;
   }
@@ -151,6 +161,8 @@ class CatalogFilters {
     bool? onlyEnvioIncluido,
     String? category,
     List<String>? categoryAnyOf,
+    List<String>? productIds,
+    bool? includeBlankCategory,
     bool clearSortReference = false,
     bool clearMinOwnerRatingAvg = false,
     bool clearMinOwnerRatingCount = false,
@@ -183,6 +195,10 @@ class CatalogFilters {
       category: clearCategory ? null : (category ?? this.category),
       categoryAnyOf:
           clearCategory ? const [] : (categoryAnyOf ?? this.categoryAnyOf),
+      productIds: clearCategory ? const [] : (productIds ?? this.productIds),
+      includeBlankCategory: clearCategory
+          ? false
+          : (includeBlankCategory ?? this.includeBlankCategory),
       brandField: brandField,
     );
   }

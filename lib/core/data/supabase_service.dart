@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/admin/incomplete_signup_row.dart';
 import 'package:motolink_pro_app/features/admin/admin_user_activity_row_model.dart';
 import 'package:motolink_pro_app/features/admin/user_presence.dart';
 import 'package:motolink_pro_app/features/catalog/importer_daily_store_notice.dart';
+import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_profile.dart';
@@ -288,6 +289,9 @@ class SupabaseService {
 
   static Future<List<String>> fetchAliadoCatalogCategories() =>
       CatalogService.fetchAliadoCatalogCategories();
+
+  static Future<List<WebCatalogStockItem>> fetchWebCatalogStockIndex() =>
+      CatalogService.fetchWebCatalogStockIndex();
 
   static Future<PartModel?> fetchVisibleImporterStoreProduct({
     required String importerId,

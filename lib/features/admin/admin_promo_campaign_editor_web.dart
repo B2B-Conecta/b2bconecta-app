@@ -233,6 +233,13 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
               ? 'Subir escritorio'
               : 'Cambiar escritorio',
           onUpload: _uploading || _saving ? null : () => _pickImage(),
+          onDownload: _imageUrl == null ||
+                  _uploading ||
+                  _saving ||
+                  _downloadingCreative != null
+              ? null
+              : () => _downloadCreative(_imageUrl!, mobile: false),
+          downloading: _downloadingCreative == 'desktop',
           emptyGlyph: LucideGlyph.image,
         ),
         const SizedBox(height: 14),
@@ -250,7 +257,15 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
           buttonLabel: _mobileImageUrl == null
               ? 'Subir móvil'
               : 'Cambiar móvil',
-          onUpload: _uploading || _saving ? null : () => _pickImage(mobile: true),
+          onUpload:
+              _uploading || _saving ? null : () => _pickImage(mobile: true),
+          onDownload: _mobileImageUrl == null ||
+                  _uploading ||
+                  _saving ||
+                  _downloadingCreative != null
+              ? null
+              : () => _downloadCreative(_mobileImageUrl!, mobile: true),
+          downloading: _downloadingCreative == 'mobile',
           onClear: _mobileImageUrl == null || _uploading || _saving
               ? null
               : () => _desktopSet(() {
@@ -658,6 +673,59 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
     );
   }
 
+  Future<void> _downloadCreative(String url, {required bool mobile}) async {
+    if (_downloadingCreative != null) return;
+    final slot = mobile ? 'mobile' : 'desktop';
+    _desktopSet(() => _downloadingCreative = slot);
+    final fileName = _creativeDownloadName(mobile: mobile, url: url);
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('status');
+      }
+      final ext = storedFileExtension(fileName, url);
+      final safeExt = ext.isEmpty ? 'jpg' : ext;
+      final result = await saveBytesForExport(
+        name: storedFileBaseName(fileName, safeExt),
+        bytes: response.bodyBytes,
+        ext: safeExt,
+        mimeType: storedFileMimeType(safeExt),
+      );
+      if (!mounted || result == ExcelExportResult.cancelled) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Imagen descargada.')),
+      );
+    } catch (_) {
+      try {
+        await downloadStoredFile(url, fileName);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Imagen descargada.')),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo descargar la imagen.')),
+        );
+      }
+    } finally {
+      if (mounted) _desktopSet(() => _downloadingCreative = null);
+    }
+  }
+
+  String _creativeDownloadName({required bool mobile, required String url}) {
+    final raw = _internalTitleCtrl.text.trim();
+    final slug = raw
+        .replaceAll(RegExp(r'[\\/]+'), '-')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final slot = mobile ? 'movil' : 'escritorio';
+    final ext = storedFileExtension('', url);
+    final safeExt = ext.isEmpty ? 'jpg' : ext;
+    final base = slug.isEmpty ? 'valla' : slug;
+    return 'valla-$slot-$base.$safeExt';
+  }
+
   Widget _creativeCard(
     B2BThemeExtension theme, {
     required String title,
@@ -669,6 +737,8 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
     required String buttonLabel,
     required VoidCallback? onUpload,
     required LucideGlyph emptyGlyph,
+    VoidCallback? onDownload,
+    bool downloading = false,
     VoidCallback? onClear,
   }) {
     final hasImage = url != null && url.isNotEmpty;
@@ -741,33 +811,62 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
               ),
             ],
             const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: onUpload,
-                icon: _uploading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onUpload,
+                  icon: _uploading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: B2BBrandHero.start,
+                          ),
+                        )
+                      : const LucideIcon(
+                          LucideGlyph.image,
+                          size: 16,
                           color: B2BBrandHero.start,
                         ),
-                      )
-                    : const LucideIcon(
-                        LucideGlyph.image,
-                        size: 16,
-                        color: B2BBrandHero.start,
-                      ),
-                label: Text(buttonLabel),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: B2BBrandHero.start,
-                  side: const BorderSide(color: B2BBrandHero.start),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  label: Text(buttonLabel),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: B2BBrandHero.start,
+                    side: const BorderSide(color: B2BBrandHero.start),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-              ),
+                if (hasImage)
+                  OutlinedButton.icon(
+                    onPressed: onDownload,
+                    icon: downloading
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.textPrimary,
+                            ),
+                          )
+                        : LucideIcon(
+                            LucideGlyph.download,
+                            size: 16,
+                            color: theme.textPrimary,
+                          ),
+                    label: const Text('Descargar'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.textPrimary,
+                      side: BorderSide(color: theme.borderStrong),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             if (onClear != null)
               Align(

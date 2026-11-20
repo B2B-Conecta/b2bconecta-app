@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:motolink_pro_app/features/admin/promo_banner_crop_sheet.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
@@ -12,6 +13,9 @@ import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/adaptive_admin_sheet.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
+import 'package:motolink_pro_app/core/utils/stored_file_actions.dart';
+import 'package:motolink_pro_app/core/utils/stored_file_name.dart';
 import 'package:motolink_pro_app/core/utils/upload_file_guard.dart';
 import 'package:motolink_pro_app/core/widgets/app_date_picker.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
@@ -445,6 +449,7 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
   String? _uploadError;
   bool _uploading = false;
   bool _saving = false;
+  String? _downloadingCreative;
 
   bool get _isThirdParty => _sponsorType == PromoCampaignModel.sponsorTercero;
 
@@ -1304,6 +1309,22 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                   ? 'Subir y recortar escritorio'
                   : 'Cambiar y recortar escritorio'),
             ),
+            if (_imageUrl != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _uploading || _saving || _downloadingCreative != null
+                    ? null
+                    : () => _downloadCreative(_imageUrl!, mobile: false),
+                icon: _downloadingCreative == 'desktop'
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_outlined),
+                label: const Text('Descargar'),
+              ),
+            ],
             const SizedBox(height: 16),
             Text(
               _mobileImageWidth != null && _mobileImageHeight != null
@@ -1341,6 +1362,21 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
                     ? 'Subir y recortar móvil'
                     : 'Cambiar y recortar móvil'),
               ),
+              if (_mobileImageUrl != null)
+                OutlinedButton.icon(
+                  onPressed:
+                      _uploading || _saving || _downloadingCreative != null
+                          ? null
+                          : () => _downloadCreative(_mobileImageUrl!, mobile: true),
+                  icon: _downloadingCreative == 'mobile'
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download_outlined),
+                  label: const Text('Descargar'),
+                ),
               if (_mobileImageUrl != null)
                 TextButton(
                   onPressed: _uploading || _saving

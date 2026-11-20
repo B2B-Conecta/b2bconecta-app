@@ -222,16 +222,16 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
         _creativeCard(
           theme,
           title: 'Banner escritorio',
-          spec: '2100 × 300 px · proporción 7:1',
-          note: 'Al subir se abre el recorte obligatorio 7:1.',
-          aspect: PromoBannerSpec.desktopAspect,
+          spec: '1320 × 493 px',
+          note: 'Al subir, la imagen se ajusta sola a 1320 × 493 px.',
+          aspect: PromoBannerSpec.webFrameAspect,
           url: _imageUrl,
           sizeLabel: _imageWidth != null && _imageHeight != null
               ? '$_imageWidth×$_imageHeight px'
               : null,
           buttonLabel: _imageUrl == null
-              ? 'Subir y recortar escritorio'
-              : 'Cambiar y recortar escritorio',
+              ? 'Subir escritorio'
+              : 'Cambiar escritorio',
           onUpload: _uploading || _saving ? null : () => _pickImage(),
           emptyGlyph: LucideGlyph.image,
         ),
@@ -240,15 +240,16 @@ extension _PromoCampaignEditorDesktop on _PromoCampaignEditorSheetState {
           theme,
           title: 'Banner móvil',
           spec: '1500 × 500 px · proporción 3:1 · opcional',
-          note: 'Opcional: si no se sube, se usará la imagen de escritorio.',
+          note:
+              'Opcional. Al subir, se ajusta a 1500 × 500 px. Si no se sube, se usará la imagen de escritorio.',
           aspect: PromoBannerSpec.mobileAspect,
           url: _mobileImageUrl,
           sizeLabel: _mobileImageWidth != null && _mobileImageHeight != null
               ? '$_mobileImageWidth×$_mobileImageHeight px'
               : null,
           buttonLabel: _mobileImageUrl == null
-              ? 'Subir y recortar móvil'
-              : 'Cambiar y recortar móvil',
+              ? 'Subir móvil'
+              : 'Cambiar móvil',
           onUpload: _uploading || _saving ? null : () => _pickImage(mobile: true),
           onClear: _mobileImageUrl == null || _uploading || _saving
               ? null

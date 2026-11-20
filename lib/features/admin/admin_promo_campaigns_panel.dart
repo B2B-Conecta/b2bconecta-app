@@ -625,21 +625,50 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
     }
 
     if (!mounted) return;
-    final cropped = await showPromoBannerCropSheet(
-      context: context,
-      imageBytes: checked.bytes,
-      mobile: mobile,
-    );
-    if (cropped == null || !mounted) return;
-
-    setState(() {
-      _uploading = true;
-      _uploadError = null;
-    });
+    final desktopEditor = isAdminDesktopLayout(context);
+    final PromoBannerCropResult prepared;
+    if (desktopEditor) {
+      setState(() {
+        _uploading = true;
+        _uploadError = null;
+      });
+      try {
+        await Future<void>.delayed(Duration.zero);
+        final size = mobile
+            ? PromoBannerSpec.mobileRecommended
+            : PromoBannerSpec.webFrameSize;
+        prepared = fitPromoBannerImage(
+          checked.bytes,
+          width: size.width.toInt(),
+          height: size.height.toInt(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _uploading = false;
+          _uploadError = e
+              .toString()
+              .replaceFirst(RegExp(r'^(Exception|FormatException): '), '');
+        });
+        return;
+      }
+    } else {
+      final cropped = await showPromoBannerCropSheet(
+        context: context,
+        imageBytes: checked.bytes,
+        mobile: mobile,
+      );
+      if (cropped == null || !mounted) return;
+      prepared = cropped;
+      setState(() {
+        _uploading = true;
+        _uploadError = null;
+      });
+    }
     try {
       final uploaded = await SupabaseService.uploadPromoCampaignImage(
-        bytes: cropped.bytes,
-        fileExtension: cropped.extension,
+        bytes: prepared.bytes,
+        fileExtension: prepared.extension,
         campaignId: widget.existing?.id,
       );
       if (!mounted) return;
@@ -647,13 +676,13 @@ class _PromoCampaignEditorSheetState extends State<_PromoCampaignEditorSheet> {
         if (mobile) {
           _mobileImagePath = uploaded.path;
           _mobileImageUrl = uploaded.publicUrl;
-          _mobileImageWidth = cropped.width;
-          _mobileImageHeight = cropped.height;
+          _mobileImageWidth = prepared.width;
+          _mobileImageHeight = prepared.height;
         } else {
           _imagePath = uploaded.path;
           _imageUrl = uploaded.publicUrl;
-          _imageWidth = cropped.width;
-          _imageHeight = cropped.height;
+          _imageWidth = prepared.width;
+          _imageHeight = prepared.height;
         }
         _uploadError = null;
       });

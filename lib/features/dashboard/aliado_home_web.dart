@@ -1546,7 +1546,10 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
     if (live.isEmpty) return _WebHomeHero(onCatalog: widget.onCatalog);
     final theme = B2BThemeExtension.of(context);
     final several = live.length > 1;
-    return MouseRegion(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: PromoBannerSpec.webFrameWidth),
+        child: MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: DecoratedBox(
@@ -1565,7 +1568,7 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
           borderRadius: BorderRadius.circular(16),
           clipBehavior: Clip.antiAlias,
           child: AspectRatio(
-            aspectRatio: PromoBannerSpec.desktopAspect,
+            aspectRatio: PromoBannerSpec.webFrameAspect,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1650,6 +1653,8 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
           ),
         ),
       ),
+        ),
+      ),
     );
   }
 }
@@ -1701,7 +1706,10 @@ class _WebHomeHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
-    return DecoratedBox(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: PromoBannerSpec.webFrameWidth),
+        child: DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -1717,7 +1725,7 @@ class _WebHomeHero extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: AspectRatio(
-          aspectRatio: 1024 / 382,
+          aspectRatio: PromoBannerSpec.webFrameAspect,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
@@ -1758,6 +1766,8 @@ class _WebHomeHero extends StatelessWidget {
               );
             },
           ),
+        ),
+      ),
         ),
       ),
     );

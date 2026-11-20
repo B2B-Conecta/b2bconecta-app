@@ -280,6 +280,7 @@ class AdminExpandableOrderCard extends StatelessWidget {
       child: TransactionRequestPartiesContactSection(
         request: lines.first,
         embedded: true,
+        orderLines: desktop ? lines : null,
       ),
     );
     final commission = orderCardCommissionSubtitle(lines) == null

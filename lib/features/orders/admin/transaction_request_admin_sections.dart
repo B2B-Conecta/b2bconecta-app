@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 import 'package:motolink_pro_app/features/payments/document_type_preference.dart';
 import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
+import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -67,10 +68,14 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
     super.key,
     required this.request,
     this.embedded = false,
+    this.orderLines,
   });
 
   final TransactionRequestModel request;
   final bool embedded;
+
+  /// Partidas del pedido. Solo el detalle web las pasa, para una tarjeta por importador.
+  final List<TransactionRequestModel>? orderLines;
 
   static String partiesSubtitle(TransactionRequestModel r) {
     final aliado = r.aliadoBusinessName?.trim();
@@ -100,29 +105,37 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
       showEntrepreneurBadge: r.aliadoEntrepreneurBadge,
       loadApprovedDocuments: !embedded,
     );
-    final importadorProfile = TransactionRequestCounterpartyProfileSection(
-      profileId: r.ownerId,
-      partyLabel: 'Importador',
-      businessName: r.ownerBusinessName,
-      rif: r.ownerRif,
-      phone: r.ownerPhone,
-      estado: r.ownerEstado,
-      ciudad: r.ownerCiudad,
-      direccion: r.ownerDireccion,
-      fiscalMapsUrl: r.ownerFiscalMapsUrl,
-      logoStoragePath: r.ownerLogoStoragePath,
-      kycStatus: r.ownerKycStatus,
-      catalogVerifiedAt: r.ownerCatalogVerifiedAt,
-      loadApprovedDocuments: false,
-    );
+    final importers = _importerAnchors();
+    final importadorCards = [
+      for (final line in importers)
+        TransactionRequestCounterpartyProfileSection(
+          key: ValueKey('party-importer-${line.ownerId}'),
+          profileId: line.ownerId,
+          partyLabel: 'Importador',
+          businessName: line.ownerBusinessName,
+          rif: line.ownerRif,
+          phone: line.ownerPhone,
+          estado: line.ownerEstado,
+          ciudad: line.ownerCiudad,
+          direccion: line.ownerDireccion,
+          fiscalMapsUrl: line.ownerFiscalMapsUrl,
+          logoStoragePath: line.ownerLogoStoragePath,
+          kycStatus: line.ownerKycStatus,
+          catalogVerifiedAt: line.ownerCatalogVerifiedAt,
+          loadApprovedDocuments: false,
+        ),
+    ];
 
+    final gap = importers.length > 1 ? 12.0 : 10.0;
     if (embedded) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           aliadoProfile,
-          const SizedBox(height: 10),
-          importadorProfile,
+          for (final card in importadorCards) ...[
+            SizedBox(height: gap),
+            card,
+          ],
         ],
       );
     }
@@ -140,10 +153,21 @@ class TransactionRequestPartiesContactSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         aliadoProfile,
-        const SizedBox(height: 10),
-        importadorProfile,
+        for (final card in importadorCards) ...[
+          const SizedBox(height: 10),
+          card,
+        ],
       ],
     );
+  }
+
+  /// Mismo orden que «Avance por proveedor». Sin [orderLines], queda el importador de [request].
+  List<TransactionRequestModel> _importerAnchors() {
+    final lines = orderLines;
+    if (lines == null || lines.isEmpty) return [request];
+    final groups = groupCheckoutLinesByImportador(lines);
+    if (groups.isEmpty) return [request];
+    return [for (final group in groups) group.first];
   }
 }
 

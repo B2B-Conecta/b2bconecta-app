@@ -17,11 +17,16 @@ enum ShellUserMenuAction {
 
 /// Nombre visible + badge de rol para el footer de cuenta.
 abstract final class ShellUserIdentity {
+  /// Nombre de la cuenta en el shell.
+  ///
+  /// Siempre el nombre comercial: el de Ajustes en el admin, la tienda del
+  /// minorista y la razón social del mayorista. El contacto legal del
+  /// mayorista es otra persona y no sustituye esa marca.
   static String displayName(ProfileModel profile) {
-    final legal = profile.legalContactName?.trim();
-    if (legal != null && legal.isNotEmpty) return legal;
     final business = profile.businessName?.trim();
     if (business != null && business.isNotEmpty) return business;
+    final legal = profile.legalContactName?.trim();
+    if (legal != null && legal.isNotEmpty) return legal;
     final email = profile.email?.trim();
     if (email != null && email.isNotEmpty) {
       final at = email.indexOf('@');

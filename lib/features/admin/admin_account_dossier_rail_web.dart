@@ -309,7 +309,7 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
                   profile: profile,
                   viewerRole: viewerRole,
                   onChanged: onChanged,
-                  entrepreneurRequirements: profile.isEntrepreneurRetailer,
+                  entrepreneurRequirements: true,
                 ),
                 if (profile.isImportador) ...[
                   const SizedBox(height: 16),

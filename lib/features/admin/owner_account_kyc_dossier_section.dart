@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/kyc/document_review_status.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_doc_photo_slots.dart';
 import 'package:motolink_pro_app/features/kyc/kyc_rejection_note_dialog.dart';
 import 'package:motolink_pro_app/features/kyc/profile_document_model.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_retailer.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 /// Expediente KYC: cada documento admite hasta 3 fotos con lightbox zoom.
@@ -19,11 +20,15 @@ class OwnerAccountKycDossierSection extends StatefulWidget {
     required this.profile,
     required this.viewerRole,
     this.onChanged,
+    this.entrepreneurRequirements = false,
   });
 
   final ProfileModel profile;
   final String? viewerRole;
   final VoidCallback? onChanged;
+
+  /// Escritorio: requeridos vs. complementarios. El panel estrecho no lo activa.
+  final bool entrepreneurRequirements;
 
   @override
   State<OwnerAccountKycDossierSection> createState() =>
@@ -178,6 +183,9 @@ class _OwnerAccountKycDossierSectionState
       uploadedTypes: byType.keys,
     );
 
+    final entrepreneurWeb = widget.entrepreneurRequirements &&
+        widget.profile.isEntrepreneurRetailer;
+
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(14),
@@ -186,9 +194,10 @@ class _OwnerAccountKycDossierSectionState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AdminUsersChrome.sectionHeader(
-            title: 'Expediente KYC / Documentos',
-            subtitle:
-                'Cada documento admite hasta 3 fotos. Toca una miniatura para zoom.',
+            title: entrepreneurWeb ? 'Documentos' : 'Expediente KYC / Documentos',
+            subtitle: entrepreneurWeb
+                ? 'Requeridos para habilitar. La referencia bancaria es complementaria.'
+                : 'Cada documento admite hasta 3 fotos. Toca una miniatura para zoom.',
             glyph: LucideGlyph.clipboardCheck,
           ),
           if (_loading)
@@ -202,6 +211,8 @@ class _OwnerAccountKycDossierSectionState
                 ),
               ),
             )
+          else if (entrepreneurWeb)
+            ..._entrepreneurGroups(byType)
           else
             for (final group in groups) ...[
               KycDocPhotoSlots(
@@ -222,5 +233,114 @@ class _OwnerAccountKycDossierSectionState
         ],
       ),
     );
+  }
+
+  List<Widget> _entrepreneurGroups(Map<String, ProfileDocumentModel> byType) {
+    final theme = AdminUsersChrome.of(context);
+    Widget heading(String title, String hint) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: theme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              hint,
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.35,
+                color: theme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget slot(
+      String base, {
+      required String emphasis,
+      bool complementary = false,
+      String? title,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: KycDocPhotoSlots(
+          baseType: base,
+          titleOverride: title,
+          emphasisLabel: emphasis,
+          complementary: complementary,
+          docsByType: {
+            for (final type in AliadoDocType.photoSlotsFor(base))
+              if (byType[type] != null) type: byType[type]!,
+          },
+          busyType: _busyType,
+          canUpload: true,
+          canReview: _canReview,
+          onUpload: _upload,
+          onApprove: (t) => _review(t, DocumentReviewStatus.aprobado),
+          onReject: (t) => _review(t, DocumentReviewStatus.rechazado),
+        ),
+      );
+    }
+
+    final extras = <String>[
+      AliadoDocType.cedulaPropietario,
+      AliadoDocType.cedulaRepresentante,
+      AliadoDocType.actaConstitutiva,
+    ].where((base) {
+      return AliadoDocType.photoSlotsFor(base).any(byType.containsKey);
+    }).toList();
+
+    return [
+      heading(
+        'Requeridos',
+        'Registro Mercantil, fotos del local y registro comercial o carta de crédito.',
+      ),
+      slot(
+        AliadoDocType.registroMercantil,
+        emphasis: 'Requerido',
+      ),
+      slot(
+        AliadoDocType.fotoTienda,
+        emphasis: 'Requerido',
+        title: 'Fotos del local',
+      ),
+      slot(
+        EntrepreneurDeferredKycDocs.toStorageDocType(
+          EntrepreneurDeferredKycDocs.registroComercialCartaCredito,
+        ),
+        emphasis: 'Requerido',
+        title: 'Registro Comercial / Carta de Crédito',
+      ),
+      const SizedBox(height: 6),
+      heading(
+        'Complementario',
+        'Referencia bancaria 1 y 2. No hace falta para habilitar la cuenta.',
+      ),
+      for (final type in EntrepreneurDeferredKycDocs.complementary)
+        slot(
+          type,
+          emphasis: 'Complementario',
+          complementary: true,
+          title: EntrepreneurDeferredKycDocs.labelEs(type),
+        ),
+      if (extras.isNotEmpty) ...[
+        heading(
+          'Otros documentos',
+          'Archivos que ya estaban en el expediente.',
+        ),
+        for (final base in extras)
+          slot(base, emphasis: 'En expediente', complementary: true),
+      ],
+    ];
   }
 }

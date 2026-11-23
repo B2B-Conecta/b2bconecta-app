@@ -277,12 +277,17 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
     if (selected == null) {
       return const _ResolutionEmptyState();
     }
-    return SupportTicketDetailScreen(
-      key: ValueKey<String>('support-detail-${selected.id}'),
-      ticket: selected,
-      isAdminView: true,
-      embedded: true,
-      onTicketChanged: () => _load(silent: true),
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: SupportTicketDetailScreen(
+        key: ValueKey<String>('support-detail-${selected.id}'),
+        ticket: selected,
+        isAdminView: true,
+        embedded: true,
+        onTicketChanged: () => _load(silent: true),
+      ),
     );
   }
 
@@ -341,21 +346,37 @@ class _AdminSupportTicketsPanelState extends State<AdminSupportTicketsPanel> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-            child: SegmentedFilterBar(
-              labels: [
-                'Por atender ($_countAtencion)',
-                'Abiertos ($_countAbiertos)',
-                'En revisión ($_countEnRevision)',
-                'Cerrados',
-                'Todos',
-              ],
-              selectedIndex: _filter.index,
-              onSelected: (index) {
-                setState(
-                  () => _filter = _AdminSupportFilter.values[index],
-                );
-              },
-            ),
+            child: MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu
+                ? _WebSupportFilters(
+                    labels: [
+                      'Por atender ($_countAtencion)',
+                      'Abiertos ($_countAbiertos)',
+                      'En revisión ($_countEnRevision)',
+                      'Cerrados',
+                      'Todos',
+                    ],
+                    selectedIndex: _filter.index,
+                    onSelected: (index) {
+                      setState(
+                        () => _filter = _AdminSupportFilter.values[index],
+                      );
+                    },
+                  )
+                : SegmentedFilterBar(
+                    labels: [
+                      'Por atender ($_countAtencion)',
+                      'Abiertos ($_countAbiertos)',
+                      'En revisión ($_countEnRevision)',
+                      'Cerrados',
+                      'Todos',
+                    ],
+                    selectedIndex: _filter.index,
+                    onSelected: (index) {
+                      setState(
+                        () => _filter = _AdminSupportFilter.values[index],
+                      );
+                    },
+                  ),
           ),
           Expanded(
             child: _loading
@@ -622,8 +643,12 @@ class _SupportTicketTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     final t = ticket;
     final when = t.updatedAt ?? t.createdAt;
+    final whenLabel =
+        desktop ? formatEsShortDateTime12h(when) : _relativeEs(when);
 
     return Material(
       color: selected ? theme.brandContainer : theme.surfaceCard,
@@ -631,7 +656,9 @@ class _SupportTicketTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: desktop ? 180 : 0),
+          curve: Curves.easeOutCubic,
           padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
@@ -703,7 +730,7 @@ class _SupportTicketTile extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          _relativeEs(when),
+                          whenLabel,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
@@ -1127,6 +1154,82 @@ class _AdminManualTicketDialogState extends State<_AdminManualTicketDialog> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _WebSupportFilters extends StatelessWidget {
+  const _WebSupportFilters({
+    required this.labels,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _WebFilterPill(
+              label: labels[i],
+              selected: i == selectedIndex,
+              onTap: () => onSelected(i),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WebFilterPill extends StatelessWidget {
+  const _WebFilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final onBrand = Theme.of(context).colorScheme.onPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? theme.brand : theme.surfaceSubtle,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? theme.brand : theme.borderSubtle,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: selected ? onBrand : theme.textSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }

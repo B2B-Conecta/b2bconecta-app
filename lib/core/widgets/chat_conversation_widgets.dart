@@ -245,6 +245,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.author,
     this.isAction = false,
     this.showDate = false,
+    this.use12HourClock = false,
   });
 
   final bool mine;
@@ -252,6 +253,9 @@ class ChatMessageBubble extends StatelessWidget {
   final String? author;
   final bool isAction;
   final bool showDate;
+
+  /// Hora de 12 horas (`10:32 AM`). El panel estrecho sigue en 24 h.
+  final bool use12HourClock;
   final Widget child;
 
   @override
@@ -261,10 +265,12 @@ class ChatMessageBubble extends StatelessWidget {
     final formats = MaterialLocalizations.of(context);
     final time = local == null
         ? null
-        : formats.formatTimeOfDay(
-            TimeOfDay.fromDateTime(local),
-            alwaysUse24HourFormat: true,
-          );
+        : use12HourClock
+            ? _clock12h(local)
+            : formats.formatTimeOfDay(
+                TimeOfDay.fromDateTime(local),
+                alwaysUse24HourFormat: true,
+              );
     return LayoutBuilder(builder: (context, constraints) {
       final maxWidth = (constraints.maxWidth * (isAction ? 0.96 : 0.86))
           .clamp(0.0, 500.0)
@@ -340,4 +346,11 @@ class ChatMessageBubble extends StatelessWidget {
       );
     });
   }
+}
+
+String _clock12h(DateTime d) {
+  final suffix = d.hour >= 12 ? 'PM' : 'AM';
+  final hour12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final min = d.minute.toString().padLeft(2, '0');
+  return '$hour12:$min $suffix';
 }

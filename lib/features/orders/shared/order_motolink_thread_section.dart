@@ -17,6 +17,7 @@ import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'order_card_collapsible_layout.dart';
@@ -410,11 +411,9 @@ class _OrderMotolinkThreadSectionState
     final request = OrderReturnRules.parseReturnRequestMessage(m.body);
     final line = request == null ? null : _lineForMessage(m, request);
     final mine = uid != null && m.authorId == uid;
-    final author = m.isFromAdmin
-        ? 'B2B Conecta'
-        : widget.allowReplyAsAdmin && !mine
-            ? (m.isFromImportador ? 'Importador' : 'Tienda minorista')
-            : null;
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final author = desktop ? _desktopAuthorLabel(m) : _narrowAuthorLabel(m, mine);
     return ChatMessageBubble(
       key: ValueKey(m.id),
       mine: mine,
@@ -456,6 +455,38 @@ class _OrderMotolinkThreadSectionState
                   _resolveReturn(line!, resolution, note),
             ),
     );
+  }
+
+  String? _narrowAuthorLabel(TransactionRequestMessageModel m, bool mine) {
+    if (m.isFromAdmin) return 'B2B Conecta';
+    if (widget.allowReplyAsAdmin && !mine) {
+      return m.isFromImportador ? 'Importador' : 'Tienda minorista';
+    }
+    return null;
+  }
+
+  /// En escritorio el autor es la parte del pedido. «B2B Conecta» queda para la plataforma.
+  String? _desktopAuthorLabel(TransactionRequestMessageModel m) {
+    final authorId = m.authorId.trim();
+    for (final line in widget.orderLines) {
+      if (authorId.isNotEmpty && authorId == line.ownerId.trim()) {
+        final name = line.ownerBusinessName?.trim();
+        return (name != null && name.isNotEmpty) ? name : 'Importador';
+      }
+      if (authorId.isNotEmpty && authorId == line.aliadoId.trim()) {
+        final name = line.aliadoBusinessName?.trim();
+        return (name != null && name.isNotEmpty) ? name : 'Tienda minorista';
+      }
+    }
+    if (m.isFromImportador && widget.orderLines.isNotEmpty) {
+      final name = widget.orderLines.first.ownerBusinessName?.trim();
+      return (name != null && name.isNotEmpty) ? name : 'Importador';
+    }
+    if (m.isFromAliado && widget.orderLines.isNotEmpty) {
+      final name = widget.orderLines.first.aliadoBusinessName?.trim();
+      return (name != null && name.isNotEmpty) ? name : 'Tienda minorista';
+    }
+    return 'B2B Conecta';
   }
 
   void _handleChatAction(_ChatAction action) {

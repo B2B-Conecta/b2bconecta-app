@@ -1051,11 +1051,17 @@ class _MainShellState extends State<MainShell> {
     }
     if (i == ImporterShellTabs.pedidos && role == AppHomeRole.importador) {
       final pending = _importerShellBadges?.pendingOrders ?? 0;
-      if (pending > 0) {
+      final desktop =
+          MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+      final fromNotification = desktop &&
+          (MainShellTabController.peekPendingNotificationRelatedId() !=
+                  null ||
+              MainShellTabController.peekPendingNotificationType() != null);
+      if (!fromNotification && pending > 0) {
         MainShellTabController.setImporterPedidosPreferNuevosFilter(true);
       }
       MainShellTabController.notifyPedidosReload();
-      if (pending > 0) {
+      if (!fromNotification && pending > 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           MainShellTabController.notifyPedidosDeepLink();

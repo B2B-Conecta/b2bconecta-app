@@ -47,6 +47,19 @@ abstract final class EntrepreneurDeferredKycDocs {
     registroComercialCartaCredito,
   ];
 
+  /// Expediente web: obligatorios para cerrar la revisión de Emprendedor.
+  /// Las fotos del local viven en el grupo KYC `foto_tienda`.
+  static const requiredReview = <String>[
+    registroMercantil,
+    registroComercialCartaCredito,
+  ];
+
+  /// Expediente web: no bloquean la habilitación.
+  static const complementary = <String>[
+    referenciaBancaria1,
+    referenciaBancaria2,
+  ];
+
   static String toStorageDocType(String type) {
     final t = type.trim();
     if (t == registroComercialCartaCredito) return storageDocType;

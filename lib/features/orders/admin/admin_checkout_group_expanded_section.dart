@@ -5,6 +5,9 @@ import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/orders/shared/admin_order_panel_utils.dart';
 import 'package:motolink_pro_app/features/orders/shared/aliado_order_grouping.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
@@ -382,24 +385,35 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
               for (final r in chunk)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: OutlinedButton.icon(
-                    onPressed: deleteBusyId != null
-                        ? null
-                        : () => onEliminarPedido!(r),
-                    icon: Icon(
-                      Icons.delete_outline,
-                      size: 18,
-                      color: Colors.red.shade800,
-                    ),
-                    label: Text(
-                      deleteBusyId == r.id
-                          ? 'Eliminando…'
-                          : 'Eliminar línea · ${r.productName ?? r.id.substring(0, 8)}',
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red.shade800,
-                    ),
-                  ),
+                  child: MediaQuery.sizeOf(context).width >=
+                          AppBreakpoints.mobileMenu
+                      ? Align(
+                          alignment: Alignment.centerLeft,
+                          child: _CompactDeleteLineButton(
+                            busy: deleteBusyId == r.id,
+                            enabled: deleteBusyId == null,
+                            tooltip: _deleteLineTooltip(r),
+                            onPressed: () => onEliminarPedido!(r),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: deleteBusyId != null
+                              ? null
+                              : () => onEliminarPedido!(r),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Colors.red.shade800,
+                          ),
+                          label: Text(
+                            deleteBusyId == r.id
+                                ? 'Eliminando…'
+                                : 'Eliminar línea · ${r.productName ?? r.id.substring(0, 8)}',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade800,
+                          ),
+                        ),
                 ),
             ],
             if (chunk.any(
@@ -505,6 +519,92 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+String _deleteLineTooltip(TransactionRequestModel line) {
+  final name = line.productName?.trim();
+  final sku = line.productSku?.trim();
+  final parts = <String>[
+    if (name != null && name.isNotEmpty) name,
+    if (sku != null && sku.isNotEmpty) 'SKU $sku',
+  ];
+  if (parts.isEmpty) return 'Eliminar línea';
+  return 'Eliminar ${parts.join(' · ')}';
+}
+
+class _CompactDeleteLineButton extends StatefulWidget {
+  const _CompactDeleteLineButton({
+    required this.busy,
+    required this.enabled,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final bool busy;
+  final bool enabled;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  State<_CompactDeleteLineButton> createState() =>
+      _CompactDeleteLineButtonState();
+}
+
+class _CompactDeleteLineButtonState extends State<_CompactDeleteLineButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final error = Theme.of(context).colorScheme.error;
+    final canTap = widget.enabled && !widget.busy;
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: _hover && canTap ? theme.surfaceSubtle : theme.surfaceCard,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: error.withOpacity(_hover && canTap ? 0.85 : 0.4),
+            ),
+          ),
+          child: Material(
+            color: theme.surfaceCard.withOpacity(0),
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              onTap: canTap ? widget.onPressed : null,
+              borderRadius: BorderRadius.circular(999),
+              hoverColor: error.withOpacity(0.06),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LucideIcon(LucideGlyph.trash2, size: 14, color: error),
+                    const SizedBox(width: 6),
+                    Text(
+                      widget.busy ? 'Eliminando…' : 'Eliminar línea',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

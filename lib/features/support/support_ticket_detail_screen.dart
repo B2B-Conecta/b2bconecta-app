@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'support_ticket_model.dart';
+import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
 import 'support_ticket_status.dart';
 import 'support_ticket_thread_section.dart';
 
-enum _SupportAction { refresh, details, close }
+enum _SupportAction { refresh, details, dossier, close }
 
 /// Detalle de un reclamo (aliado, importador o admin).
 class SupportTicketDetailScreen extends StatefulWidget {
@@ -123,10 +126,10 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
             Text(_ticket.subject,
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
-            Text('Creado el ${formatEsShortDateTime(_ticket.createdAt)}'),
+            Text('Creado el ${_stamp(_ticket.createdAt)}'),
             if (_ticket.closedAt != null) ...[
               const SizedBox(height: 8),
-              Text('Cerrado el ${formatEsShortDateTime(_ticket.closedAt)}'),
+              Text('Cerrado el ${_stamp(_ticket.closedAt)}'),
             ],
             if (widget.isAdminView) ...[
               const SizedBox(height: 8),
@@ -153,12 +156,36 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
     );
   }
 
+  bool get _desktop =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
+  String _stamp(DateTime? at) =>
+      _desktop ? formatEsShortDateTime12h(at) : formatEsShortDateTime(at);
+
+  void _openUserDossier() {
+    final id = _ticket.createdBy.trim();
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Este reclamo no tiene un usuario asociado.'),
+        ),
+      );
+      return;
+    }
+    MainShellTabController.navigateToAdminUsers(
+      section: AdminUsersHubSection.cuentas,
+      userId: id,
+    );
+  }
+
   void _onAction(_SupportAction action) {
     switch (action) {
       case _SupportAction.refresh:
         _reloadTicket(refreshMessages: true);
       case _SupportAction.details:
         _showDetails();
+      case _SupportAction.dossier:
+        _openUserDossier();
       case _SupportAction.close:
         _closeTicket();
     }
@@ -179,6 +206,8 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
         : (_ticket.status == SupportTicketStatus.enRevision
             ? theme.surfaceSubtle
             : theme.brandContainer);
+    final desktop = _desktop;
+    final webAdmin = desktop && widget.isAdminView;
     final roleLabel = _ticket.authorRole == 'importador'
         ? 'Mayorista'
         : 'Minorista';
@@ -214,6 +243,23 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                       color: theme.textSecondary,
                     ),
                   ),
+                  if (webAdmin) ...[
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: _openUserDossier,
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.brand,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: const Text('Ir al expediente del usuario'),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                 ],
                 Tooltip(
@@ -253,22 +299,24 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                         ),
                       ),
                     ),
-                    Text(
-                      _ticket.categoryLabel,
-                      style: TextStyle(
-                        color: theme.textSecondary,
-                        fontSize: 12,
+                    if (!webAdmin)
+                      Text(
+                        _ticket.categoryLabel,
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                    Text(
-                      widget.isAdminView
-                          ? _ticket.creatorDisplayName
-                          : 'Soporte B2B Conecta',
-                      style: TextStyle(
-                        color: theme.textSecondary,
-                        fontSize: 12,
+                    if (!webAdmin)
+                      Text(
+                        widget.isAdminView
+                            ? _ticket.creatorDisplayName
+                            : 'Soporte B2B Conecta',
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
                     if (_ticket.relatedTransactionRequestId
                             ?.isNotEmpty ==
                         true)
@@ -290,7 +338,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                         ),
                       ),
                     Text(
-                      formatEsShortDateTime(_ticket.createdAt),
+                      _stamp(_ticket.createdAt),
                       style: TextStyle(
                         fontSize: 11.5,
                         color: theme.textMuted,
@@ -341,6 +389,11 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                 value: _SupportAction.details,
                 child: Text('Datos del reclamo'),
               ),
+              if (webAdmin)
+                const PopupMenuItem(
+                  value: _SupportAction.dossier,
+                  child: Text('Ir al expediente del usuario'),
+                ),
               if (!_isClosed && (isOwner || widget.isAdminView))
                 const PopupMenuItem(
                   value: _SupportAction.close,
@@ -370,6 +423,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
             canReplyAsOwner: isOwner && !widget.isAdminView,
             canReplyAsAdmin: widget.isAdminView,
             isTicketClosed: _isClosed,
+            counterpartName: webAdmin ? _ticket.creatorDisplayName : null,
             refreshVersion: _refreshVersion,
             onThreadChanged: () => _reloadTicket(),
           ),

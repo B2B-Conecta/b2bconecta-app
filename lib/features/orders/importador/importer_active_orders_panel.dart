@@ -32,6 +32,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
+import 'package:motolink_pro_app/core/data/supabase_access.dart';
+import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 
 /// Pedidos del importador: ingreso directo, filtros rápidos y ciclo completo en una sola vista.
 class ImporterActiveOrdersPanel extends StatefulWidget {
@@ -127,6 +129,7 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       if (match != null) {
         setState(() {
           _scope = _scopeForOrderStatus(match.status);
+          if (_desktopOrders) _onlyNuevos = false;
           if (_scope != PedidosListScope.entregados &&
               _scope != PedidosListScope.cancelados) {
             _morosoOnly = false;
@@ -186,9 +189,12 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
   }
 
+  bool get _desktopOrders =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+
   bool _tryApplyExpandFromPendingNotification() {
     final pending = MainShellTabController.peekPendingNotificationRelatedId();
-    if (pending == null) return false;
+    if (pending == null || pending.trim().isEmpty) return false;
     final key = _expandKeyForPendingId(pending);
     if (key == null) return false;
     final openChat = MainShellTabController.consumePendingOpenOrderChat();
@@ -616,14 +622,54 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     }
   }
 
+  /// 5 uds por producto, o el mínimo que el proveedor ya configuró en el SKU.
+  Future<int> _webDefaultOfferedQty(List<TransactionRequestModel> g) async {
+    const fallback = 5;
+    final ids = g
+        .map((line) => line.productId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    final mins = <String, int>{};
+    if (ids.isNotEmpty) {
+      try {
+        final raw = await SupabaseAccess.client
+            .from('products')
+            .select('id, min_order_qty')
+            .inFilter('id', ids);
+        for (final row in raw as List<dynamic>) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final id = map['id']?.toString() ?? '';
+          if (id.isEmpty) continue;
+          final qty = map['min_order_qty'];
+          final parsed = qty is int ? qty : int.tryParse('$qty');
+          if (parsed != null) mins[id] = parsed;
+        }
+      } catch (_) {}
+    }
+    var total = 0;
+    for (final line in g) {
+      final raw = mins[line.productId.trim()];
+      total += ProductMinOrderQty.isSupplierDefined(raw)
+          ? ProductMinOrderQty.resolve(raw)
+          : fallback;
+    }
+    return total < 1 ? fallback : total;
+  }
+
   Future<void> _notificarAjusteCantidad(
     BuildContext context,
-    List<TransactionRequestModel> g,
-  ) async {
+    List<TransactionRequestModel> g, {
+    required bool desktop,
+  }) async {
     final requested = _requestedQtyForGroup(g);
+    final initial = desktop ? await _webDefaultOfferedQty(g) : null;
+    if (!context.mounted) return;
     final draft = await showImporterNotificarAjusteCantidadDialog(
       context,
       requestedQty: requested,
+      initialQty: initial,
+      allowDifferentQty: desktop,
     );
     if (draft == null) return;
     if (!context.mounted) return;
@@ -831,8 +877,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final rk = _displayGroupKey(g);
     final canCancel = _canCancelGroup(g);
     final showQtyAdj = _showQtyAdjustmentSection(g);
-    final canNotifyQty = _canNotifyQtyAdjustment(g);
-    final qtyAdjHint = _qtyAdjustmentDisabledHint(g);
+    final desktop = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final canNotifyQty =
+        desktop ? showQtyAdj : _canNotifyQtyAdjustment(g);
+    final qtyAdjHint = desktop ? null : _qtyAdjustmentDisabledHint(g);
     return ImporterExpandableOrderCard(
       workspaceDetail: true,
       request: primary,
@@ -874,8 +922,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
               )
           : null,
       canNotifyQtyAdjustment: showQtyAdj,
-      onNotifyQtyAdjustment:
-          canNotifyQty ? () => _notificarAjusteCantidad(context, g) : null,
+      onNotifyQtyAdjustment: canNotifyQty
+          ? () => _notificarAjusteCantidad(context, g, desktop: desktop)
+          : null,
       qtyAdjustmentDisabledHint: qtyAdjHint,
       onThreadChanged: _load,
       aliadoCreditRemaining: _creditFor(primary.aliadoId),

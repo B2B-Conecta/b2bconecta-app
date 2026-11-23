@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'support_ticket_message_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
 
 /// Conversación de un reclamo, con escritura fija bajo el historial.
@@ -16,6 +17,7 @@ class SupportTicketThreadSection extends StatefulWidget {
     required this.isTicketClosed,
     this.onThreadChanged,
     this.refreshVersion = 0,
+    this.counterpartName,
   });
 
   final String ticketId;
@@ -24,6 +26,9 @@ class SupportTicketThreadSection extends StatefulWidget {
   final bool isTicketClosed;
   final VoidCallback? onThreadChanged;
   final int refreshVersion;
+
+  /// Nombre del usuario del reclamo. Solo se muestra en la burbuja de escritorio.
+  final String? counterpartName;
 
   @override
   State<SupportTicketThreadSection> createState() =>
@@ -176,15 +181,23 @@ class _SupportTicketThreadSectionState
                           messageAt: (i) {
                             final message = _items[i];
                             final mine = uid != null && message.authorId == uid;
+                            final desktop = MediaQuery.sizeOf(context).width >=
+                                AppBreakpoints.mobileMenu;
+                            final other = widget.counterpartName?.trim();
                             return ChatMessageBubble(
                               key: ValueKey(message.id),
                               mine: mine,
                               at: message.createdAt,
+                              use12HourClock: desktop,
                               author: mine
                                   ? null
                                   : message.isFromAdmin
                                       ? 'Soporte B2B Conecta'
-                                      : 'Usuario',
+                                      : (desktop &&
+                                              other != null &&
+                                              other.isNotEmpty)
+                                          ? other
+                                          : 'Usuario',
                               child: Text(
                                 message.body,
                                 style: const TextStyle(height: 1.4),
@@ -194,14 +207,25 @@ class _SupportTicketThreadSectionState
                         ),
         ),
         if (_canReply)
-          ChatComposer(
-            controller: _ctrl,
-            onSend: _send,
-            sending: _sending,
-            hint: widget.canReplyAsAdmin
-                ? 'Responde al usuario…'
-                : 'Escribe a soporte…',
-          )
+          Builder(builder: (context) {
+            final desktop = MediaQuery.sizeOf(context).width >=
+                AppBreakpoints.mobileMenu;
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: desktop
+                  ? const EdgeInsets.fromLTRB(8, 0, 8, 8)
+                  : EdgeInsets.zero,
+              child: ChatComposer(
+                controller: _ctrl,
+                onSend: _send,
+                sending: _sending,
+                hint: widget.canReplyAsAdmin
+                    ? 'Responde al usuario…'
+                    : 'Escribe a soporte…',
+              ),
+            );
+          })
         else if (widget.isTicketClosed)
           Padding(
             padding: const EdgeInsets.all(16),

@@ -732,6 +732,7 @@ class _AdminAccountManagementPanelState
                   onHardDelete: widget.viewer.isOwner
                       ? () => _hardDelete(preview)
                       : null,
+                  onEnable: () => _reactivate(preview),
                 ),
               ),
             ],

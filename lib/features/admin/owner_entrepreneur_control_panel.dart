@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/admin_entrepreneur_badge.dart';
 import 'package:motolink_pro_app/features/kyc/document_review_status.dart';
@@ -18,12 +19,20 @@ class OwnerEntrepreneurControlPanel extends StatefulWidget {
     this.onChanged,
     this.onDeactivate,
     this.onHardDelete,
+    this.showDocuments = true,
+    this.showAccountActions = true,
   });
 
   final ProfileModel profile;
   final VoidCallback? onChanged;
   final VoidCallback? onDeactivate;
   final VoidCallback? onHardDelete;
+
+  /// El panel estrecho lista los documentos aquí. En escritorio van una sola vez en el expediente KYC.
+  final bool showDocuments;
+
+  /// El panel estrecho deja Desactivar / Purgar en este bloque. En escritorio van al final.
+  final bool showAccountActions;
 
   @override
   State<OwnerEntrepreneurControlPanel> createState() =>
@@ -103,6 +112,15 @@ class _OwnerEntrepreneurControlPanelState
     };
   }
 
+  String _deadlineLabel() {
+    final at = widget.profile.kycCompletionDeadline;
+    if (at == null) return '—';
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    if (!desktop) return at.toLocal().toString();
+    return formatEsShortDateTime12h(at);
+  }
+
   Future<void> _extend(int weeks) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -136,59 +154,68 @@ class _OwnerEntrepreneurControlPanelState
     final theme = B2BThemeExtension.of(context);
     final mobile =
         MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
-    final choice = await showModalBottomSheet<int>(
-      context: context,
-      backgroundColor: theme.dialogSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        Widget tile(int weeks, String label) {
-          return ListTile(
-            title: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: theme.textPrimary,
+    final int? choice;
+    if (mobile) {
+      choice = await showModalBottomSheet<int>(
+        context: context,
+        backgroundColor: theme.dialogSurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          Widget tile(int weeks, String label) {
+            return ListTile(
+              title: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: theme.textPrimary,
+                ),
               ),
-            ),
-            subtitle: Text(
-              '${weeks * 7} días · vuelve a kyc_in_progress',
-              style: TextStyle(color: theme.textSecondary, fontSize: 12.5),
-            ),
-            onTap: () => Navigator.pop(ctx, weeks),
-          );
-        }
+              subtitle: Text(
+                '${weeks * 7} días · vuelve a kyc_in_progress',
+                style: TextStyle(color: theme.textSecondary, fontSize: 12.5),
+              ),
+              onTap: () => Navigator.pop(ctx, weeks),
+            );
+          }
 
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                  child: Text(
-                    'Otorgar prórroga de KYC',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: theme.textPrimary,
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                    child: Text(
+                      'Otorgar prórroga de KYC',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                      ),
                     ),
                   ),
-                ),
-                tile(2, '2 semanas'),
-                tile(4, '4 semanas'),
-                tile(8, '8 semanas'),
-                if (!mobile) const SizedBox(height: 8),
-              ],
+                  tile(2, '2 semanas'),
+                  tile(4, '4 semanas'),
+                  tile(8, '8 semanas'),
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    } else {
+      choice = await showDialog<int>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: theme.textPrimary.withOpacity(0.45),
+        builder: (ctx) => _KycExtendDialog(theme: theme),
+      );
+    }
     if (choice != null) await _extend(choice);
   }
 
@@ -268,7 +295,7 @@ class _OwnerEntrepreneurControlPanelState
           if (widget.profile.kycCompletionDeadline != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Plazo docs: ${widget.profile.kycCompletionDeadline!.toLocal()}',
+              'Plazo docs: ${_deadlineLabel()}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, color: theme.textMuted),
@@ -305,39 +332,42 @@ class _OwnerEntrepreneurControlPanelState
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-          const SizedBox(height: 14),
-          Text(
-            'Documentos comerciales (8 semanas)',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: theme.textPrimary,
+          if (widget.showDocuments) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Documentos comerciales (8 semanas)',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: theme.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          if (_loading)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: theme.brand,
+            const SizedBox(height: 8),
+            if (_loading)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: theme.brand,
+                    ),
                   ),
                 ),
-              ),
-            )
-          else
-            for (final t in EntrepreneurDeferredKycDocs.requiredDeferred)
-              _DocRow(
-                title: EntrepreneurDeferredKycDocs.labelEs(t),
-                doc: _docFor(t),
-                busy: _busyDoc == t,
-                onApprove: () => _approveDoc(t),
-              ),
-          if (widget.onDeactivate != null || widget.onHardDelete != null) ...[
+              )
+            else
+              for (final t in EntrepreneurDeferredKycDocs.requiredDeferred)
+                _DocRow(
+                  title: EntrepreneurDeferredKycDocs.labelEs(t),
+                  doc: _docFor(t),
+                  busy: _busyDoc == t,
+                  onApprove: () => _approveDoc(t),
+                ),
+          ],
+          if (widget.showAccountActions &&
+              (widget.onDeactivate != null || widget.onHardDelete != null)) ...[
             const SizedBox(height: 12),
             Text(
               'Cuenta',
@@ -389,6 +419,104 @@ class _OwnerEntrepreneurControlPanelState
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _KycExtendDialog extends StatelessWidget {
+  const _KycExtendDialog({required this.theme});
+
+  final B2BThemeExtension theme;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget option(int weeks, String label) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: theme.surfaceSubtle,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            onTap: () => Navigator.pop(context, weeks),
+            borderRadius: BorderRadius.circular(10),
+            hoverColor: theme.brandContainer,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${weeks * 7} días · la documentación vuelve a estar en curso',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final width = (MediaQuery.sizeOf(context).width - 48).clamp(280.0, 480.0);
+    return Dialog(
+      backgroundColor: theme.dialogSurface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.border),
+      ),
+      child: SizedBox(
+        width: width.toDouble(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Otorgar prórroga de KYC',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: LucideIcon(
+                      LucideGlyph.close,
+                      size: 16,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              option(2, '2 semanas'),
+              option(4, '4 semanas'),
+              option(8, '8 semanas'),
+            ],
+          ),
+        ),
       ),
     );
   }

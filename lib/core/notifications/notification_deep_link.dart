@@ -121,6 +121,11 @@ void navigateFromNotificationPayload({
     MainShellTabController.navigateToAliadoCatalog();
     return;
   }
+  if ((t0 == 'reputacion' || t0 == 'valoracion') &&
+      homeRole == AppHomeRole.importador) {
+    MainShellTabController.navigateToReputationTab();
+    return;
+  }
   if (t0 == 'promocion' || t0 == 'inventario') {
     switch (homeRole) {
       case AppHomeRole.importador:

@@ -23,6 +23,9 @@ class KycDocPhotoSlots extends StatelessWidget {
     required this.onUpload,
     required this.onApprove,
     required this.onReject,
+    this.emphasisLabel,
+    this.complementary = false,
+    this.titleOverride,
   });
 
   final String baseType;
@@ -35,6 +38,11 @@ class KycDocPhotoSlots extends StatelessWidget {
   final Future<void> Function(String docType) onApprove;
   final Future<void> Function(String docType) onReject;
 
+  /// «Requerido» o «Complementario». Null conserva la tarjeta actual.
+  final String? emphasisLabel;
+  final bool complementary;
+  final String? titleOverride;
+
   List<String> get _slots => AliadoDocType.photoSlotsFor(baseType);
 
   int get _filled => _slots.where(docsByType.containsKey).length;
@@ -43,12 +51,15 @@ class KycDocPhotoSlots extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
     final isStore = AliadoDocType.isStorePhoto(baseType);
+    final titled = titleOverride?.trim();
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.surfaceCard,
+        color: complementary ? theme.surfaceSubtle : theme.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.borderStrong),
+        border: Border.all(
+          color: complementary ? theme.borderSubtle : theme.borderStrong,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,13 +72,48 @@ class KycDocPhotoSlots extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      AliadoDocType.groupLabelEs(baseType),
+                      titled != null && titled.isNotEmpty
+                          ? titled
+                          : AliadoDocType.groupLabelEs(baseType),
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                         color: theme.textPrimary,
                       ),
                     ),
+                    if (emphasisLabel != null) ...[
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: complementary
+                                ? theme.surfaceCard
+                                : theme.brandContainer,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: complementary
+                                  ? theme.borderSubtle
+                                  : theme.brand.withOpacity(0.35),
+                            ),
+                          ),
+                          child: Text(
+                            emphasisLabel!,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: complementary
+                                  ? theme.textSecondary
+                                  : theme.brand,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Text(
                       isStore

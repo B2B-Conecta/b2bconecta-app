@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
-import 'package:motolink_pro_app/core/widgets/admin_crud_toast.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/admin/unified_action_dialog.dart';
 import 'package:motolink_pro_app/features/admin/admin_entrepreneur_badge.dart';
 import 'package:motolink_pro_app/features/admin/admin_published_catalogs_section.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_chrome.dart';
@@ -28,6 +28,7 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
     required this.onChanged,
     this.onDeactivate,
     this.onHardDelete,
+    this.onEnable,
   });
 
   final ProfileModel profile;
@@ -40,6 +41,7 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
   final VoidCallback onChanged;
   final VoidCallback? onDeactivate;
   final VoidCallback? onHardDelete;
+  final VoidCallback? onEnable;
 
   bool get _isB2b {
     final role = profile.role?.trim().toLowerCase();
@@ -80,6 +82,21 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
   bool get _statusActive =>
       _statusLabel == 'Activo' &&
       profile.accountAccessStatus != AccountAccessStatus.pendingReview;
+
+  bool get _accessEnabled {
+    if (profile.deactivatedAt != null) return false;
+    final access = profile.accountAccessStatus?.trim();
+    return access == null ||
+        access.isEmpty ||
+        access == AccountAccessStatus.active;
+  }
+
+  bool get _readyToEnable {
+    if (profile.deactivatedAt != null || _accessEnabled) return false;
+    final access = profile.accountAccessStatus?.trim();
+    return access == AccountAccessStatus.draft ||
+        access == AccountAccessStatus.pendingReview;
+  }
 
   String get _help {
     if (profile.isEntrepreneurRetailer) {
@@ -129,30 +146,123 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
     );
   }
 
-  void _onSegment(BuildContext context, _AccountSegment segment) {
+  String get _accountName {
+    final business = profile.businessName?.trim();
+    if (business != null && business.isNotEmpty) return business;
+    final email = profile.email?.trim();
+    if (email != null && email.isNotEmpty) return email;
+    return 'esta cuenta';
+  }
+
+  Future<void> _explain(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required String body,
+    required LucideGlyph glyph,
+  }) {
+    final theme = B2BThemeExtension.of(context);
+    return UnifiedActionDialog.show<void>(
+      context: context,
+      builder: (ctx) => UnifiedActionDialog(
+        title: title,
+        subtitle: subtitle,
+        glyph: glyph,
+        tone: UnifiedActionTone.info,
+        profile: profile,
+        primaryLabel: 'Entendido',
+        cancelLabel: 'Cerrar',
+        onPrimary: () => Navigator.of(ctx).pop(),
+        body: Text(
+          body,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.45,
+            color: theme.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmRoleChange(
+    BuildContext context, {
+    required String nextLabel,
+    required String role,
+  }) async {
+    final theme = B2BThemeExtension.of(context);
+    final who = _accountName;
+    final from = _dossierRoleLabel;
+    final ok = await UnifiedActionDialog.show<bool>(
+      context: context,
+      builder: (ctx) => UnifiedActionDialog(
+        title: 'Cambiar rol de la cuenta',
+        subtitle: '«$who» pasará de $from a $nextLabel.',
+        glyph: LucideGlyph.arrowLeftRight,
+        tone: UnifiedActionTone.warning,
+        profile: profile,
+        primaryLabel: 'Cambiar a $nextLabel',
+        onPrimary: () => Navigator.of(ctx).pop(true),
+        body: Text(
+          profile.isEntrepreneurRetailer
+              ? 'El listado y los permisos pasan al nuevo rol. El historial de pedidos se conserva. Esta cuenta sigue marcada en el programa Minorista-Emprendedor hasta completar la verificación.'
+              : 'El listado, el catálogo y los permisos pasan al nuevo rol. El historial de pedidos se conserva.',
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.45,
+            color: theme.textSecondary,
+          ),
+        ),
+      ),
+    );
+    if (ok == true) {
+      await onSetRole(role);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _onSegment(BuildContext context, _AccountSegment segment) async {
     if (busy) return;
+    final who = _accountName;
     if (segment == _AccountSegment.entrepreneur) {
       if (profile.isEntrepreneurRetailer) return;
-      AdminCrudToast.error(
+      await _explain(
         context,
-        'El programa Minorista-Emprendedor se asigna en el alta. Esta cuenta no está en ese programa.',
+        title: 'Programa solo en el alta',
+        subtitle: '«$who» no está en Minorista-Emprendedor.',
+        glyph: LucideGlyph.rocket,
+        body:
+            'Este programa se asigna al crear la cuenta, con plazos de primera compra y documentación diferida. No se puede agregar después. Desde este expediente puedes cambiar el rol entre tienda minorista y proveedor.',
       );
       return;
     }
     if (segment == _AccountSegment.minorista) {
       if (profile.isEntrepreneurRetailer && profile.isAliado) {
-        AdminCrudToast.error(
+        await _explain(
           context,
-          'Sigue en el programa Minorista-Emprendedor. El sello del listado se mantiene hasta completar la verificación.',
+          title: 'Sigue en el programa',
+          subtitle: '«$who» ya es Minorista-Emprendedor.',
+          glyph: LucideGlyph.rocket,
+          body:
+              'El sello del listado se mantiene hasta completar la verificación. Desde aquí no se quita el programa; solo puedes confirmar el rol de tienda minorista o pasarlo a proveedor.',
         );
         return;
       }
       if (profile.isAliado) return;
-      onSetRole('aliado');
+      await _confirmRoleChange(
+        context,
+        nextLabel: 'Tienda minorista',
+        role: 'aliado',
+      );
       return;
     }
     if (profile.isImportador) return;
-    onSetRole('importador');
+    await _confirmRoleChange(
+      context,
+      nextLabel: 'Proveedor',
+      role: 'importador',
+    );
   }
 
   @override
@@ -192,13 +302,14 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
                 OwnerEntrepreneurControlPanel(
                   profile: profile,
                   onChanged: onChanged,
-                  onDeactivate: onDeactivate,
-                  onHardDelete: onHardDelete,
+                  showDocuments: false,
+                  showAccountActions: false,
                 ),
                 OwnerAccountKycDossierSection(
                   profile: profile,
                   viewerRole: viewerRole,
                   onChanged: onChanged,
+                  entrepreneurRequirements: profile.isEntrepreneurRetailer,
                 ),
                 if (profile.isImportador) ...[
                   const SizedBox(height: 16),
@@ -213,11 +324,172 @@ class AdminAccountDossierRailWeb extends StatelessWidget {
                     help: _help,
                     onSelect: (segment) => _onSegment(context, segment),
                   ),
+                if (_isB2b) ...[
+                  const SizedBox(height: 18),
+                  _EnableAccountBar(
+                    theme: theme,
+                    ready: _readyToEnable,
+                    enabled: _accessEnabled,
+                    busy: busy,
+                    onEnable: onEnable,
+                  ),
+                ],
+                if (onDeactivate != null || onHardDelete != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Cuenta',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (onDeactivate != null)
+                        OutlinedButton.icon(
+                          onPressed: busy ? null : onDeactivate,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: theme.textPrimary,
+                            side: BorderSide(color: theme.borderStrong),
+                          ),
+                          icon: LucideIcon(
+                            LucideGlyph.userMinus,
+                            size: 16,
+                            color: theme.textSecondary,
+                          ),
+                          label: const Text('Desactivar'),
+                        ),
+                      if (onHardDelete != null)
+                        OutlinedButton.icon(
+                          onPressed: busy ? null : onHardDelete,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor:
+                                Theme.of(context).colorScheme.error,
+                            side: BorderSide(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .error
+                                  .withOpacity(0.45),
+                            ),
+                          ),
+                          icon: LucideIcon(
+                            LucideGlyph.trash2,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          label: const Text('Purgar cuenta'),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EnableAccountBar extends StatelessWidget {
+  const _EnableAccountBar({
+    required this.theme,
+    required this.ready,
+    required this.enabled,
+    required this.busy,
+    required this.onEnable,
+  });
+
+  final B2BThemeExtension theme;
+  final bool ready;
+  final bool enabled;
+  final bool busy;
+  final VoidCallback? onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    if (enabled) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.successBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: theme.successFg.withOpacity(0.35)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              LucideIcon(LucideGlyph.circleCheck, size: 16, color: theme.successFg),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cuenta habilitada',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: theme.successFg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final canTap = ready && !busy && onEnable != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: canTap ? onEnable : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: theme.brand,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            disabledBackgroundColor: theme.surfaceSubtle,
+            disabledForegroundColor: theme.textMuted,
+            minimumSize: const Size.fromHeight(44),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          icon: busy
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                )
+              : LucideIcon(
+                  LucideGlyph.circlePlay,
+                  size: 16,
+                  color: canTap
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : theme.textMuted,
+                ),
+          label: const Text(
+            'Habilitar cuenta',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          canTap
+              ? 'Activa el acceso de esta cuenta ya aprobada. El estado se actualiza al confirmar.'
+              : 'Disponible cuando la cuenta está aprobada y aún no tiene acceso.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: theme.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

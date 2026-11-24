@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
@@ -21,6 +22,7 @@ import 'order_motolink_thread_section.dart';
 import 'order_return_rules.dart';
 import 'orders_service.dart';
 import 'transaction_request_message_model.dart';
+import 'mobile_chat_widgets.dart';
 
 /// Abre la bandeja de chats desde Pedidos. El encabezado ya no lleva el icono.
 class OrderChatsEntryButton extends StatelessWidget {
@@ -58,31 +60,20 @@ Future<void> showOrderChatInboxSheet({
   bool Function()? hasSession,
 }) {
   final theme = B2BThemeExtension.of(context);
-  final mobile =
-      MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+  final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
 
   if (mobile) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: theme.dialogSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(ctx).height * 0.92,
-          child: OrderChatInboxSheet(
-            homeRole: homeRole,
-            fetchOrders: fetchOrders,
-            hasSession: hasSession,
-            asPage: true,
-          ),
-        ),
-      ),
-    ).whenComplete(() {
+    return Navigator.of(context)
+        .push<void>(MaterialPageRoute(
+            builder: (_) => Scaffold(
+                backgroundColor: theme.surfaceCard,
+                body: OrderChatInboxSheet(
+                  homeRole: homeRole,
+                  fetchOrders: fetchOrders,
+                  hasSession: hasSession,
+                  asPage: true,
+                ))))
+        .whenComplete(() {
       NotificationProvider.active?.reload();
     });
   }
@@ -465,6 +456,42 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     }
     final flags =
         orderChatInboxReplyFlags(role: widget.homeRole, thread: thread);
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    void openOrder() {
+      final navigator = Navigator.of(context);
+      if (!embedded) navigator.pop();
+      navigator.pop();
+      MainShellTabController.setPendingOpenOrderChat(false);
+      MainShellTabController.setPendingNotificationType(null);
+      MainShellTabController.setPendingNotificationRelatedId(id);
+      MainShellTabController.navigateToPedidosForNotification();
+    }
+
+    if (mobile) {
+      return OrderMotolinkThreadSection(
+        key: ValueKey('pedido-$id'),
+        transactionRequestId: id,
+        mergedThreadRequestIds:
+            thread.requestIds.length > 1 ? thread.requestIds : null,
+        orderLines: thread.lines,
+        allowReplyAsAliado: flags.aliado,
+        allowReplyAsAdmin: flags.admin,
+        allowReplyAsImportador: flags.importador,
+        deliveryGrace: thread.inDeliveryGrace,
+        expandMessages: true,
+        onThreadChanged: _scheduleRefresh,
+        mobileAppBarBuilder: (actions) => MobileChatAppBar(
+            title: thread.counterpartName,
+            subtitle: 'Chat del pedido',
+            showAvatar: true,
+            logoPath: _orderLogo(thread),
+            actions: actions,
+            automaticallyImplyLeading: !embedded),
+        conversationContext: MobileOrderChatCard(
+            thread: thread, onOpenOrder: _isAdmin ? null : openOrder),
+      );
+    }
+
     return Scaffold(
       key: ValueKey('pedido-$id'),
       backgroundColor: AppColors.background,
@@ -550,6 +577,7 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
   }
 
   Widget _inbox(bool wide) {
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
     final orders = filterOrderChatThreads(
       threads: _threads,
       query: _search.text,
@@ -586,11 +614,12 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!widget.asPage)
+        if (mobile) _mobileInboxHeader(isOrders),
+        if (!mobile && !widget.asPage)
           ListTile(
               title: const Text('Chats'),
               trailing: CloseButton(onPressed: () => Navigator.pop(context))),
-        if (!_signedOut)
+        if (!mobile && !_signedOut)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Column(
@@ -675,6 +704,14 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
               ],
             ),
           ),
+        if (mobile && !_signedOut)
+          Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                  '$count ${count == 1 ? 'conversación' : 'conversaciones'}',
+                  style: TextStyle(
+                      color: B2BThemeExtension.of(context).textSecondary,
+                      fontSize: 13))),
         if (_loading)
           const LinearProgressIndicator(semanticsLabel: 'Actualizando chats')
         else
@@ -721,8 +758,10 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
                               key: PageStorageKey(_kind),
                               controller: _scroll,
                               itemCount: count,
-                              separatorBuilder: (_, __) => const Divider(
-                                  height: 1, indent: 16, endIndent: 16),
+                              separatorBuilder: (_, __) => Divider(
+                                  height: 1,
+                                  indent: mobile ? 84 : 16,
+                                  endIndent: 16),
                               itemBuilder: (_, i) => isOrders
                                   ? _orderTile(orders[i], wide)
                                   : _directTile(direct[i], wide),
@@ -753,6 +792,8 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
       at: _activity(thread),
       unread: _orderUnread(thread.requestIds),
       wide: wide,
+      logoPath: _orderLogo(thread),
+      readOnly: !thread.canReply && !_isAdmin,
     );
   }
 
@@ -766,6 +807,7 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
         at: item.lastAt,
         unread: _directUnread(item.thread.id),
         wide: wide,
+        logoPath: item.thread.logoFor(SupabaseAccess.currentUserId),
       );
 
   Widget _tile({
@@ -776,84 +818,266 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
     required DateTime? at,
     required int unread,
     required bool wide,
+    String? logoPath,
+    bool readOnly = false,
   }) {
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    final theme = B2BThemeExtension.of(context);
     final selected = wide && id == _selectedId;
     final muted = TextStyle(color: AppColors.textSecondary, fontSize: 12);
-    return Material(
-      color:
-          selected || unread > 0 ? AppColors.surfaceTinted : Colors.transparent,
-      child: InkWell(
-        onTap: () => _open(id, wide),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: AppColors.brandBlueContainer,
-                foregroundColor: AppColors.textPrimary,
-                child: Text(title.trim().isEmpty
-                    ? '?'
-                    : title.trim().characters.first.toUpperCase()),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Column(
+    return Container(
+        margin: mobile
+            ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2)
+            : null,
+        child: Material(
+          borderRadius: mobile ? BorderRadius.circular(16) : null,
+          clipBehavior: mobile ? Clip.antiAlias : Clip.none,
+          color: selected || unread > 0
+              ? AppColors.surfaceTinted
+              : Colors.transparent,
+          child: InkWell(
+            onTap: () => _open(id, wide),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: mobile ? 8 : 16, vertical: 12),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontWeight:
-                              unread > 0 ? FontWeight.w800 : FontWeight.w700)),
-                  const SizedBox(height: 3),
-                  Text(preview,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: unread > 0
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary)),
-                  if (contextLabel.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Text(contextLabel,
+                  if (mobile)
+                    ChatBusinessAvatar(name: title, logoPath: logoPath)
+                  else
+                    CircleAvatar(
+                      radius: 17,
+                      backgroundColor: AppColors.brandBlueContainer,
+                      foregroundColor: AppColors.textPrimary,
+                      child: Text(title.trim().isEmpty
+                          ? '?'
+                          : title.trim().characters.first.toUpperCase()),
+                    ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: muted),
-                    ),
-                ],
-              )),
-              if (at != null || unread > 0) ...[
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 82),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (at != null)
-                        Tooltip(
-                            message: formatEsShortDateTime(at),
-                            child: Text(_shortTime(at),
-                                style: muted, textAlign: TextAlign.end)),
-                      if (unread > 0)
+                          style: TextStyle(
+                              fontSize: mobile ? 15 : null,
+                              fontWeight: unread > 0
+                                  ? FontWeight.w800
+                                  : FontWeight.w700)),
+                      const SizedBox(height: 3),
+                      Text(preview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: mobile ? 14 : null,
+                              color: unread > 0
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary)),
+                      if (contextLabel.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.only(top: 5),
-                          child: Badge(
-                              label: Text(unread > 99 ? '99+' : '$unread')),
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                              mobile
+                                  ? contextLabel.replaceAll(
+                                      ' · Solo lectura', '')
+                                  : contextLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: muted),
                         ),
+                      if (mobile && readOnly)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 5),
+                            child: Row(children: [
+                              Icon(Icons.lock_outline,
+                                  size: 13, color: theme.textSecondary),
+                              const SizedBox(width: 4),
+                              Text('Solo lectura', style: muted),
+                            ])),
                     ],
-                  ),
-                ),
-              ],
-            ],
+                  )),
+                  if (at != null || unread > 0) ...[
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 82),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (at != null)
+                            Tooltip(
+                                message: formatEsShortDateTime(at),
+                                child: Text(_shortTime(at),
+                                    style: muted, textAlign: TextAlign.end)),
+                          if (unread > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 5),
+                              child: Badge(
+                                  backgroundColor:
+                                      mobile ? mobileChatBlue : null,
+                                  textColor: mobile ? Colors.white : null,
+                                  label: Text(unread > 99 ? '99+' : '$unread')),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        ));
+  }
+
+  String? _orderLogo(OrderChatThread thread) =>
+      widget.homeRole == AppHomeRole.aliado
+          ? thread.lines.firstOrNull?.ownerLogoStoragePath
+          : thread.lines.firstOrNull?.aliadoLogoStoragePath;
+
+  Widget _mobileInboxHeader(bool isOrders) {
+    final theme = B2BThemeExtension.of(context);
+    final unread = isOrders
+        ? _threads.where((t) => _orderUnread(t.requestIds) > 0).length
+        : _consultas.where((t) => _directUnread(t.thread.id) > 0).length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(
+          decoration: const BoxDecoration(
+              color: mobileChatBlue,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(24))),
+          child: SafeArea(
+              bottom: false,
+              child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+                  child: Column(children: [
+                    Row(children: [
+                      BackButton(
+                          color: Colors.white,
+                          onPressed: () => Navigator.maybePop(context)),
+                      const Expanded(
+                        child: B2bHeaderTitle(
+                          title: Text('Chats',
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white)),
+                        ),
+                      ),
+                      IconButton(
+                          tooltip: 'Actualizar chats',
+                          onPressed: _loading ? null : _load,
+                          color: Colors.white,
+                          disabledColor: Colors.white70,
+                          icon: const Icon(Icons.refresh)),
+                    ]),
+                    if (!_signedOut)
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+                          child: TextField(
+                            controller: _search,
+                            onChanged: (_) => setState(() {}),
+                            style: const TextStyle(
+                                color: Color(0xFF172240), fontSize: 14),
+                            decoration: InputDecoration(
+                                hintText: isOrders
+                                    ? 'Pedido, negocio, producto o SKU…'
+                                    : 'Buscar negocio o producto…',
+                                hintStyle:
+                                    const TextStyle(color: Color(0xFF52617A)),
+                                prefixIcon: const Icon(Icons.search,
+                                    color: Color(0xFF52617A)),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                    borderSide: BorderSide.none),
+                                enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                    borderSide: BorderSide.none)),
+                          )),
+                  ])))),
+      if (!_signedOut)
+        Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!_isAdmin)
+                    SegmentedButton<_ChatKind>(
+                        showSelectedIcon: false,
+                        style: ButtonStyle(
+                            minimumSize:
+                                const WidgetStatePropertyAll(Size(0, 44)),
+                            backgroundColor: WidgetStateProperty.resolveWith(
+                                (s) => s.contains(WidgetState.selected)
+                                    ? mobileChatBlue
+                                    : theme.brandContainer),
+                            foregroundColor: WidgetStateProperty.resolveWith(
+                                (s) => s.contains(WidgetState.selected)
+                                    ? Colors.white
+                                    : theme.textPrimary)),
+                        segments: const [
+                          ButtonSegment(
+                              value: _ChatKind.pedidos, label: Text('Pedidos')),
+                          ButtonSegment(
+                              value: _ChatKind.consultas,
+                              label: Text('Consultas'))
+                        ],
+                        selected: {_kind},
+                        onSelectionChanged: (selection) {
+                          if (_scroll.hasClients) _scroll.jumpTo(0);
+                          setState(() {
+                            _kind = selection.single;
+                            _selectedId = null;
+                            _search.clear();
+                          });
+                        }),
+                  const SizedBox(height: 8),
+                  Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        FilterChip(
+                            label:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Text('No leídos'),
+                              if (unread > 0) ...[
+                                const SizedBox(width: 6),
+                                Badge(
+                                    backgroundColor: mobileChatBlue,
+                                    textColor: Colors.white,
+                                    label: Text('$unread'))
+                              ]
+                            ]),
+                            selected: _unreadOnly,
+                            onSelected: (value) =>
+                                setState(() => _unreadOnly = value)),
+                        OutlinedButton.icon(
+                            onPressed: _editFilters,
+                            icon: const Icon(Icons.tune, size: 18),
+                            label: const Text('Filtros')),
+                        if (isOrders && _filter != OrderChatInboxFilter.all)
+                          InputChip(
+                              label: Text(_statusLabel(_filter)),
+                              onDeleted: () => setState(
+                                  () => _filter = OrderChatInboxFilter.all)),
+                        if (_datePreset != _DatePreset.all)
+                          InputChip(
+                              label: Text(_dateLabel(_datePreset)),
+                              onDeleted: () => setState(() {
+                                    _datePreset = _DatePreset.all;
+                                    _customFrom = null;
+                                    _customTo = null;
+                                  })),
+                      ]),
+                ])),
+    ]);
   }
 
   String _shortTime(DateTime at) {
@@ -869,27 +1093,30 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
   }
 
   Widget _notice(String title, String description,
-          {Widget? action, Widget? glyph}) =>
-      Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              glyph ??
-                  LucideIcon(LucideGlyph.messageCircle,
-                      size: 28, color: AppColors.textSecondary),
-              const SizedBox(height: 8),
-              Text(title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text(description,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary)),
-              if (action != null) action,
-            ],
-          ),
-        ),
-      );
+      {Widget? action, Widget? glyph}) {
+    final content = Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          glyph ??
+              LucideIcon(LucideGlyph.messageCircle,
+                  size: 28, color: AppColors.textSecondary),
+          const SizedBox(height: 8),
+          Text(title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(description,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary)),
+          if (action != null) action,
+        ],
+      ),
+    );
+    return Center(
+        child: MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu
+            ? SingleChildScrollView(child: content)
+            : content);
+  }
 }

@@ -177,23 +177,24 @@ class AppDecorations {
 SnackBarThemeData _snackBarTheme({
   required Color background,
   required Color foreground,
-  required Color action,
 }) {
   return SnackBarThemeData(
     backgroundColor: background,
     contentTextStyle: TextStyle(
       color: foreground,
       fontSize: 14,
-      fontWeight: FontWeight.w500,
+      fontWeight: FontWeight.w600,
       height: 1.35,
     ),
-    actionTextColor: action,
+    actionBackgroundColor: const Color(0xFF004BDD),
+    actionTextColor: AppColors.white,
     disabledActionTextColor: foreground.withOpacity(0.45),
+    closeIconColor: foreground,
     behavior: SnackBarBehavior.floating,
-    elevation: 3,
+    elevation: 4,
     shape: RoundedRectangleBorder(
-      borderRadius: AppDecorations.radius12,
-      side: BorderSide(color: foreground.withOpacity(0.18)),
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(color: foreground.withOpacity(0.14)),
     ),
     insetPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
   );
@@ -224,9 +225,8 @@ ThemeData buildAppTheme() {
       onError: AppColors.white,
     ),
     snackBarTheme: _snackBarTheme(
-      background: primary,
-      foreground: AppColors.white,
-      action: const Color(0xFFE0EBFF),
+      background: AppColors.white,
+      foreground: B2BThemeExtension.light.textPrimary,
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.white,
@@ -335,7 +335,6 @@ ThemeData buildAppDarkTheme() {
     snackBarTheme: _snackBarTheme(
       background: elevated,
       foreground: onSurface,
-      action: primary,
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: surface,

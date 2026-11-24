@@ -20,6 +20,8 @@ import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_cart_price.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
+import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
@@ -30,6 +32,10 @@ import 'cart_suggestions.dart';
 import 'cart_suggestions_section.dart';
 import 'importer_min_order.dart';
 import 'min_order_currency.dart';
+import 'mobile_checkout_model.dart';
+import 'mobile_checkout_screen.dart';
+import 'checkout_attempt.dart';
+import 'checkout_delivery_data.dart';
 
 part 'cart_screen_web.dart';
 
@@ -61,16 +67,7 @@ enum _PagoMoneda { bolivares, usd }
 
 /// Every display currency starts with the same effective price as checkout.
 double _cartUnitDollars(CartLine line, _PagoMoneda modo) {
-  switch (modo) {
-    case _PagoMoneda.usd:
-      return ProductCatalogPricing.aliadoUnitUsdPaymentLine(
-          refUnitUsd: line.precioUnitarioAliadoRef,
-          salePriceUsd: line.part.salePriceUsd,
-          discountRules: line.part.discountRules,
-          ownerPagoSoloDivisas: line.part.ownerPagoSoloDivisas);
-    case _PagoMoneda.bolivares:
-      return line.precioUnitarioAliadoRef;
-  }
+  return checkoutUnitPrice(line, payUsd: modo == _PagoMoneda.usd);
 }
 
 String _cartMoney(double dollars, _PagoMoneda modo, double? tasa) {
@@ -103,6 +100,37 @@ class _CartScreenState extends State<CartScreen> {
   final Map<String, Timer> _suggestionConfirmTimers = {};
   final GlobalKey _summaryKey = GlobalKey();
   double _summaryHeight = 420;
+  bool get _mobileCheckout =>
+      MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+  bool _supplierPaysUsd(String owner) {
+    final lines = _cart.supplierGroups[owner] ?? const <CartLine>[];
+    if (lines.any((line) => line.part.ownerPagoSoloDivisas) ||
+        (_tasa ?? 0) <= 0) return true;
+    return _cart.supplierCurrencyPreferences[owner] ??
+        (_pagoMoneda == _PagoMoneda.usd);
+  }
+
+  Map<String, bool> get _supplierCurrencies => {
+        for (final owner in _cart.supplierGroups.keys)
+          owner: _supplierPaysUsd(owner),
+      };
+  _PagoMoneda _modeFor(List<CartLine> lines) =>
+      _mobileCheckout && lines.isNotEmpty
+          ? (_supplierPaysUsd(lines.first.part.ownerId ?? '')
+              ? _PagoMoneda.usd
+              : _PagoMoneda.bolivares)
+          : _pagoMoneda;
+  MobileCheckoutTotals get _mobileTotals => MobileCheckoutTotals(
+      lines: _cart.lines,
+      payUsd: _pagoMoneda == _PagoMoneda.usd,
+      payUsdBySupplier: _supplierCurrencies,
+      credits: {
+        for (final e in _credits.entries)
+          if (!_creditOptOut.contains(e.key)) e.key: e.value.remaining
+      },
+      carriers: const {},
+      supplierCount: _cart.supplierGroups.length,
+      rate: _tasa);
 
   void _selectDesktopCurrency(int index) {
     setState(() => _pagoMoneda = _PagoMoneda.values[index]);
@@ -276,7 +304,7 @@ class _CartScreenState extends State<CartScreen> {
   double _groupSubtotal(List<CartLine> lines) => lines.fold<double>(
         0,
         (sum, line) =>
-            sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity,
+            sum + _cartUnitDollars(line, _modeFor(lines)) * line.quantity,
       );
 
   double _creditFor(List<CartLine> lines) {
@@ -327,6 +355,12 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _checkout() async {
+    if (_cart.pendingCheckoutAttempt != null &&
+        !_submitting &&
+        !_choosingDelivery) {
+      await _recoverPendingCheckout();
+      return;
+    }
     if (!_cart.canEdit ||
         _cart.isEmpty ||
         _submitting ||
@@ -334,6 +368,11 @@ class _CartScreenState extends State<CartScreen> {
         !_cart.meetsAllImporterMinOrders ||
         _desktopShortOnUsdMinimum ||
         _desktopShortOnUnits) {
+      return;
+    }
+
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      await _checkoutMobile();
       return;
     }
 
@@ -428,6 +467,239 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  Future<void> _checkoutMobile() async {
+    final revision = _cart.accountRevision;
+    final snapshot = _cart.lines
+        .map((line) => CartLine(
+            part: line.part,
+            quantity: line.quantity,
+            precioUnitarioAliadoRef: line.precioUnitarioAliadoRef))
+        .toList();
+    String fingerprint(Iterable<CartLine> lines) => lines
+        .map((l) => '${l.part.id}:${l.quantity}:${l.precioUnitarioAliadoRef}')
+        .join('|');
+    final original = fingerprint(snapshot);
+    final promos =
+        Map<String, String>.from(_cart.promoAttributionPayloadForCheckout());
+    final applyCredit = _creditPayload();
+    final credits = <String, double>{
+      for (final e in applyCredit.entries)
+        if (e.value) e.key: _credits[e.key]?.remaining ?? 0
+    };
+    String? createdId;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _choosingDelivery = true);
+    try {
+      final exit = await Navigator.of(context)
+          .push<MobileCheckoutExit>(MaterialPageRoute(
+              builder: (_) => MobileCheckoutScreen(
+                    profile: widget.profile,
+                    lines: snapshot,
+                    initialPayUsd: _pagoMoneda == _PagoMoneda.usd,
+                    initialPayUsdBySupplier: _supplierCurrencies,
+                    onCurrenciesChanged: (choices) {
+                      if (revision == _cart.accountRevision) {
+                        _cart.setSupplierCurrencies(choices);
+                      }
+                    },
+                    rate: _tasa,
+                    credits: credits,
+                    loadAddresses: CheckoutDeliveryData.loadAddresses,
+                    saveAddress: CheckoutDeliveryData.saveAddress,
+                    deleteAddress: CheckoutDeliveryData.deleteAddress,
+                    loadPickups: CheckoutDeliveryData.loadPickups,
+                    submit: (submission) async {
+                      if (!mounted ||
+                          _submitting ||
+                          !_cart.canEdit ||
+                          _cart.isEmpty ||
+                          revision != _cart.accountRevision ||
+                          original != fingerprint(_cart.lines)) {
+                        throw const MobileCheckoutException(
+                            'Tu bolsa cambió. Vuelve a ella y revisa los productos antes de confirmar.');
+                      }
+                      if (!_cart.meetsAllImporterMinOrders) {
+                        throw const MobileCheckoutException(
+                            'Completa el mínimo de cada proveedor para continuar.');
+                      }
+                      if (snapshot.any((line) =>
+                          !submission.paysUsd(line.part.ownerId ?? '') &&
+                          (line.part.ownerPagoSoloDivisas ||
+                              (_tasa ?? 0) <= 0))) {
+                        throw const MobileCheckoutException(
+                            'Revisa la moneda de pago. Hay proveedores que requieren divisas o falta la tasa BCV.');
+                      }
+                      setState(() => _submitting = true);
+                      try {
+                        final attempt = await _cart.prepareCheckoutAttempt(
+                            CheckoutAttempt.signatureFor({
+                              'lines': [
+                                for (final l in snapshot)
+                                  {
+                                    'product_id': l.part.id,
+                                    'cantidad': l.quantity
+                                  }
+                              ],
+                              'destination': {
+                                'profile': submission.destination.useProfile,
+                                'text': submission.destination.texto,
+                                'maps': submission.destination.mapsUrl,
+                                'saved': submission.savedAddressId
+                              },
+                              'currencies': submission.currenciesBySupplier,
+                              'carriers': submission.carriers,
+                              'pickups': submission.deliveryBySupplier,
+                              'promos': promos,
+                              'credit': applyCredit,
+                            }),
+                            resolve: CheckoutDeliveryData.resolveAttempt);
+                        final id =
+                            await SupabaseService.checkoutMultiImportadorCart(
+                                lines: [
+                              for (final l in snapshot)
+                                {
+                                  'product_id': l.part.id,
+                                  'cantidad': l.quantity
+                                }
+                            ],
+                                destinoEntregaUsaPerfil:
+                                    submission.destination.useProfile,
+                                destinoEntregaTexto:
+                                    submission.destination.texto,
+                                destinoEntregaMapsUrl:
+                                    submission.destination.mapsUrl,
+                                promoByImportador: promos,
+                                applyCreditByImportador: applyCredit,
+                                carriersByImportador: submission.carriers,
+                                moneda:
+                                    submission.payUsd ? 'DIVISAS' : 'BOLIVARES',
+                                currencyByImportador:
+                                    submission.currenciesBySupplier,
+                                requestId: attempt.id,
+                                savedAddressId: submission.savedAddressId,
+                                deliveryByImportador:
+                                    submission.deliveryBySupplier);
+                        if (id.trim().isEmpty) {
+                          throw const MobileCheckoutException(
+                              'No recibimos la referencia. Revisa Pedidos antes de volver a enviar.');
+                        }
+                        createdId = id;
+                        final totals = MobileCheckoutTotals(
+                            lines: snapshot,
+                            payUsd: submission.payUsd,
+                            payUsdBySupplier: submission.payUsdBySupplier,
+                            credits: credits,
+                            carriers: const {},
+                            supplierCount: submission.carriers.length);
+                        if (revision == _cart.accountRevision) {
+                          _cart.completeCheckout();
+                        }
+                        MainShellTabController.notifyPedidosReload();
+                        try {
+                          trackPurchase(
+                              orderId: id, valueUsd: totals.netProducts);
+                        } catch (_) {
+                          // Analytics must not turn a created order into a failed checkout.
+                        }
+                        return id;
+                      } on CheckoutRecoveredException catch (recovered) {
+                        createdId = recovered.orderId;
+                        if (revision == _cart.accountRevision) {
+                          if (recovered.samePayload &&
+                              original == fingerprint(_cart.lines)) {
+                            _cart.completeCheckout();
+                          } else {
+                            _cart.acknowledgeCheckout();
+                          }
+                        }
+                        MainShellTabController.notifyPedidosReload();
+                        throw MobileCheckoutRecovered(recovered.orderId);
+                      } on ProfileLocationException catch (error) {
+                        throw MobileCheckoutException(error.message);
+                      } catch (error) {
+                        if (error.toString().contains('PGRST202')) {
+                          throw const MobileCheckoutException(
+                              'Esta forma de confirmar aún no está disponible. No se creó el pedido y conservamos tu selección.');
+                        }
+                        final minOrderError = cartMinOrderErrorMessage(error);
+                        if (minOrderError != null) {
+                          throw MobileCheckoutException(minOrderError);
+                        }
+                        rethrow;
+                      } finally {
+                        if (mounted) setState(() => _submitting = false);
+                      }
+                    },
+                  )));
+      if (!mounted || createdId == null) return;
+      Navigator.of(context).pop(true);
+      if (exit?.viewOrder == true) {
+        MainShellTabController.setPendingOpenOrderChat(false);
+        MainShellTabController.setPendingNotificationType(null);
+        MainShellTabController.setPendingNotificationRelatedId(createdId);
+        MainShellTabController.navigateToPedidosForNotification();
+      }
+    } finally {
+      if (mounted) setState(() => _choosingDelivery = false);
+    }
+  }
+
+  Future<void> _recoverPendingCheckout() async {
+    final attempt = _cart.pendingCheckoutAttempt;
+    if (attempt == null ||
+        _submitting ||
+        _choosingDelivery ||
+        _cart.restoring) {
+      return;
+    }
+    final revision = _cart.accountRevision;
+    setState(() => _submitting = true);
+    try {
+      final orderId = await CheckoutDeliveryData.resolveAttempt(attempt.id);
+      if (!mounted || revision != _cart.accountRevision) return;
+      if (orderId == null || orderId.isEmpty) {
+        _cart.acknowledgeCheckout();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'La confirmación anterior no creó un pedido. Puedes revisar tu bolsa y continuar.')));
+        return;
+      }
+      if (attempt.cartSignature == _cart.checkoutCartSignature) {
+        _cart.completeCheckout();
+      } else {
+        _cart.acknowledgeCheckout();
+      }
+      MainShellTabController.notifyPedidosReload();
+      final view = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+                  title: const Text('Pedido recuperado'),
+                  content: Text(
+                      'Tu pedido #${orderId.substring(0, 8).toUpperCase()} ya había sido creado. No se envió otra vez.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Volver a la bolsa')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Ver pedido'))
+                  ]));
+      if (view == true && mounted) {
+        MainShellTabController.setPendingNotificationRelatedId(orderId);
+        MainShellTabController.navigateToPedidosForNotification();
+        Navigator.pop(context, true);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'No pudimos verificar la confirmación anterior. Conservamos la referencia; reintenta cuando tengas conexión.')));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
   void _removeLine(CartLine line) {
     final accountRevision = _cart.accountRevision;
     final campaign = _cart.promoCampaignIdForImportador(line.part.ownerId);
@@ -436,14 +708,9 @@ class _CartScreenState extends State<CartScreen> {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final narrow = MediaQuery.sizeOf(context).width < 980;
     // Con checkout sticky: subir el banner. Bolsa vacía: pegarlo abajo.
-    final bottomGap = _cart.isEmpty
-        ? 12.0
-        : (narrow ? 88.0 : 24.0);
+    final bottomGap = _cart.isEmpty ? 12.0 : (narrow ? 88.0 : 24.0);
     void undo() {
-      messenger.hideCurrentSnackBar();
-      if (!mounted ||
-          _submitting ||
-          accountRevision != _cart.accountRevision) {
+      if (!mounted || _submitting || accountRevision != _cart.accountRevision) {
         return;
       }
       if (_cart.lines.any((item) => item.part.id == line.part.id)) return;
@@ -456,53 +723,15 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
 
-    messenger.showSnackBar(SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: const Color(0xFF0A317B),
-      elevation: 0,
+    messenger.showSnackBar(appActionNotice(
       margin: EdgeInsets.fromLTRB(16, 0, 16, bottomGap + bottomInset),
-      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       duration: const Duration(seconds: 5),
-      content: Row(
-        children: [
-          const LucideIcon(LucideGlyph.handbag,
-              size: 18, color: AppColors.white),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'Producto eliminado',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Material(
-            color: const Color(0xFF004BDD),
-            borderRadius: BorderRadius.circular(999),
-            child: InkWell(
-              onTap: undo,
-              borderRadius: BorderRadius.circular(999),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                child: Text(
-                  'Deshacer',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      content: const AppNoticeMessage(
+        'Producto eliminado',
+        icon: LucideGlyph.handbag,
       ),
+      actionLabel: 'Deshacer',
+      onAction: undo,
     ));
   }
 
@@ -522,121 +751,243 @@ class _CartScreenState extends State<CartScreen> {
     return matches.isEmpty ? null : matches.first;
   }
 
+  List<Widget> _mixedSummaryRows(MobileCheckoutTotals totals, double? rate) {
+    final usd = totals.suppliers.values.where((s) => s.payUsd);
+    final bs = totals.suppliers.values.where((s) => !s.payUsd);
+    final usdCredit = usd.fold(0.0, (sum, s) => sum + s.credit);
+    final bsCredit = bs.fold(0.0, (sum, s) => sum + s.credit);
+    final savings = usd.fold(0.0, (sum, s) => sum + s.usdSavings);
+    return [
+      if (usdCredit > 0) ...[
+        _CartSummaryRow(
+            label: 'Productos en USD',
+            value:
+                '${formatRefAmount(usd.fold(0.0, (sum, s) => sum + s.products))} USD'),
+        const SizedBox(height: 8),
+        _CartSummaryRow(
+            label: 'Saldo a favor en USD',
+            value: '−${formatRefAmount(usdCredit)} USD'),
+      ],
+      const SizedBox(height: 10),
+      _CartSummaryRow(
+          key: const ValueKey('cart-total-usd'),
+          label: 'Subtotal en USD',
+          value: '${formatRefAmount(totals.netUsd)} USD',
+          prominent: true),
+      const SizedBox(height: 12),
+      Divider(height: 1, color: AppColors.divider),
+      const SizedBox(height: 12),
+      _CartSummaryRow(
+          label: bsCredit > 0 ? 'Productos en REF' : 'Base en REF',
+          value:
+              '${formatRefAmount(bs.fold(0.0, (sum, s) => sum + s.products))} REF'),
+      if (bsCredit > 0) ...[
+        const SizedBox(height: 8),
+        _CartSummaryRow(
+            label: 'Saldo a favor en REF',
+            value: '−${formatRefAmount(bsCredit)} REF'),
+      ],
+      const SizedBox(height: 10),
+      _CartSummaryRow(
+          key: const ValueKey('cart-total-bs'),
+          label: 'Subtotal en bolívares',
+          value: rate != null && rate > 0
+              ? formatBsLabel(totals.netRef * rate)
+              : '${formatRefAmount(totals.netRef)} REF',
+          prominent: true),
+      if (rate != null && rate > 0) ...[
+        const SizedBox(height: 8),
+        _CartBcvRate(tasa: rate, effectiveDate: _tasaEffectiveDate),
+      ],
+      if (savings > 0.009) ...[
+        const SizedBox(height: 12),
+        _CartSummaryRow(
+            label: 'Ahorro en USD', value: '${formatRefAmount(savings)} USD'),
+      ],
+      const SizedBox(height: 10),
+      const Text('Cada proveedor recibe el pago en la moneda elegida.',
+          style: TextStyle(fontSize: 12)),
+    ];
+  }
+
   Widget _buildSupplierGroup(
       MapEntry<String, List<CartLine>> entry, double? tasa) {
     final progress = _progressFor(entry.value);
     final ownerId = entry.value.first.part.ownerId?.trim() ?? '';
+    final mode = _modeFor(entry.value);
+    final quote = MobileSupplierTotals(
+        lines: entry.value,
+        payUsd: mode == _PagoMoneda.usd,
+        availableCredit: _creditOptOut.contains(ownerId)
+            ? 0
+            : _credits[ownerId]?.remaining ?? 0);
     return _CartPanel(
+        key: ValueKey('cart-supplier-$ownerId'),
         child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          child: Row(children: [
-            const LucideIcon(LucideGlyph.store,
-                size: 20, color: AppColors.brandBlue),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(_cart.importadorDisplayName(entry.key),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: Color(0xFF004BDD)))),
-            if (entry.value.any((l) => l.part.ownerPagoSoloDivisas)) ...[
-              const SizedBox(width: 8),
-              Flexible(
-                child: _CartOfferChip(
-                    label: 'Solo divisas',
-                    bg: AppColors.infoSurface,
-                    fg: AppColors.brandLink,
-                    border: AppColors.borderSubtle),
-              ),
-            ],
-            if (_importerGroupHasPromo(entry.value)) ...[
-              const SizedBox(width: 8),
-              Flexible(
-                child: _CartOfferChip(
-                    label: 'Promoción',
-                    bg: AppColors.brandBlueContainer,
-                    fg: AppColors.brandLink,
-                    border: AppColors.divider),
-              ),
-            ],
-          ]),
-        ),
-        Divider(height: 1, color: AppColors.divider),
-        if (progress != null && progress.hasMinimum)
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                        progress.meets
-                            ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
-                            : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: progress.meets
-                                ? AppColors.successGreen
-                                : AppColors.textPrimary)),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                            value: progress.fraction,
-                            minHeight: 4,
-                            backgroundColor: AppColors.divider,
-                            color: progress.meets
-                                ? AppColors.successGreen
-                                : AppColors.brandBlue)),
-                  ])),
-        if ((_credits[ownerId]?.remaining ?? 0) > 0)
-          Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: _CreditToggle(
-                lines: entry.value,
-                balance: _credits[ownerId],
-                availableLabel: _cartMoney(
-                    _credits[ownerId]?.remaining ?? 0, _pagoMoneda, tasa),
-                appliedLabel:
-                    _cartMoney(_creditFor(entry.value), _pagoMoneda, tasa),
-                optedOut: _creditOptOut.contains(ownerId),
-                onChanged: (useCredit) => setState(() {
-                  if (useCredit) {
-                    _creditOptOut.remove(ownerId);
-                  } else {
-                    _creditOptOut.add(ownerId);
-                  }
-                }),
-              )),
-        for (var i = 0; i < entry.value.length; i++) ...[
-          if (i > 0)
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Divider(height: 1, color: AppColors.divider)),
-          _CartLineDismissible(
-            lineId: entry.value[i].part.id,
-            enabled: !_submitting && _cart.canEdit,
-            onDismissed: () => _removeLine(entry.value[i]),
-            child: _CartLineCard(
-              line: entry.value[i],
-              modo: _pagoMoneda,
-              tasa: tasa,
-              onRemove: _submitting || !_cart.canEdit
-                  ? null
-                  : () => _removeLine(entry.value[i]),
-              onQuantityChanged: _submitting || !_cart.canEdit
-                  ? null
-                  : (qty) => _cart.setQuantity(entry.value[i].part.id, qty),
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(children: [
+                const LucideIcon(LucideGlyph.store,
+                    size: 20, color: AppColors.brandBlue),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text(_cart.importadorDisplayName(entry.key),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: Color(0xFF004BDD)))),
+                if (entry.value.any((l) => l.part.ownerPagoSoloDivisas)) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: _CartOfferChip(
+                        label: 'Solo divisas',
+                        bg: AppColors.infoSurface,
+                        fg: AppColors.brandLink,
+                        border: AppColors.borderSubtle),
+                  ),
+                ],
+                if (_importerGroupHasPromo(entry.value)) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: _CartOfferChip(
+                        label: 'Promoción',
+                        bg: AppColors.brandBlueContainer,
+                        fg: AppColors.brandLink,
+                        border: AppColors.divider),
+                  ),
+                ],
+              ]),
             ),
-          ),
-        ],
-      ],
-    ));
+            Divider(height: 1, color: AppColors.divider),
+            if (progress != null && progress.hasMinimum)
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                            progress.meets
+                                ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
+                                : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: progress.meets
+                                    ? AppColors.successGreen
+                                    : AppColors.textPrimary)),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                                value: progress.fraction,
+                                minHeight: 4,
+                                backgroundColor: AppColors.divider,
+                                color: progress.meets
+                                    ? AppColors.successGreen
+                                    : AppColors.brandBlue)),
+                      ])),
+            if ((_credits[ownerId]?.remaining ?? 0) > 0)
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: _CreditToggle(
+                    lines: entry.value,
+                    balance: _credits[ownerId],
+                    availableLabel: _cartMoney(
+                        _credits[ownerId]?.remaining ?? 0, mode, tasa),
+                    appliedLabel:
+                        _cartMoney(_creditFor(entry.value), mode, tasa),
+                    optedOut: _creditOptOut.contains(ownerId),
+                    onChanged: (useCredit) => setState(() {
+                      if (useCredit) {
+                        _creditOptOut.remove(ownerId);
+                      } else {
+                        _creditOptOut.add(ownerId);
+                      }
+                    }),
+                  )),
+            for (var i = 0; i < entry.value.length; i++) ...[
+              if (i > 0)
+                Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Divider(height: 1, color: AppColors.divider)),
+              _CartLineDismissible(
+                lineId: entry.value[i].part.id,
+                enabled: !_submitting && _cart.canEdit,
+                onDismissed: () => _removeLine(entry.value[i]),
+                child: _CartLineCard(
+                  line: entry.value[i],
+                  modo: mode,
+                  tasa: tasa,
+                  onRemove: _submitting || !_cart.canEdit
+                      ? null
+                      : () => _removeLine(entry.value[i]),
+                  onQuantityChanged: _submitting || !_cart.canEdit
+                      ? null
+                      : (qty) => _cart.setQuantity(entry.value[i].part.id, qty),
+                ),
+              ),
+            ],
+            if (_mobileCheckout)
+              Padding(
+                  key: ValueKey('supplier-currency-$ownerId'),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Divider(height: 20, color: AppColors.divider),
+                        const Text('Moneda de pago',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 13)),
+                        const SizedBox(height: 8),
+                        _CartCurrencySelector(
+                            selected: mode.index,
+                            labels: const ['Bolívares', 'USD'],
+                            canPayBolivares: (_tasa ?? 0) > 0 &&
+                                !entry.value.any(
+                                    (line) => line.part.ownerPagoSoloDivisas),
+                            onSelected: _submitting ||
+                                    _choosingDelivery ||
+                                    !_cart.canEdit
+                                ? null
+                                : (index) => _cart.setSupplierCurrencies(
+                                    {ownerId: index == _PagoMoneda.usd.index})),
+                        const SizedBox(height: 8),
+                        if (entry.value
+                            .any((line) => line.part.ownerPagoSoloDivisas))
+                          const Text('Este proveedor solo acepta USD.',
+                              style: TextStyle(fontSize: 12))
+                        else if ((_tasa ?? 0) <= 0)
+                          const Text(
+                              'Bolívares no disponible: falta la tasa BCV.',
+                              style: TextStyle(fontSize: 12)),
+                        if (quote.usdSavings > 0.009)
+                          Text(
+                              mode == _PagoMoneda.usd
+                                  ? 'Ahorras ${formatRefAmount(quote.usdSavings)} USD con este proveedor.'
+                                  : 'Si pagas en USD, ahorras ${formatRefAmount(quote.usdSavings)} USD.',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.textPrimary))
+                        else
+                          const Text('Elige la moneda para este proveedor.',
+                              style: TextStyle(fontSize: 12)),
+                        const SizedBox(height: 10),
+                        _CartSummaryRow(
+                            label: 'Subtotal del proveedor',
+                            value:
+                                '${formatRefAmount(quote.net)} ${quote.payUsd ? 'USD' : 'REF'}'),
+                        if (!quote.payUsd && (tasa ?? 0) > 0) ...[
+                          const SizedBox(height: 6),
+                          _CartSummaryRow(
+                              label: 'En bolívares',
+                              value: formatBsLabel(quote.net * tasa!)),
+                        ],
+                      ])),
+          ],
+        ));
   }
 
   @override
@@ -645,28 +996,47 @@ class _CartScreenState extends State<CartScreen> {
       return _buildDesktopCartScreen(this);
     }
     final tasa = _tasa;
+    final mobileCheckout = _mobileCheckout;
+    final mobileTotals = mobileCheckout ? _mobileTotals : null;
     final grossRef = _cart.totalRef();
-    final appliedCredit = _appliedCredit;
+    final appliedCredit = mobileTotals?.credit ?? _appliedCredit;
     final totalRef = grossRef - appliedCredit;
     final totalBs = tasa != null && tasa > 0 ? totalRef * tasa : null;
-    final displayGross = _cart.lines.fold<double>(
-      0,
-      (sum, line) => sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity,
-    );
+    final displayGross = mobileTotals?.products ??
+        _cart.lines.fold<double>(
+          0,
+          (sum, line) =>
+              sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity,
+        );
     final displayNet = displayGross - appliedCredit;
-    final pagaBolivares = _pagoMoneda != _PagoMoneda.usd;
+    final pagaBolivares =
+        !(mobileTotals?.suppliers.values.firstOrNull?.payUsd ??
+            (_pagoMoneda == _PagoMoneda.usd));
     final currencyBlocked = pagaBolivares &&
         _cart.lines.any((line) => line.part.ownerPagoSoloDivisas);
     final canConfirm = _cart.canEdit &&
         !_submitting &&
         !_choosingDelivery &&
-        !currencyBlocked &&
+        (mobileCheckout || !currencyBlocked) &&
         _cart.meetsAllImporterMinOrders &&
-        (!pagaBolivares || totalBs != null);
+        (mobileCheckout || !pagaBolivares || totalBs != null);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceTinted,
       appBar: _BolsaAppBar(profile: widget.profile),
+      bottomNavigationBar: _cart.pendingCheckoutAttempt == null
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: OutlinedButton.icon(
+                      onPressed:
+                          _submitting || _choosingDelivery || _cart.restoring
+                              ? null
+                              : _recoverPendingCheckout,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Verificar confirmación anterior')))),
       body: _cart.restoring || (_cart.isEmpty && !_cart.canEdit)
           ? Center(
               child: Padding(
@@ -773,95 +1143,105 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ],
                   );
-                  final currencyBlock = Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _CartCurrencySelector(
-                        selected: _pagoMoneda.index,
-                        onSelected: _submitting
-                            ? null
-                            : (index) {
-                                setState(() =>
-                                    _pagoMoneda = _PagoMoneda.values[index]);
-                              },
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        pagaBolivares
-                            ? 'Pago en Bs al BCV'
-                            : 'Pago en divisas',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  );
+                  final currencyBlock = mobileCheckout
+                      ? Text(
+                          'Elige la moneda en cada proveedor. Puedes cambiarla al revisar.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 13, color: AppColors.textSecondary),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _CartCurrencySelector(
+                              selected: _pagoMoneda.index,
+                              onSelected: _submitting
+                                  ? null
+                                  : (index) {
+                                      setState(() => _pagoMoneda =
+                                          _PagoMoneda.values[index]);
+                                    },
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              pagaBolivares
+                                  ? 'Pago en Bs al BCV'
+                                  : 'Pago en divisas',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        );
                   final warning = _cart.restoreMessage ?? _cart.storageMessage;
                   final listRefGross = _cart.totalRef();
-                  final usdSavings = !pagaBolivares
-                      ? (listRefGross - displayGross)
-                      : 0.0;
+                  final usdSavings =
+                      !pagaBolivares ? (listRefGross - displayGross) : 0.0;
                   final net = displayNet < 0 ? 0.0 : displayNet;
                   final summaryRows = <Widget>[
-                    _CartSummaryRow(
-                        label: !pagaBolivares && usdSavings > 0.009
-                            ? 'Precio sin descuento'
-                            : 'Productos (${_cart.itemCount} uds)',
-                        value: !pagaBolivares && usdSavings > 0.009
-                            ? '${formatRefAmount(listRefGross)} USD'
-                            : (pagaBolivares
-                                ? '${formatRefAmount(displayGross)} REF'
-                                : '${formatRefAmount(displayGross)} USD')),
-                    if (appliedCredit > 0) ...[
-                      const SizedBox(height: 10),
+                    if (mobileTotals?.mixedCurrencies == true)
+                      ..._mixedSummaryRows(mobileTotals!, tasa)
+                    else ...[
                       _CartSummaryRow(
-                          label: 'Saldo a favor',
+                          label: !pagaBolivares && usdSavings > 0.009
+                              ? 'Precio sin descuento'
+                              : 'Productos (${_cart.itemCount} uds)',
+                          value: !pagaBolivares && usdSavings > 0.009
+                              ? '${formatRefAmount(listRefGross)} USD'
+                              : (pagaBolivares
+                                  ? '${formatRefAmount(displayGross)} REF'
+                                  : '${formatRefAmount(displayGross)} USD')),
+                      if (appliedCredit > 0) ...[
+                        const SizedBox(height: 10),
+                        _CartSummaryRow(
+                            label: 'Saldo a favor',
+                            value: pagaBolivares
+                                ? '−${formatRefAmount(appliedCredit)} REF'
+                                : '−${formatRefAmount(appliedCredit)} USD'),
+                      ],
+                      if (!pagaBolivares && usdSavings > 0.009) ...[
+                        const SizedBox(height: 10),
+                        _CartSummaryRow(
+                            label: 'Ahorro en divisas',
+                            value: '−${formatRefAmount(usdSavings)} USD',
+                            valueColor: AppColors.successGreen),
+                      ],
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: AppColors.divider),
+                      const SizedBox(height: 12),
+                      _CartSummaryRow(
+                          label: 'Subtotal',
                           value: pagaBolivares
-                              ? '−${formatRefAmount(appliedCredit)} REF'
-                              : '−${formatRefAmount(appliedCredit)} USD'),
-                    ],
-                    if (!pagaBolivares && usdSavings > 0.009) ...[
-                      const SizedBox(height: 10),
-                      _CartSummaryRow(
-                          label: 'Ahorro en divisas',
-                          value: '−${formatRefAmount(usdSavings)} USD',
-                          valueColor: AppColors.successGreen),
-                    ],
-                    const SizedBox(height: 12),
-                    Divider(height: 1, color: AppColors.divider),
-                    const SizedBox(height: 12),
-                    _CartSummaryRow(
-                        label: 'Subtotal',
-                        value: pagaBolivares
-                            ? '${formatRefAmount(net)} REF'
-                            : '${formatRefAmount(net)} USD',
-                        // REF/Bs: el destaque es el equivalente en Bs.
-                        // USD: el destaque es el subtotal neto.
-                        prominent: !pagaBolivares),
-                    if (pagaBolivares && totalBs != null) ...[
-                      const SizedBox(height: 12),
-                      _CartSummaryRow(
-                          label: 'Equivalente en Bs',
-                          value: formatBsLabel(totalBs),
-                          prominent: true),
-                      const SizedBox(height: 8),
-                      _CartBcvRate(
-                          tasa: tasa!, effectiveDate: _tasaEffectiveDate),
-                    ],
-                    if (pagaBolivares && totalBs == null) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                          'No hay tasa BCV vigente para cobrar en bolívares.',
-                          style: TextStyle(
-                              fontSize: 12, color: AppColors.brandBlue)),
-                    ],
-                    if (currencyBlocked) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                          'Un proveedor solo acepta divisas. Elige USD para continuar.'),
+                              ? '${formatRefAmount(net)} REF'
+                              : '${formatRefAmount(net)} USD',
+                          // REF/Bs: el destaque es el equivalente en Bs.
+                          // USD: el destaque es el subtotal neto.
+                          prominent: !pagaBolivares),
+                      if (pagaBolivares && totalBs != null) ...[
+                        const SizedBox(height: 12),
+                        _CartSummaryRow(
+                            label: 'Equivalente en Bs',
+                            value: formatBsLabel(totalBs),
+                            prominent: true),
+                        const SizedBox(height: 8),
+                        _CartBcvRate(
+                            tasa: tasa!, effectiveDate: _tasaEffectiveDate),
+                      ],
+                      if (pagaBolivares && totalBs == null) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                            'No hay tasa BCV vigente para cobrar en bolívares.',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.brandBlue)),
+                      ],
+                      if (currencyBlocked && !mobileCheckout) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                            'Un proveedor solo acepta divisas. Elige USD para continuar.'),
+                      ],
                     ],
                     if (!_cart.meetsAllImporterMinOrders) ...[
                       const SizedBox(height: 12),
@@ -921,8 +1301,7 @@ class _CartScreenState extends State<CartScreen> {
                                       height: 20,
                                       width: 20,
                                       child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white))
+                                          strokeWidth: 2, color: Colors.white))
                                   : const Text('Continuar con la entrega →',
                                       textAlign: TextAlign.center),
                             ),
@@ -987,8 +1366,8 @@ class _CartScreenState extends State<CartScreen> {
                                             color: Colors.white))
                                     : const FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text(
-                                            'Continuar con la entrega →'),
+                                        child:
+                                            Text('Continuar con la entrega →'),
                                       ),
                               ),
                             ),
@@ -1133,14 +1512,12 @@ class _CartLineCard extends StatelessWidget {
     final cover = part.coverImageUrl?.trim();
     final sku = (part.sku ?? '').trim();
     // Solo-divisas: siempre precio/importe en USD, aunque el resumen esté en Bs.
-    final displayModo =
-        part.ownerPagoSoloDivisas ? _PagoMoneda.usd : modo;
+    final displayModo = part.ownerPagoSoloDivisas ? _PagoMoneda.usd : modo;
     final unit = _cartUnitDollars(line, displayModo);
     final showUsd = displayModo == _PagoMoneda.usd;
     final usdDiscount = showUsd
         ? ProductCatalogPricing.directSaleDiscountChipEs(
-            listPriceUsd: line.precioUnitarioAliadoRef,
-            salePriceUsd: unit)
+            listPriceUsd: line.precioUnitarioAliadoRef, salePriceUsd: unit)
         : null;
     final campaignChip = ProductCatalogPricing.campaignDiscountChipEs(
         part.activeCampaignDiscountPercent,
@@ -1244,8 +1621,7 @@ class _CartLineCard extends StatelessWidget {
         child: Row(
           children: [
             Text('Total',
-                style:
-                    TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(width: 12),
             Expanded(
               child: _CartMoneyText(value: lineTotalLabel, style: amountStyle),
@@ -1348,7 +1724,8 @@ class _CartQuantityControl extends StatelessWidget {
 }
 
 class _CartPanel extends StatelessWidget {
-  const _CartPanel({required this.child, this.padding = EdgeInsets.zero});
+  const _CartPanel(
+      {super.key, required this.child, this.padding = EdgeInsets.zero});
   final Widget child;
   final EdgeInsets padding;
   @override
@@ -1363,7 +1740,8 @@ class _CartPanel extends StatelessWidget {
 
 class _CartSummaryRow extends StatelessWidget {
   const _CartSummaryRow(
-      {required this.label,
+      {super.key,
+      required this.label,
       required this.value,
       this.prominent = false,
       this.valueColor});
@@ -1464,9 +1842,14 @@ class _CartBcvRate extends StatelessWidget {
 
 class _CartCurrencySelector extends StatelessWidget {
   const _CartCurrencySelector(
-      {required this.selected, required this.onSelected});
+      {required this.selected,
+      required this.onSelected,
+      this.labels = const ['REF / Bs', 'USD'],
+      this.canPayBolivares = true});
   final int selected;
   final ValueChanged<int>? onSelected;
+  final List<String> labels;
+  final bool canPayBolivares;
   static const _active = Color(0xFF004BDD);
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -1482,11 +1865,14 @@ class _CartCurrencySelector extends StatelessWidget {
                     child: Semantics(
                   selected: i == selected,
                   button: true,
+                  enabled: onSelected != null && (i != 0 || canPayBolivares),
                   child: Material(
                     color: i == selected ? _active : Colors.transparent,
                     borderRadius: BorderRadius.circular(999),
                     child: InkWell(
-                      onTap: onSelected == null ? null : () => onSelected!(i),
+                      onTap: onSelected == null || (i == 0 && !canPayBolivares)
+                          ? null
+                          : () => onSelected!(i),
                       borderRadius: BorderRadius.circular(999),
                       child: ConstrainedBox(
                           constraints: const BoxConstraints(minHeight: 44),
@@ -1496,11 +1882,7 @@ class _CartCurrencySelector extends StatelessWidget {
                                       horizontal: 4, vertical: 10),
                                   child: FittedBox(
                                       fit: BoxFit.scaleDown,
-                                      child: Text(
-                                          const [
-                                            'REF / Bs',
-                                            'USD'
-                                          ][i],
+                                      child: Text(labels[i],
                                           textAlign: TextAlign.center,
                                           maxLines: 1,
                                           style: TextStyle(
@@ -1508,8 +1890,10 @@ class _CartCurrencySelector extends StatelessWidget {
                                               fontWeight: FontWeight.w700,
                                               color: i == selected
                                                   ? AppColors.white
-                                                  : AppColors
-                                                      .textPrimary)))))),
+                                                  : (i == 0 && !canPayBolivares
+                                                      ? AppColors.textMuted
+                                                      : AppColors
+                                                          .textPrimary))))))),
                     ),
                   ),
                 )),
@@ -1707,7 +2091,8 @@ class _BolsaAppBarState extends State<_BolsaAppBar> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.white,
-            border: Border.all(color: AppColors.white.withOpacity(0.9), width: 1.5),
+            border:
+                Border.all(color: AppColors.white.withOpacity(0.9), width: 1.5),
           ),
           clipBehavior: Clip.antiAlias,
           child: child,
@@ -1762,48 +2147,16 @@ class _BolsaAppBarState extends State<_BolsaAppBar> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tu bolsa',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
-                      height: 1.1,
-                    ),
+              child: B2bHeaderTitle(
+                title: Text(
+                  'Tu bolsa',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                    height: 1.1,
                   ),
-                  SizedBox(height: 3),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'B2B',
-                          style: TextStyle(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w800,
-                            fontStyle: FontStyle.italic,
-                            fontSize: 11,
-                            height: 1.1,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ' CONECTA',
-                          style: TextStyle(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 11,
-                            height: 1.1,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

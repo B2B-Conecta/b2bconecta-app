@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'importer_pickup_location_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_pickup_flow_copy.dart';
 
@@ -28,6 +29,64 @@ class _ImporterPickupLocationsPanelState
   List<ImporterPickupLocationModel> _locations = [];
   bool _loading = true;
   String? _error;
+
+  Future<void> _offerCustomerPickup(
+      ImporterPickupLocationModel location) async {
+    var instructions = location.customerPickupInstructions;
+    var enabled = location.customerPickupEnabled;
+    try {
+      final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+              builder: (ctx, setDialogState) => AlertDialog(
+                      scrollable: true,
+                      title: const Text('Retiro para clientes'),
+                      content:
+                          Column(mainAxisSize: MainAxisSize.min, children: [
+                        Text(location.ubicacionMultilinea),
+                        SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text(
+                                'Ofrecer retiro sin costo en el checkout'),
+                            subtitle: const Text(
+                                'El cliente recogerá aquí su pedido. Esta opción es independiente del retiro por transportistas.'),
+                            value: enabled,
+                            onChanged: (value) =>
+                                setDialogState(() => enabled = value)),
+                        TextFormField(
+                            initialValue: instructions,
+                            onChanged: (value) => instructions = value,
+                            maxLength: 1000,
+                            minLines: 2,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                                labelText: 'Horario y condiciones de retiro')),
+                      ]),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar')),
+                        FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Guardar'))
+                      ])));
+      if (confirmed != true || !mounted) return;
+      setState(() => _loading = true);
+      await SupabaseAccess.client.rpc('set_customer_pickup_offer', params: {
+        'p_location_id': location.id,
+        'p_enabled': enabled,
+        'p_instructions': instructions
+      });
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'No pudimos guardar el retiro para clientes. Comprueba que la ubicación tenga estado, ciudad, dirección y enlace de mapas.')));
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -57,7 +116,8 @@ class _ImporterPickupLocationsPanelState
   }
 
   Future<void> _openForm([ImporterPickupLocationModel? existing]) async {
-    final saved = await showImporterPickupLocationForm(context, existing: existing);
+    final saved =
+        await showImporterPickupLocationForm(context, existing: existing);
     if (saved == true) await _load();
   }
 
@@ -130,7 +190,8 @@ class _ImporterPickupLocationsPanelState
             ),
             Text(
               OrderPickupFlowCopy.ubicacionesIntro,
-              style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
+              style: TextStyle(
+                  fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
             if (_loading)
@@ -145,11 +206,13 @@ class _ImporterPickupLocationsPanelState
                 ),
               )
             else if (_error != null)
-              Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12))
+              Text(_error!,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 12))
             else if (_locations.where((l) => l.isActive).isEmpty)
               Text(
                 OrderPickupFlowCopy.ubicacionesVacias,
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                style:
+                    TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
               )
             else
               ..._locations.where((l) => l.isActive).map(
@@ -159,6 +222,7 @@ class _ImporterPickupLocationsPanelState
                         location: loc,
                         onEdit: () => _openForm(loc),
                         onDeactivate: () => _deactivate(loc),
+                        onCustomerPickup: () => _offerCustomerPickup(loc),
                       ),
                     ),
                   ),
@@ -174,11 +238,13 @@ class _LocationTile extends StatelessWidget {
     required this.location,
     required this.onEdit,
     required this.onDeactivate,
+    required this.onCustomerPickup,
   });
 
   final ImporterPickupLocationModel location;
   final VoidCallback onEdit;
   final VoidCallback onDeactivate;
+  final VoidCallback onCustomerPickup;
 
   @override
   Widget build(BuildContext context) {
@@ -200,14 +266,16 @@ class _LocationTile extends StatelessWidget {
                 ),
                 if (location.isDefault)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.brandBlue.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       'Por defecto',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                     ),
                   ),
               ],
@@ -215,10 +283,11 @@ class _LocationTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               location.ubicacionMultilinea,
-              style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textPrimary),
+              style: TextStyle(
+                  fontSize: 12, height: 1.35, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
-            Row(
+            Wrap(
               children: [
                 TextButton(
                   onPressed: onEdit,
@@ -226,8 +295,14 @@ class _LocationTile extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: onDeactivate,
-                  child: Text('Desactivar', style: TextStyle(color: Colors.red.shade700)),
+                  child: Text('Desactivar',
+                      style: TextStyle(color: Colors.red.shade700)),
                 ),
+                TextButton(
+                    onPressed: onCustomerPickup,
+                    child: Text(location.customerPickupEnabled
+                        ? 'Retiro para clientes · Activo'
+                        : 'Ofrecer retiro a clientes')),
               ],
             ),
           ],
@@ -247,7 +322,8 @@ class _ImporterPickupLocationDialog extends StatefulWidget {
       _ImporterPickupLocationDialogState();
 }
 
-class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDialog> {
+class _ImporterPickupLocationDialogState
+    extends State<_ImporterPickupLocationDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _label;
   late final TextEditingController _estado;
@@ -320,7 +396,8 @@ class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDi
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: icon == null ? null : Icon(icon, color: AppColors.textSecondary),
+      prefixIcon:
+          icon == null ? null : Icon(icon, color: AppColors.textSecondary),
       filled: true,
       fillColor: AppColors.fieldFill,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -389,7 +466,8 @@ class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDi
           );
     return AlertDialog(
       scrollable: true,
-      title: Text(widget.existing == null ? 'Nueva ubicación' : 'Editar ubicación'),
+      title: Text(
+          widget.existing == null ? 'Nueva ubicación' : 'Editar ubicación'),
       content: SizedBox(
         width: 460,
         child: Form(
@@ -530,7 +608,10 @@ class _ImporterPickupLocationDialogState extends State<_ImporterPickupLocationDi
     return TextFormField(
       controller: _ciudad,
       textCapitalization: TextCapitalization.words,
-      decoration: _field(label: 'Ciudad', hint: 'Opcional', icon: Icons.location_city_outlined),
+      decoration: _field(
+          label: 'Ciudad',
+          hint: 'Opcional',
+          icon: Icons.location_city_outlined),
     );
   }
 }

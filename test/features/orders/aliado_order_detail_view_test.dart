@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_expandable_order_card.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_order_detail_view.dart';
+import 'package:motolink_pro_app/features/orders/aliado/mobile_cancel_order_screen.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
@@ -10,7 +11,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_delivery_stepper.d
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
 import 'order_workspace_test.dart' show fixture;
 
-TransactionRequestModel supplierLine(String id, String supplier) =>
+TransactionRequestModel supplierLine(String id, String supplier,
+        {bool invoice = false, bool paid = false}) =>
     TransactionRequestModel.fromJson({
       'aliado_id': 'store',
       'product_id': id,
@@ -23,11 +25,326 @@ TransactionRequestModel supplierLine(String id, String supplier) =>
       'id': id,
       'importador_id': supplier,
       'checkout_group_id': 'checkout',
+      if (invoice) 'proveedor_factura_storage_path': '$id/factura.pdf',
+      if (paid) 'pago_estado_revision': 'aprobado',
       'products': {'name': 'Repuesto $id'},
       'importador': {'business_name': 'Proveedor $supplier'},
     });
 
+List<TransactionRequestModel> mixedSummaryFixture({bool bsSnapshot = true}) => [
+      for (final row in [
+        ('one', 'A', 'DIVISAS', 49.5),
+        ('two', 'B', 'DIVISAS', 98.0),
+        ('three', 'C', 'BOLIVARES', 156.42)
+      ])
+        TransactionRequestModel.fromJson({
+          'id': row.$1,
+          'aliado_id': 'store',
+          'importador_id': row.$2,
+          'product_id': row.$1,
+          'checkout_group_id': 'DCBD89FC-checkout',
+          'status': row.$1 == 'one' ? 'pendiente' : 'en_preparacion',
+          'cantidad': 5,
+          'precio_total_usd': row.$4,
+          'precio_unitario_aliado': row.$4 / 5,
+          'precio_unitario_proveedor': row.$4 / 5,
+          'metodo_pago_moneda': row.$3,
+          'discount_rules': {'checkout_pricing_version': 1},
+          if (row.$3 == 'BOLIVARES' && bsSnapshot) ...{
+            'total_ref': row.$4,
+            'total_bs': 139386.93,
+            'tasa_bcv_aplicada': 891.105,
+          },
+          'products': {
+            'name':
+                row.$1 == 'one' ? 'Casco Vini Rabe azul' : 'Producto ${row.$1}'
+          },
+          'importador': {'business_name': 'Proveedor ${row.$2}'},
+        }),
+    ];
+
 void main() {
+  for (final width in [320.0, 390.0]) {
+    for (final scale in [1.0, 1.6]) {
+      testWidgets(
+          'mixed mobile summary separates actual currencies without a combined line $width/$scale',
+          (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width, 1000);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(MaterialApp(
+            home: Builder(
+                builder: (context) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: TextScaler.linear(scale)),
+                    child: Scaffold(
+                        body: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: OrderSummaryHeader(
+                              lines: mixedSummaryFixture(),
+                              viewerRole: AppHomeRole.aliado,
+                              expanded: true,
+                              onToggle: () {},
+                              statusLabel: 'Varios estados',
+                              detailSummary: true,
+                              compactDetail: true,
+                              actionsInHeader: true,
+                              chatAction: OrderChatIconButton(
+                                  relatedOrderIds: const [], onOpen: () {}),
+                              onCancel: () {},
+                            )))))));
+        await tester.pumpAndSettle();
+        expect(find.text('147.50 USD'), findsOneWidget);
+        expect(find.text('Bs 139.386,93'), findsOneWidget);
+        expect(tester.getBottomRight(find.text('147.50 USD')).dx,
+            closeTo(width - 21, .5));
+        expect(tester.getBottomRight(find.text('Bs 139.386,93')).dx,
+            closeTo(width - 21, .5));
+        expect(find.textContaining('USD +'), findsNothing);
+        expect(tester.getTopLeft(find.text('147.50 USD')).dy,
+            lessThan(tester.getTopLeft(find.text('Bs 139.386,93')).dy));
+        expect(find.text('Casco Vini Rabe azul y 2 más'), findsOneWidget);
+        expect(find.byTooltip('Más opciones del pedido'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets(
+      'mixed mobile summary preserves REF when the Bs snapshot is unavailable',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: OrderDetailOverview(
+                lines: mixedSummaryFixture(bsSnapshot: false),
+                compactRetailer: true,
+                nextStep: '',
+                chatAction: const SizedBox.shrink()))));
+    await tester.pumpAndSettle();
+    expect(find.text('147.50 USD'), findsOneWidget);
+    expect(find.text('156.42 REF'), findsOneWidget);
+    expect(find.textContaining('Bs '), findsNothing);
+  });
+
+  for (final width in [320.0, 390.0]) {
+    for (final scale in [1.0, 1.6]) {
+      testWidgets(
+          'compact summary shares the title row with working actions $width/$scale',
+          (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width, 1000);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        var chats = 0, cancellations = 0;
+        final line = supplierLine(
+            'Filtro de aire de espuma para motocicleta de nombre largo', 'B');
+        await tester.pumpWidget(MaterialApp(
+            theme: scale > 1 ? ThemeData.dark() : ThemeData.light(),
+            home: Builder(
+                builder: (context) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: TextScaler.linear(scale)),
+                    child: Scaffold(
+                        body: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: OrderSummaryHeader(
+                              lines: [line],
+                              viewerRole: AppHomeRole.aliado,
+                              expanded: true,
+                              onToggle: () {},
+                              statusLabel: 'Pendiente',
+                              detailSummary: true,
+                              compactDetail: true,
+                              actionsInHeader: true,
+                              chatAction: OrderChatIconButton(
+                                  relatedOrderIds: const [],
+                                  onOpen: () => chats++),
+                              onCancel: () => cancellations++,
+                            )))))));
+        await tester.pumpAndSettle();
+        final title = tester.getRect(find.text(line.productName!));
+        final chat = tester.getRect(find.byTooltip('Mensajes del pedido'));
+        expect(chat.top, lessThan(title.bottom));
+        expect(chat.bottom, greaterThan(title.top));
+        expect(chat.left, greaterThan(title.left));
+        await tester.tap(find.byTooltip('Mensajes del pedido'));
+        await tester.pumpAndSettle();
+        expect(chats, 1);
+        await tester.tap(find.byTooltip('Más opciones del pedido'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancelar pedido'));
+        await tester.pumpAndSettle();
+        expect(cancellations, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets(
+      'confirming cancellation from a mixed checkout writes only the chosen supplier',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final lines = [
+      supplierLine('paid-A', 'A', invoice: true, paid: true),
+      supplierLine('B-one', 'B'),
+      supplierLine('B-two', 'B')
+    ];
+    final cancelled = <String>[];
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: Builder(
+                builder: (context) => SingleChildScrollView(
+                      child: AliadoExpandableOrderCard(
+                        request: lines.first,
+                        checkoutGroupLines: lines,
+                        expanded: true,
+                        onToggle: () {},
+                        statusLabel: 'Varios estados',
+                        workspaceDetail: true,
+                        compactDetail: true,
+                        onCancelarProveedor: (selected) => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => MobileCancelOrderScreen(
+                                      lines: selected,
+                                      loadLines: () async => lines,
+                                      cancelLine: (line, reason) async {
+                                        cancelled.add(line.id);
+                                        expect(reason,
+                                            'Me equivoqué de proveedor.');
+                                      },
+                                    ))),
+                        detailSectionsBuilder: (_, __, ___, ____) =>
+                            const AliadoOrderDetailSections(
+                                payment: SizedBox.shrink(),
+                                paymentStatus: 'Estado del pago'),
+                      ),
+                    )))));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Proveedor B'));
+    await tester.tap(find.text('Proveedor B'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Más opciones del pedido'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Más opciones del pedido'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar a Proveedor B'));
+    await tester.pumpAndSettle();
+    expect(find.text('Proveedor A'), findsNothing);
+    expect(find.text('Repuesto paid-A'), findsNothing);
+    await tester.ensureVisible(find.byKey(const ValueKey('cancel-reason')));
+    await tester.enterText(find.byKey(const ValueKey('cancel-reason')),
+        'Me equivoqué de proveedor.');
+    await tester.tap(find.text('Confirmar cancelación'));
+    await tester.pumpAndSettle();
+    expect(cancelled, ['B-one', 'B-two']);
+    expect(find.text('Cancelación registrada'), findsOneWidget);
+    expect(lines.first.pagoEstadoRevisionEfectivo, 'aprobado');
+  });
+
+  for (final width in [320.0, 390.0]) {
+    testWidgets(
+        'mobile mixed checkout cancels only the selected supplier at $width',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 1000);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      List<TransactionRequestModel>? requested;
+      var globalCalls = 0;
+      late StateSetter refresh;
+      var lines = [
+        supplierLine('paid-A', 'A', invoice: true, paid: true),
+        supplierLine('B-one', 'B'),
+        supplierLine('B-two', 'B')
+      ];
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: StatefulBuilder(builder: (context, setState) {
+        refresh = setState;
+        return SingleChildScrollView(
+            child: AliadoExpandableOrderCard(
+          request: lines.first,
+          checkoutGroupLines: lines,
+          expanded: true,
+          onToggle: () {},
+          statusLabel: 'Varios estados',
+          workspaceDetail: true,
+          compactDetail: true,
+          onCancelarSolicitudPendiente: () => globalCalls++,
+          onCancelarProveedor: (selected) => requested = selected,
+          detailSectionsBuilder: (_, __, ___, ____) =>
+              const AliadoOrderDetailSections(
+                  payment: SizedBox.shrink(), paymentStatus: 'Estado del pago'),
+        ));
+      }))));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Más opciones del pedido'), findsNothing);
+      await tester.ensureVisible(find.text('Proveedor B'));
+      await tester.tap(find.text('Proveedor B'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byTooltip('Más opciones del pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Más opciones del pedido'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cancelar a Proveedor B'), findsOneWidget);
+      await tester.tap(find.text('Cancelar a Proveedor B'));
+      await tester.pumpAndSettle();
+      expect(requested!.map((line) => line.id), ['B-one', 'B-two']);
+      expect(requested!.every((line) => line.ownerId == 'B'), isTrue);
+      expect(globalCalls, 0);
+      // A normal refresh preserves B as the selected supplier but its new invoice
+      // must immediately remove the action, independently of A's payment.
+      refresh(() => lines = [
+            lines.first,
+            supplierLine('B-one', 'B', invoice: true),
+            lines.last
+          ]);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Más opciones del pedido'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+      'mobile cancellation remains provider scoped even when everyone is eligible',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final lines = [supplierLine('A-one', 'A'), supplierLine('B-one', 'B')];
+    List<TransactionRequestModel>? requested;
+    var globalCalls = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: AliadoExpandableOrderCard(
+      request: lines.first,
+      checkoutGroupLines: lines,
+      expanded: true,
+      onToggle: () {},
+      statusLabel: 'Pendiente',
+      workspaceDetail: true,
+      compactDetail: true,
+      onCancelarSolicitudPendiente: () => globalCalls++,
+      onCancelarProveedor: (selected) => requested = selected,
+      detailSectionsBuilder: (_, __, ___, ____) =>
+          const AliadoOrderDetailSections(
+              payment: SizedBox.shrink(), paymentStatus: 'Esperando factura'),
+    )))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Más opciones del pedido'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar a Proveedor A'));
+    await tester.pumpAndSettle();
+    expect(requested!.map((line) => line.id), ['A-one']);
+    expect(globalCalls, 0);
+  });
+
   testWidgets('retailer detail places the chat icon in the summary header',
       (tester) async {
     tester.view.devicePixelRatio = 1;
@@ -163,7 +480,7 @@ void main() {
           findsOneWidget);
       expect(find.textContaining('2.600,00'),
           mode == 'DIVISAS' ? findsNothing : findsOneWidget);
-      await tester.tap(find.text('Mensajes'));
+      await tester.tap(find.text('Chat'));
       expect(opened, isTrue);
       expect(tester.takeException(), isNull);
     });

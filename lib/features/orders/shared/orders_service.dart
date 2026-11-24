@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -113,6 +114,7 @@ class OrdersService {
     proveedor_factura_submitted_at,
     tiempo_estimado_envio,
     pago_metodo,
+    pago_declaracion,
     comprobante_pago_storage_path,
     comprobante_pago_file_name,
     comprobante_pago_submitted_at,
@@ -120,6 +122,9 @@ class OrdersService {
     pago_comprobante_rechazo_nota,
     pago_aprobado_at,
     destino_entrega_usa_perfil,
+    customer_delivery_mode,
+    customer_pickup_location_id,
+    customer_delivery_snapshot,
     destino_entrega_texto,
     destino_entrega_maps_url,
     checkout_group_id,
@@ -196,19 +201,45 @@ class OrdersService {
   static Future<T> _readOrders<T>(
     Future<T> Function(String fields) query,
   ) async {
-    try {
-      return await query(_trSelectMotoconecta);
-    } on PostgrestException catch (error) {
-      if (error.code != '42703' ||
-          !error.message
-              .contains('transaction_requests.aliado_entrepreneur_badge')) {
-        rethrow;
+    var fields = _trSelectMotoconecta;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        return await query(fields);
+      } on PostgrestException catch (error) {
+        var code = error.code;
+        var message = error.message;
+        // postgrest 2.x can wrap a maybeSingle schema error as HTTP 400.
+        // Recover only the explicit server code; other failures still surface.
+        if (code == '400') {
+          try {
+            final payload = jsonDecode(message);
+            if (payload is Map && payload['code'] == '42703') {
+              code = '42703';
+              message = payload['message'] as String? ?? message;
+            }
+          } on FormatException {/* Not a wrapped PostgREST error. */}
+        }
+        if (code != '42703') rethrow;
+        if (message.contains('pago_declaracion')) {
+          fields = fields.replaceFirst('pago_declaracion,', '');
+        } else if (message
+            .contains('transaction_requests.aliado_entrepreneur_badge')) {
+          fields = fields.replaceFirst('aliado_entrepreneur_badge,', '');
+        } else if ([
+          'customer_delivery_mode',
+          'customer_pickup_location_id',
+          'customer_delivery_snapshot'
+        ].any(message.contains)) {
+          fields = fields
+              .replaceFirst('customer_delivery_mode,', '')
+              .replaceFirst('customer_pickup_location_id,', '')
+              .replaceFirst('customer_delivery_snapshot,', '');
+        } else {
+          rethrow;
+        }
       }
-      return query(_trSelectMotoconecta.replaceFirst(
-        'aliado_entrepreneur_badge,',
-        '',
-      ));
     }
+    return query(fields);
   }
 
   static String get _trSelectForListFlat => _trSelectMotoconecta;
@@ -637,6 +668,10 @@ class OrdersService {
     Map<String, String> promoByImportador = const {},
     Map<String, Map<String, String?>> carriersByImportador = const {},
     Map<String, bool> applyCreditByImportador = const {},
+    Map<String, String> currencyByImportador = const {},
+    String? requestId,
+    String? savedAddressId,
+    Map<String, Map<String, String>> deliveryByImportador = const {},
   }) async {
     final uid = SupabaseAccess.currentUserId;
     if (uid == null) throw StateError('No hay sesión activa.');
@@ -676,10 +711,30 @@ class OrdersService {
       };
     }
 
+    final currencies = currencyByImportador
+        .map((key, value) => MapEntry(key.trim(), value.trim().toUpperCase()));
+    if (currencies.values
+        .any((value) => !['DIVISAS', 'BOLIVARES'].contains(value))) {
+      throw ArgumentError('Moneda de pago inválida.');
+    }
+    final mixed = currencies.values.toSet().length > 1;
     final res = await SupabaseAccess.client.rpc(
-      'aliado_checkout_multi_importador_moneda',
+      requestId != null
+          ? 'aliado_checkout_confirmar_v2'
+          : mixed
+              ? 'aliado_checkout_proveedores_v1'
+              : 'aliado_checkout_multi_importador_moneda',
       params: <String, dynamic>{
-        'p_moneda': moneda,
+        if (requestId == null)
+          'p_moneda': currencies.isNotEmpty && !mixed
+              ? currencies.values.first
+              : moneda,
+        if (mixed || requestId != null) 'p_moneda_by_importador': currencies,
+        if (requestId != null) ...{
+          'p_request_id': requestId,
+          'p_saved_address_id': savedAddressId,
+          'p_delivery_by_importador': deliveryByImportador,
+        },
         'p_lines': lines,
         'p_destino_entrega_usa_perfil': destinoEntregaUsaPerfil,
         'p_destino_entrega_texto': destinoEntregaTexto,

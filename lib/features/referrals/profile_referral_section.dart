@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'referral_invite_storage.dart';
 import 'referral_invite_config.dart';
@@ -77,10 +78,9 @@ class _ProfileReferralSectionState extends State<ProfileReferralSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: AppNoticeMessage.error(
             e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
           ),
-          backgroundColor: Colors.red.shade800,
         ),
       );
     } finally {

@@ -31,7 +31,6 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
     if (nImp < 2) return const SizedBox.shrink();
 
     final pagados = importadoresConPagoConfirmado(porImportador);
-    final totalRef = allLines.fold<double>(0, (s, r) => s + r.precioTotal);
     final cg = allLines.first.checkoutGroupId?.trim();
     final refCorta =
         (cg != null && cg.length >= 8) ? '${cg.substring(0, 8)}…' : null;
@@ -81,7 +80,7 @@ class AliadoPedidoMaestroHeader extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Carrito con $nImp importadores · '
-                      '${formatRefAmount(totalRef)} ${orderAmountCurrency(allLines)}'
+                      '${orderAmountSummary(allLines)}'
                       '${refCorta != null ? ' · ref. $refCorta' : ''}',
                       style: TextStyle(
                         fontSize: 11.5,

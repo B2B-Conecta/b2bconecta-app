@@ -6,43 +6,71 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'order_message_attachment.dart';
 
 class OrderMessageMediaStrip extends StatelessWidget {
-  const OrderMessageMediaStrip({super.key, required this.attachments});
+  const OrderMessageMediaStrip(
+      {super.key,
+      required this.attachments,
+      this.expanded = false,
+      this.resolveUrl});
 
   final List<OrderMessageAttachment> attachments;
+  final bool expanded;
+  final Future<String> Function(String path)? resolveUrl;
 
   @override
   Widget build(BuildContext context) {
     if (attachments.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final item in attachments) ...[
-            if (item.isVideo)
-              _OrderMessageVideo(attachment: item)
-            else
-              _OrderMessagePhoto(attachment: item),
-            const SizedBox(height: 6),
-          ],
-        ],
-      ),
-    );
+    if (!expanded) return _strip(null);
+    return LayoutBuilder(
+        builder: (context, constraints) => _strip(
+            constraints.maxWidth.isFinite ? constraints.maxWidth : null));
   }
+
+  Widget _strip(double? width) => Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final item in attachments) ...[
+              if (item.isVideo)
+                _OrderMessageVideo(
+                    attachment: item,
+                    width: width ?? 220,
+                    height: width == null ? 140 : width * .75,
+                    resolveUrl: resolveUrl)
+              else
+                _OrderMessagePhoto(
+                    attachment: item,
+                    width: width ?? 160,
+                    height: width == null ? 120 : width * .75,
+                    expanded: expanded,
+                    resolveUrl: resolveUrl),
+              const SizedBox(height: 6),
+            ],
+          ],
+        ),
+      );
 }
 
 class _OrderMessagePhoto extends StatefulWidget {
-  const _OrderMessagePhoto({required this.attachment});
+  const _OrderMessagePhoto(
+      {required this.attachment,
+      required this.width,
+      required this.height,
+      required this.expanded,
+      this.resolveUrl});
 
   final OrderMessageAttachment attachment;
+  final double width, height;
+  final bool expanded;
+  final Future<String> Function(String path)? resolveUrl;
 
   @override
   State<_OrderMessagePhoto> createState() => _OrderMessagePhotoState();
 }
 
 class _OrderMessagePhotoState extends State<_OrderMessagePhoto> {
-  late final Future<String> _urlFuture =
-      SupabaseService.createSignedUrlForOrderMessageAttachment(
+  late final Future<String> _urlFuture = (widget.resolveUrl ??
+      SupabaseService.createSignedUrlForOrderMessageAttachment)(
     widget.attachment.path,
   );
 
@@ -52,18 +80,18 @@ class _OrderMessagePhotoState extends State<_OrderMessagePhoto> {
       future: _urlFuture,
       builder: (context, snap) {
         if (snap.hasError) {
-          return const SizedBox(
-            width: 160,
-            height: 80,
-            child: Center(child: Text('No se pudo mostrar la foto')),
+          return SizedBox(
+            width: widget.width,
+            height: widget.expanded ? widget.height : 80,
+            child: const Center(child: Text('No se pudo mostrar la foto')),
           );
         }
         final url = snap.data;
         if (url == null || url.isEmpty) {
-          return const SizedBox(
-            width: 120,
-            height: 90,
-            child: Center(
+          return SizedBox(
+            width: widget.expanded ? widget.width : 120,
+            height: widget.expanded ? widget.height : 90,
+            child: const Center(
               child: SizedBox(
                 width: 18,
                 height: 18,
@@ -78,13 +106,13 @@ class _OrderMessagePhotoState extends State<_OrderMessagePhoto> {
             borderRadius: BorderRadius.circular(8),
             child: Image.network(
               url,
-              width: 160,
-              height: 120,
+              width: widget.width,
+              height: widget.height,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const SizedBox(
-                width: 160,
-                height: 80,
-                child: Center(child: Text('No se pudo mostrar la foto')),
+              errorBuilder: (_, __, ___) => SizedBox(
+                width: widget.width,
+                height: widget.expanded ? widget.height : 80,
+                child: const Center(child: Text('No se pudo mostrar la foto')),
               ),
             ),
           ),
@@ -120,9 +148,15 @@ class _OrderMessagePhotoState extends State<_OrderMessagePhoto> {
 }
 
 class _OrderMessageVideo extends StatefulWidget {
-  const _OrderMessageVideo({required this.attachment});
+  const _OrderMessageVideo(
+      {required this.attachment,
+      required this.width,
+      required this.height,
+      this.resolveUrl});
 
   final OrderMessageAttachment attachment;
+  final double width, height;
+  final Future<String> Function(String path)? resolveUrl;
 
   @override
   State<_OrderMessageVideo> createState() => _OrderMessageVideoState();
@@ -162,7 +196,8 @@ class _OrderMessageVideoState extends State<_OrderMessageVideo> {
       _error = null;
     });
     try {
-      final url = await SupabaseService.createSignedUrlForOrderMessageAttachment(
+      final url = await (widget.resolveUrl ??
+          SupabaseService.createSignedUrlForOrderMessageAttachment)(
         widget.attachment.path,
       );
       final controller = VideoPlayerController.networkUrl(Uri.parse(url));
@@ -197,8 +232,8 @@ class _OrderMessageVideoState extends State<_OrderMessageVideo> {
       child: InkWell(
         onTap: _play,
         child: SizedBox(
-          width: 220,
-          height: 140,
+          width: widget.width,
+          height: widget.height,
           child: ready
               ? Stack(
                   fit: StackFit.expand,

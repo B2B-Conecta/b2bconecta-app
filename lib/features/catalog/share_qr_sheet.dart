@@ -13,6 +13,7 @@ Future<void> showShareQrSheet(
   BuildContext context, {
   required String title,
   required String url,
+  String heading = 'Compartir QR',
   String? subtitle,
 }) {
   return showModalBottomSheet<void>(
@@ -25,6 +26,7 @@ Future<void> showShareQrSheet(
     builder: (ctx) => _ShareQrCard(
       title: title,
       url: url,
+      heading: heading,
       subtitle: subtitle,
     ),
   );
@@ -34,11 +36,13 @@ class _ShareQrCard extends StatefulWidget {
   const _ShareQrCard({
     required this.title,
     required this.url,
+    required this.heading,
     this.subtitle,
   });
 
   final String title;
   final String url;
+  final String heading;
   final String? subtitle;
 
   @override
@@ -128,7 +132,7 @@ class _ShareQrCardState extends State<_ShareQrCard> {
               ),
             ),
             Text(
-              'Compartir QR',
+              widget.heading,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,

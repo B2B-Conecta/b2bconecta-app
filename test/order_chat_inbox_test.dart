@@ -62,8 +62,8 @@ void main() {
         );
     final send = find.byTooltip('Enviar mensaje');
     await tester.pumpWidget(screen());
-    expect(
-        tester.widget<IconButton>(find.byType(IconButton)).onPressed, isNull);
+    await tester.tap(send);
+    expect(sends, 0);
     await tester.enterText(find.byType(TextField), 'Consulta');
     await tester.pump();
     await tester.tap(send);

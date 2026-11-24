@@ -937,7 +937,11 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final isBundle = g.length > 1;
     final nextBase = TransactionRequestStatus.nextForImporter(primary.status);
     final blockQtyAdj = g.any((r) => r.qtyAdjustmentPendienteAliado);
-    final next = (nextBase != null && !blockQtyAdj) ? nextBase : null;
+    final waitingForPickup = g.every((r) =>
+        r.customerPickup && r.status == TransactionRequestStatus.pedidoListo);
+    final next = (nextBase != null && !blockQtyAdj && !waitingForPickup)
+        ? nextBase
+        : null;
     final headline =
         TransactionRequestStatus.importerOperationalHeadline(primary.status);
     final rk = _displayGroupKey(g);
@@ -969,7 +973,9 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
       onToggle: () => setState(() => _expandedRequestId = null),
       statusLabel:
           TransactionRequestStatus.importerFilterStatusLabelEs(primary.status),
-      operationalHeadline: headline,
+      operationalHeadline: waitingForPickup
+          ? 'Listo para retirar · El cliente confirma la recepción'
+          : headline,
       nextStatus: next,
       nextActionLabel: next != null
           ? TransactionRequestStatus.importerAdvanceButtonLabel(

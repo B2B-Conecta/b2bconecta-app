@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'lucide_icon.dart';
+import 'aliado_header_metrics.dart';
 
 class AliadoHeaderSearch extends StatelessWidget {
   const AliadoHeaderSearch({
@@ -10,6 +11,7 @@ class AliadoHeaderSearch extends StatelessWidget {
     required this.onSearch,
     required this.onFilters,
     this.autofocus = false,
+    this.focusNode,
     this.filterCount = 0,
     this.searchLabel = 'Buscar en el catálogo',
     this.filterLabel = 'Filtros del catálogo',
@@ -20,6 +22,7 @@ class AliadoHeaderSearch extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onFilters;
   final bool autofocus;
+  final FocusNode? focusNode;
   final int filterCount;
   final String searchLabel;
   final String filterLabel;
@@ -36,9 +39,10 @@ class AliadoHeaderSearch extends StatelessWidget {
       borderSide: BorderSide.none,
     );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 14),
+      padding: AliadoHeaderMetrics.searchPadding,
       child: TextField(
         controller: controller,
+        focusNode: focusNode,
         autofocus: autofocus,
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => onSearch(),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -6,9 +7,13 @@ import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
+import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_categories.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
+import 'aliado_product_card.dart';
+import 'mobile_supplier_chrome.dart';
+import 'mobile_supplier_visuals.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_route_lock.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_taxonomy.dart';
@@ -130,6 +135,8 @@ class ImporterStoreProfileScreen extends StatefulWidget {
 class _ImporterStoreProfileScreenState
     extends State<ImporterStoreProfileScreen> {
   final _scrollController = ScrollController();
+  final _mobileSearch = TextEditingController();
+  Timer? _searchDebounce;
   late final ImporterStoreCatalogSource _source;
   ImporterStoreProfile? _profile;
   List<String> _categories = const [];
@@ -162,12 +169,15 @@ class _ImporterStoreProfileScreenState
     return CatalogFilters.importerStore(
       importerId: widget.importerId,
       category: values.length == 1 ? values.single : null,
-    ).copyWith(categoryAnyOf: values.length > 1 ? values : const []);
+    ).copyWith(
+        categoryAnyOf: values.length > 1 ? values : const [],
+        searchQuery: _desktopStore ? null : _mobileSearch.text.trim());
   }
 
   @override
   void initState() {
     super.initState();
+    _mobileSearch.addListener(_queueMobileSearch);
     _source = widget.catalogSource ?? ImporterStoreCatalogSource.app();
     final initial = widget.initialCategory?.trim();
     if (initial != null && initial.isNotEmpty) {
@@ -178,8 +188,24 @@ class _ImporterStoreProfileScreenState
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _mobileSearch.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _queueMobileSearch() {
+    _searchDebounce?.cancel();
+    if (_desktopStore) return;
+    _loadGen++;
+    setState(() {
+      _parts.clear();
+      _matchingTotal = null;
+      _loadingMore = true;
+      _error = null;
+    });
+    _searchDebounce =
+        Timer(const Duration(milliseconds: 320), () => _loadMore(reset: true));
   }
 
   Future<void> _loadProfile() async {
@@ -224,11 +250,13 @@ class _ImporterStoreProfileScreenState
   }
 
   Future<void> _loadMore({bool reset = false}) async {
+    if (reset) _searchDebounce?.cancel();
     if (!reset && (_loadingMore || !_hasMore)) return;
     final gen = ++_loadGen;
     setState(() => _loadingMore = true);
     try {
       if (reset) {
+        _error = null;
         _parts.clear();
         _matchingTotal = null;
         _hasMore = true;
@@ -397,58 +425,87 @@ class _ImporterStoreProfileScreenState
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final desktop = _desktopStore;
+    final showNavigation = !desktop &&
+        widget.viewer.isAliado &&
+        MediaQuery.viewInsetsOf(context).bottom == 0;
     final hPad = desktop ? 40.0 : AliadoCatalogLayout.horizontalPadding(width);
     const maxW = AppBreakpoints.adminContentMaxWidth;
     final theme = B2BThemeExtension.of(context);
 
     return Scaffold(
       backgroundColor: desktop ? theme.background : AppColors.background,
-      appBar: AppBar(
-        backgroundColor: desktop ? theme.surfaceCard : null,
-        foregroundColor: desktop ? theme.textPrimary : null,
-        surfaceTintColor: desktop ? theme.surfaceCard : null,
-        elevation: desktop ? 0 : null,
-        title: Text(
-          _profile?.displayName ?? 'Mayorista',
-          style: desktop
-              ? TextStyle(
-                  color: theme.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                )
-              : null,
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Compartir QR',
-            onPressed: () => showShareQrSheet(
-              context,
-              title: _profile?.displayName ?? 'Vitrina',
-              url: ImporterStoreShareLink.urlFor(widget.importerId),
-              subtitle: 'Vitrina del proveedor',
+      extendBody: showNavigation,
+      appBar: !desktop
+          ? mobileSupplierAppBar(context,
+              title: _profile?.displayName ?? 'Mayorista',
+              viewer: widget.viewer,
+              brandedToolbarHeight: B2bHeaderTitle.singleLineToolbarHeight(
+                context,
+                titleFontSize: supplierHeaderTitleSize,
+              ),
+              actions: [
+                  IconButton(
+                      tooltip: 'Compartir QR',
+                      onPressed: () => showShareQrSheet(context,
+                          title: _profile?.displayName ?? 'Vitrina',
+                          url: ImporterStoreShareLink.urlFor(widget.importerId),
+                          subtitle: 'Vitrina del proveedor'),
+                      icon: const Icon(Icons.qr_code_2))
+                ])
+          : AppBar(
+              backgroundColor: desktop ? theme.surfaceCard : null,
+              foregroundColor: desktop ? theme.textPrimary : null,
+              surfaceTintColor: desktop ? theme.surfaceCard : null,
+              elevation: desktop ? 0 : null,
+              title: Text(
+                _profile?.displayName ?? 'Mayorista',
+                style: desktop
+                    ? TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      )
+                    : null,
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Compartir QR',
+                  onPressed: () => showShareQrSheet(
+                    context,
+                    title: _profile?.displayName ?? 'Vitrina',
+                    url: ImporterStoreShareLink.urlFor(widget.importerId),
+                    subtitle: 'Vitrina del proveedor',
+                  ),
+                  icon: const Icon(Icons.qr_code_2),
+                ),
+                if (_profile != null && _canMessageSupplier)
+                  IconButton(
+                    key: const Key('store-supplier-chat'),
+                    tooltip: 'Mensaje al proveedor',
+                    onPressed: _openSupplierChat,
+                    icon: const LucideIcon(LucideGlyph.messageCircle),
+                  ),
+              ],
             ),
-            icon: const Icon(Icons.qr_code_2),
-          ),
-          if (_profile != null && _canMessageSupplier)
-            IconButton(
-              key: const Key('store-supplier-chat'),
-              tooltip: 'Mensaje al proveedor',
-              onPressed: _openSupplierChat,
-              icon: const LucideIcon(LucideGlyph.messageCircle),
-            ),
-        ],
-      ),
+      bottomNavigationBar:
+          showNavigation ? const SupplierMobileNavigation() : null,
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxW),
-          child: _body(hPad, desktop: desktop),
+          child: Builder(
+              builder: (context) => _body(hPad,
+                  desktop: desktop,
+                  navigationInset: showNavigation
+                      ? MediaQuery.paddingOf(context).bottom
+                      : 0)),
         ),
       ),
     );
   }
 
-  Widget _body(double hPad, {required bool desktop}) {
+  Widget _body(double hPad,
+      {required bool desktop, required double navigationInset}) {
     if (_loadingProfile) {
       return const Center(
         key: Key('importer-store-loading'),
@@ -540,9 +597,11 @@ class _ImporterStoreProfileScreenState
             child: Center(
               key: const Key('importer-store-empty'),
               child: Text(
-                _selectedCategory == null
-                    ? 'Este mayorista aún no tiene productos en vitrina.'
-                    : 'No hay productos en esta categoría.',
+                !desktop && _mobileSearch.text.trim().isNotEmpty
+                    ? 'No hay productos que coincidan con tu búsqueda.'
+                    : _selectedCategory == null
+                        ? 'Este mayorista aún no tiene productos en vitrina.'
+                        : 'No hay productos en esta categoría.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary),
               ),
@@ -563,9 +622,13 @@ class _ImporterStoreProfileScreenState
                             showHeart: widget.viewer.isAliado,
                             onTap: () => _openProduct(part),
                           )
-                        : _StoreProductCard(
+                        : AliadoProductCard(
                             part: part,
-                            showHeart: widget.viewer.isAliado,
+                            profile: widget.viewer,
+                            compact: true,
+                            showSupplier: false,
+                            adaptiveColors: true,
+                            storefront: true,
                             onTap: () => _openProduct(part),
                           );
                   }
@@ -577,7 +640,7 @@ class _ImporterStoreProfileScreenState
                       itemBuilder: cardAt,
                     );
                   }
-                  return AliadoCatalogCardWrap(
+                  return _MobileStoreCardGrid(
                     maxWidth: gridConstraints.maxWidth,
                     itemCount: visibleParts.length,
                     itemBuilder: cardAt,
@@ -627,159 +690,203 @@ class _ImporterStoreProfileScreenState
               ),
             ),
           ),
+        if (navigationInset > 0)
+          SliverToBoxAdapter(child: SizedBox(height: navigationInset)),
       ],
     );
   }
 
   Widget _header(ImporterStoreProfile profile) {
-    final rating = profile.ratingAvg;
-    final count = profile.ratingCount ?? 0;
-    final metodos = profile.pagoMetodoLabelsEs;
-    final address = profile.direccion?.trim() ?? '';
-    final rif = profile.rif?.trim() ?? '';
-    final phone = profile.phone?.trim() ?? '';
+    final colors = Theme.of(context).colorScheme;
     final maps = profile.fiscalMapsUrl?.trim() ?? '';
-    final logo = profile.logoStoragePath?.trim() ?? '';
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ImporterCatalogLogo(
-                  storagePath: logo,
-                  size: 64,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profile.displayName,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          height: 1.2,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      if (profile.locationLine.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          profile.locationLine,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                      if (profile.isCatalogVerified ||
-                          profile.isCatalogFeatured) ...[
-                        const SizedBox(height: 8),
-                        ImporterCatalogSealsRow(
-                          verified: profile.isCatalogVerified,
-                          featured: profile.isCatalogFeatured,
-                        ),
-                      ],
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final categories = _categories
+        .map(categoryFamily)
+        .toSet()
+        .take(3)
+        .map(catalogCategoryDisplayLabel)
+        .join(' · ');
+    final details = <Widget>[
+      if ((profile.direccion ?? '').trim().isNotEmpty)
+        _StoreDetailRow(
+            icon: Icons.place_outlined, text: profile.direccion!.trim()),
+      if ((profile.rif ?? '').trim().isNotEmpty)
+        _StoreDetailRow(icon: Icons.badge_outlined, text: 'RIF ${profile.rif}'),
+      if ((profile.phone ?? '').trim().isNotEmpty)
+        _StoreDetailRow(
+            icon: Icons.phone_outlined,
+            text: profile.phone!,
+            onTap: () => _openPhone(profile.phone!)),
+    ];
+    final divider = Divider(height: 15, color: supplierOutlineColor(context));
+    final consult = OutlinedButton.icon(
+        key: const Key('store-supplier-chat'),
+        onPressed: _openSupplierChat,
+        style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            foregroundColor: colors.primary,
+            backgroundColor: colors.surface,
+            side: BorderSide(color: colors.primary, width: 1.4),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            textStyle: TextStyle(
+                fontFamily: Theme.of(context).textTheme.labelLarge?.fontFamily,
+                fontSize: 15,
+                fontWeight: FontWeight.w700)),
+        icon: const LucideIcon(LucideGlyph.messageCircle, size: 20),
+        label: const Text('Consultar proveedor'));
+    final location = TextButton.icon(
+        onPressed: () => _openMaps(maps),
+        style: TextButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            textStyle: TextStyle(
+                fontFamily: Theme.of(context).textTheme.labelLarge?.fontFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.w600)),
+        icon: const Icon(Icons.place_outlined, size: 21),
+        label: const Text('Ver ubicación'));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Material(
+          color: supplierPanelColor(context),
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          mobileSupplierLogo(context,
+                              path: profile.logoStoragePath,
+                              size: scale > 1.3 ? 66 : 80),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(profile.displayName,
+                                    style: TextStyle(
+                                        fontSize: 22,
+                                        height: 1.15,
+                                        fontWeight: FontWeight.w800,
+                                        color: colors.onSurface)),
+                                if (profile.locationLine.isNotEmpty)
+                                  Padding(
+                                      padding: const EdgeInsets.only(top: 5),
+                                      child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Icon(Icons.location_on_outlined,
+                                                size: 18,
+                                                color: colors.onSurfaceVariant),
+                                            const SizedBox(width: 3),
+                                            Expanded(
+                                                child: Text(
+                                                    profile.locationLine,
+                                                    style: TextStyle(
+                                                        fontSize: 14,
+                                                        height: 1.2,
+                                                        color:
+                                                            colors.onSurface))),
+                                          ])),
+                                const SizedBox(height: 5),
+                                SupplierRating(
+                                    average: profile.ratingAvg,
+                                    count: profile.ratingCount),
+                                if (profile.isCatalogVerified ||
+                                    profile.isCatalogFeatured)
+                                  Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: ImporterCatalogSealsRow(
+                                          verified: profile.isCatalogVerified,
+                                          featured: profile.isCatalogFeatured,
+                                          compact: true)),
+                              ])),
+                        ]),
+                    if (categories.isNotEmpty) ...[
+                      divider,
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.storefront_outlined,
+                                size: 21, color: colors.onSurfaceVariant),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(categories,
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        height: 1.2,
+                                        color: colors.onSurface))),
+                          ]),
                     ],
-                  ),
-                ),
-              ],
-            ),
-            if ((rating != null && count > 0) || profile.hasMinOrder) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (rating != null && count > 0)
-                    _StoreFactChip(
-                      icon: Icons.star_rounded,
-                      iconColor: Colors.amber.shade800,
-                      label:
-                          '${rating.toStringAsFixed(1)} · $count valoración${count == 1 ? '' : 'es'}',
-                    ),
-                  if (profile.hasMinOrder)
-                    _StoreFactChip(
-                      icon: Icons.inventory_2_outlined,
-                      label: profile.minOrderLabelEs,
-                    ),
-                ],
-              ),
-            ],
-            if (address.isNotEmpty || rif.isNotEmpty || phone.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              if (address.isNotEmpty)
-                _StoreDetailRow(icon: Icons.place_outlined, text: address),
-              if (rif.isNotEmpty)
-                _StoreDetailRow(icon: Icons.badge_outlined, text: 'RIF $rif'),
-              if (phone.isNotEmpty)
-                _StoreDetailRow(
-                  icon: Icons.phone_outlined,
-                  text: phone,
-                  onTap: () => _openPhone(phone),
-                ),
-            ],
-            if (metodos.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                profile.pagoSoloDivisas ? 'Pago en divisas' : 'Métodos de pago',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final metodo in metodos)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.brandBlueContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        metodo,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.brand,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-            if (maps.isNotEmpty)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _openMaps(maps),
-                  icon: const Icon(Icons.map_outlined, size: 18),
-                  label: const Text('Ver ubicación'),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+                    if (profile.hasMinOrder)
+                      Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(profile.minOrderLabelEs,
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700))),
+                    if (profile.pagoMetodoLabelsEs.isNotEmpty) ...[
+                      divider,
+                      Text(
+                          profile.pagoSoloDivisas
+                              ? 'Pago en divisas'
+                              : 'Métodos de pago',
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Wrap(spacing: 7, runSpacing: 6, children: [
+                        for (final method in profile.pagoMetodoLabelsEs)
+                          SupplierCategoryPill(label: method),
+                      ]),
+                    ],
+                    if (details.isNotEmpty) ...[
+                      divider,
+                      Theme(
+                          data: Theme.of(context)
+                              .copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                              key: const Key('store-commercial-details'),
+                              tilePadding: EdgeInsets.zero,
+                              childrenPadding:
+                                  const EdgeInsets.only(bottom: 10),
+                              visualDensity: VisualDensity.compact,
+                              title: const Text('Datos y ubicación',
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700)),
+                              leading: const Icon(Icons.info_outline, size: 20),
+                              children: details)),
+                    ] else
+                      const SizedBox(height: 12),
+                  ]))),
+      if (_canMessageSupplier || maps.isNotEmpty)
+        Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: LayoutBuilder(builder: (context, constraints) {
+              if (_canMessageSupplier &&
+                  maps.isNotEmpty &&
+                  constraints.maxWidth >= 340 &&
+                  scale <= 1.2) {
+                return Row(children: [
+                  Expanded(flex: 6, child: consult),
+                  const SizedBox(width: 8),
+                  Expanded(flex: 4, child: location),
+                ]);
+              }
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_canMessageSupplier) consult,
+                    if (maps.isNotEmpty)
+                      Align(alignment: Alignment.centerLeft, child: location),
+                  ]);
+            })),
+    ]);
   }
 
   Future<void> _openPhone(String phone) async {
@@ -788,6 +895,40 @@ class _ImporterStoreProfileScreenState
   }
 
   Widget _categoryChips() {
+    Widget searchField() => TextField(
+          key: const Key('store-product-search'),
+          controller: _mobileSearch,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) {
+            _searchDebounce?.cancel();
+            _loadMore(reset: true);
+          },
+          decoration: InputDecoration(
+              hintText: 'Buscar en esta tienda…',
+              hintStyle: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              isDense: true,
+              prefixIcon: const Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: LucideIcon(LucideGlyph.search, size: 19)),
+              suffixIcon: _mobileSearch.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Limpiar búsqueda',
+                      onPressed: _mobileSearch.clear,
+                      icon: const Icon(Icons.close)),
+              filled: true,
+              fillColor: AppColors.card,
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: supplierOutlineColor(context))),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+        );
     final families = catalogCategoryFamilies(_categories);
     final selected = canonicalCatalogCategory(_selectedCategory);
     final family = selected == null ? null : categoryFamily(selected);
@@ -795,22 +936,24 @@ class _ImporterStoreProfileScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Catálogo',
+          'Catálogo de ${_profile?.displayName ?? 'la tienda'}',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 20,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
+        searchField(),
+        const SizedBox(height: 10),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: const Text('Todos'),
+                child: SupplierFilterChip(
+                  label: 'Todos',
                   selected: _selectedCategory == null,
                   onSelected: (_) => _selectCategory(null),
                 ),
@@ -818,8 +961,8 @@ class _ImporterStoreProfileScreenState
               for (final group in families)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(catalogCategoryDisplayLabel(group.label)),
+                  child: SupplierFilterChip(
+                    label: catalogCategoryDisplayLabel(group.label),
                     selected: family == group.label,
                     onSelected: (_) => _selectCategory(group.label),
                   ),
@@ -832,14 +975,14 @@ class _ImporterStoreProfileScreenState
             Wrap(
               spacing: 8,
               children: [
-                ChoiceChip(
-                  label: const Text('Toda la categoría'),
+                SupplierFilterChip(
+                  label: 'Toda la categoría',
                   selected: selected == group.label,
                   onSelected: (_) => _selectCategory(group.label),
                 ),
                 for (final child in group.children)
-                  ChoiceChip(
-                    label: Text(categoryLeaf(child.label)),
+                  SupplierFilterChip(
+                    label: categoryLeaf(child.label),
                     selected: selected == child.label,
                     onSelected: (_) => _selectCategory(child.label),
                   ),
@@ -1133,42 +1276,37 @@ class _ImporterStoreProfileScreenState
   }
 }
 
-class _StoreFactChip extends StatelessWidget {
-  const _StoreFactChip({
-    required this.icon,
-    required this.label,
-    this.iconColor,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color? iconColor;
-
+/// Filas de igual alto; el texto ampliado usa una columna completa.
+class _MobileStoreCardGrid extends StatelessWidget {
+  const _MobileStoreCardGrid(
+      {required this.maxWidth,
+      required this.itemCount,
+      required this.itemBuilder});
+  final double maxWidth;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTinted,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: iconColor ?? AppColors.brand),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final columns =
+        scale > 1.2 ? 1 : AliadoCatalogLayout.crossAxisCount(maxWidth);
+    const spacing = 10.0;
+    return Column(children: [
+      for (var row = 0; row < itemCount; row += columns) ...[
+        if (row > 0) const SizedBox(height: spacing),
+        IntrinsicHeight(
+            child:
+                Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var column = 0; column < columns; column++) ...[
+            if (column > 0) const SizedBox(width: spacing),
+            Expanded(
+                child: row + column < itemCount
+                    ? itemBuilder(context, row + column)
+                    : const SizedBox.shrink()),
+          ],
+        ])),
+      ],
+    ]);
   }
 }
 
@@ -1209,177 +1347,6 @@ class _StoreDetailRow extends StatelessWidget {
     );
     if (onTap == null) return row;
     return InkWell(onTap: onTap, child: row);
-  }
-}
-
-class _StoreProductCard extends StatelessWidget {
-  const _StoreProductCard({
-    required this.part,
-    required this.onTap,
-    required this.showHeart,
-  });
-
-  final PartModel part;
-  final VoidCallback onTap;
-  final bool showHeart;
-
-  @override
-  Widget build(BuildContext context) {
-    final cover = part.coverImageUrl;
-    return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderSubtle),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AspectRatio(
-                  aspectRatio: AliadoCatalogLayout.cardImageAspect,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        cover != null && cover.isNotEmpty
-                            ? Image.network(
-                                cover,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    const _StoreImagePlaceholder(),
-                              )
-                            : const _StoreImagePlaceholder(),
-                        if (part.hasWarranty)
-                          const Positioned(
-                            top: 6,
-                            left: 6,
-                            child: ProductWarrantySeal(compact: true),
-                          ),
-                        if (showHeart)
-                          Positioned(
-                            right: 6,
-                            bottom: 6,
-                            child: FavoriteHeartButton(
-                              productId: part.id,
-                              compact: true,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  part.nombre,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if ((part.category ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    formatCatalogCategoryLabel(part.category!),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.brand,
-                      height: 1.1,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                CatalogProductPriceDisplay(
-                  listPriceUsd: part.precio,
-                  salePriceUsd: part.salePriceUsd,
-                  quantity: part.minOrderQtyEffective,
-                  ownerPagoSoloDivisas: part.ownerPagoSoloDivisas,
-                  discountRules: part.discountRules,
-                  campaignDiscountPercent: part.activeCampaignDiscountPercent,
-                  catalogGrid: true,
-                  compact: true,
-                  showPromotionChips: false,
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: EnvioPoliticaBadge(
-                    tipo: part.ownerEnvioTipo,
-                    compact: true,
-                  ),
-                ),
-                if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo))
-                  const SizedBox(height: 6),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '${part.stockForSale} en stock',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.successGreen,
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' · ${part.minOrderQtyLabelEs}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (productCustomFieldsDisplayEntries(
-                  part.customFields,
-                  aliadoView: true,
-                ).isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  ProductCustomFieldsAliadoChips(
-                    customFields: part.customFields,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StoreImagePlaceholder extends StatelessWidget {
-  const _StoreImagePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.surfaceTinted,
-      child: Icon(
-        Icons.image_outlined,
-        size: 32,
-        color: AppColors.textMuted,
-      ),
-    );
   }
 }
 

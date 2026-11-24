@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
@@ -183,8 +184,7 @@ class _AdminOrderRatingsPanelState extends State<AdminOrderRatingsPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo moderar: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          content: AppNoticeMessage.error('No se pudo moderar: $e'),
           behavior: SnackBarBehavior.floating,
         ),
       );

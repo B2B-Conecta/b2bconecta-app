@@ -107,6 +107,8 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
             constraints.maxWidth >= AppBreakpoints.mobileMenu;
         final mobileRetailer =
             headerBuilder != null && viewerRole == AppHomeRole.aliado;
+        final navigationInset =
+            mobileRetailer ? MediaQuery.paddingOf(context).bottom : 0.0;
         return ScrollCompactLayout(
             resetKey: (selectedKey, resetKey),
             scrollProgress:
@@ -237,6 +239,9 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                                       true,
                                                                   compactPageBar:
                                                                       mobileRetailer,
+                                                                  scrollPageBar:
+                                                                      navigationInset >
+                                                                          0,
                                                                   pageSizeOptions:
                                                                       mobileRetailer
                                                                           ? const [
@@ -256,8 +261,8 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                                       top: mobileRetailer
                                                                           ? 2
                                                                           : 8,
-                                                                      bottom:
-                                                                          8),
+                                                                      bottom: 8 +
+                                                                          navigationInset),
                                                                   onRefresh:
                                                                       onRefresh,
                                                                   itemBuilder: (g) {
@@ -357,9 +362,9 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                   child: SingleChildScrollView(
                                                       key: ValueKey(
                                                           'order-detail-${_keyOf(selected)}'),
-                                                      padding:
-                                                          const EdgeInsets.only(
-                                                              bottom: 20),
+                                                      padding: EdgeInsets.only(
+                                                          bottom: 20 +
+                                                              navigationInset),
                                                       child: detailBuilder(
                                                           selected))),
                                             ])),
@@ -527,7 +532,8 @@ class _ImporterOrderChromeBinder extends StatefulWidget {
       _ImporterOrderChromeBinderState();
 }
 
-class _ImporterOrderChromeBinderState extends State<_ImporterOrderChromeBinder> {
+class _ImporterOrderChromeBinderState
+    extends State<_ImporterOrderChromeBinder> {
   void _publish() {
     ImporterOrderDetailChrome.instance.publish(
       reference: widget.reference,

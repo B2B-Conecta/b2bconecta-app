@@ -68,10 +68,22 @@ void main() {
             ]) {
               final color = OrderListEntry([fixture('one', status: status)])
                   .statusColor(context);
-              final background =
-                  Color.alphaBlend(color.withOpacity(.10), colors.surface);
-              expect(contrast(color, background), greaterThanOrEqualTo(4.5),
-                  reason: status);
+              for (final opacity in [.10, .14]) {
+                for (final surface in [
+                  colors.surface,
+                  colors.soft,
+                  colors.pendingSurface,
+                  if (!dark) ...[
+                    const Color(0xFFF2F4F7),
+                    const Color(0xFFFFF5E3),
+                  ],
+                ]) {
+                  final background =
+                      Color.alphaBlend(color.withOpacity(opacity), surface);
+                  expect(contrast(color, background), greaterThanOrEqualTo(4.5),
+                      reason: '$status at opacity $opacity on $surface');
+                }
+              }
             }
             return const Scaffold();
           })));

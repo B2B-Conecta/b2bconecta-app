@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_quick_filter.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_list_entry.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_priority_controls.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
@@ -47,16 +48,83 @@ void main() {
               pendingFirst: pendingFirst,
               onSort: (v) => pendingFirst = v,
             ))));
-        await tester.tap(find.text('Por confirmar'));
+        await tester.tap(find.text('Por gestionar'));
         expect(pendingSelected, isTrue);
         expect(find.text('8'), findsOneWidget);
         await tester.tap(find.byTooltip('Ordenar pedidos'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Orden habitual'));
+        await tester.tap(
+            find.widgetWithText(CheckedPopupMenuItem<bool>, 'Orden habitual'));
         await tester.pumpAndSettle();
         expect(pendingFirst, isFalse);
         expect(tester.takeException(), isNull);
       });
     }
   }
+
+  testWidgets('mobile uses catalog pills and keeps filter and sort actions',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 800);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var pendingOnly = false;
+    var pendingFirst = true;
+    var scope = PedidosListScope.todos;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: StatefulBuilder(builder: (context, setState) {
+          return OrderPriorityControls(
+            compact: true,
+            scope: scope,
+            onScope: (next) => setState(() {
+              pendingOnly = false;
+              scope = next;
+            }),
+            pendingOnly: pendingOnly,
+            pendingCount: 19,
+            onPending: () => setState(() => pendingOnly = true),
+            pendingFirst: pendingFirst,
+            onSort: (next) => setState(() => pendingFirst = next),
+          );
+        }),
+      ),
+    ));
+
+    final all = find.widgetWithText(AliadoQuickFilterChip, 'Todos');
+    final pending = find.widgetWithText(AliadoQuickFilterChip, 'Por gestionar');
+    expect(tester.widget<AliadoQuickFilterChip>(all).selected, isTrue);
+    expect(find.descendant(of: pending, matching: find.text('19')),
+        findsOneWidget);
+    await tester.tap(pending);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AliadoQuickFilterChip>(all).selected, isFalse);
+    expect(tester.widget<AliadoQuickFilterChip>(pending).selected, isTrue);
+
+    final canceled = find.widgetWithText(AliadoQuickFilterChip, 'Cancelados');
+    final filterRow = find.byType(AliadoQuickFilterRow);
+    final scrollable = find.descendant(
+      of: filterRow,
+      matching: find.byType(Scrollable),
+    );
+    await tester.timedDrag(
+        filterRow, const Offset(-240, 0), const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(tester.state<ScrollableState>(scrollable).position.pixels,
+        greaterThan(0));
+    await tester.ensureVisible(canceled);
+    await tester.pumpAndSettle();
+    await tester.tap(canceled);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AliadoQuickFilterChip>(canceled).selected, isTrue);
+
+    await tester.tap(find.byTooltip('Ordenar pedidos'));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.widgetWithText(CheckedPopupMenuItem<bool>, 'Orden habitual'));
+    await tester.pumpAndSettle();
+    expect(find.text('Orden habitual ↓'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

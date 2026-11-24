@@ -644,8 +644,7 @@ extension on _AliadoHomeDashboardState {
                           widget.profile)
                       case final warningBanner?)
                     _block(warningBanner, top: 12)
-                  else if (EntrepreneurRailStatusCard.homeBanner(
-                          widget.profile)
+                  else if (EntrepreneurRailStatusCard.homeBanner(widget.profile)
                       case final entrepreneurBanner?)
                     _block(entrepreneurBanner, top: 12),
                   if (snapshot.connectionState != ConnectionState.done &&
@@ -694,7 +693,7 @@ extension on _AliadoHomeDashboardState {
             key: const ValueKey('home-cart'),
             listenable: CartService.instance,
             builder: (_, __) => _homeToolbarButton(
-              label: 'Carrito',
+              label: 'Bolsa',
               onTap: _cart,
               icon: LucideGlyph.handbag,
               count: CartService.instance.itemCount,
@@ -1239,35 +1238,17 @@ extension on _AliadoHomeDashboardState {
 
   Future<void> _supplierPicker(List<ImporterOption> suppliers,
       {required bool consult}) async {
-    final selected = await showModalBottomSheet<ImporterOption>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _HomePicker(
-          title: consult ? 'Elige un proveedor' : 'Tiendas',
-          count: suppliers.length,
-          itemBuilder: (_, index) {
-            final supplier = suppliers[index];
-            return ListTile(
-              leading: _HomeLogo(path: supplier.logoStoragePath, size: 38),
-              title: Text(supplier.businessName),
-              subtitle: Text(supplier.ubicacionLine),
-              trailing: consult
-                  ? const LucideIcon(LucideGlyph.messageCircle)
-                  : const _HomeAngle(),
-              onTap: () => Navigator.pop(context, supplier),
-            );
-          }),
-    );
-    if (!mounted || selected == null) return;
-    if (!consult) {
-      _openStore(selected);
+    if (consult) {
+      await CatalogRouteLock.push(
+          context,
+          MaterialPageRoute<void>(
+              builder: (_) => NewConsultationScreen(suppliers: suppliers)));
       return;
     }
     await CatalogRouteLock.push(
         context,
         MaterialPageRoute<void>(
-            builder: (_) => _HomeSupplierConversation(supplier: selected)));
+            builder: (_) => SupplierDirectoryScreen(viewer: widget.profile)));
   }
 
   void _showBrands(List<MapEntry<String, String>> brands) =>
@@ -1313,6 +1294,33 @@ extension on _AliadoHomeDashboardState {
         catalogGrid: true,
         compact: true,
         showPromotionChips: false,
+        keepDiscountInline: true,
+      );
+
+  Widget _priceAndMinimum(PartModel part, {bool distribute = false}) => Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (distribute && part.hasSupplierMinOrderQty)
+            Expanded(child: _price(part))
+          else
+            Flexible(child: _price(part)),
+          if (part.hasSupplierMinOrderQty) ...[
+            SizedBox(
+              height: 36,
+              child: VerticalDivider(
+                  width: 17, thickness: 1, color: AppColors.divider),
+            ),
+            Semantics(
+              label: part.minOrderQtyLabelEs,
+              excludeSemantics: true,
+              child: Text('Mín.\n${part.minOrderQtyEffective} uds',
+                  style: TextStyle(
+                      fontSize: 11,
+                      height: 1.25,
+                      color: AppColors.textSecondary)),
+            ),
+          ],
+        ],
       );
 
   Widget _partCaption(PartModel part) => Column(
@@ -1332,7 +1340,23 @@ extension on _AliadoHomeDashboardState {
       );
 
   Widget _compactProduct(PartModel part) {
-    final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
+    if (MediaQuery.textScalerOf(context).scale(14) > 19) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          SizedBox(width: 48, height: 64, child: _HomeProductPhoto(part: part)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: InkWell(
+                  onTap: () => _openPart(part), child: _partCaption(part))),
+          _HomeAddButton(
+              part: part,
+              profile: widget.profile,
+              onDetails: () => _openPart(part)),
+        ]),
+        const SizedBox(height: 6),
+        _priceAndMinimum(part),
+      ]);
+    }
     return Row(children: [
       Expanded(
           child: InkWell(
@@ -1350,16 +1374,8 @@ extension on _AliadoHomeDashboardState {
                     children: [
                   _partCaption(part),
                   const SizedBox(height: 3),
-                  if (part.hasSupplierMinOrderQty)
-                    Text(part.minOrderQtyLabelEs,
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
-                  if (largeText) _price(part),
+                  _priceAndMinimum(part),
                 ])),
-            if (!largeText) ...[
-              const SizedBox(width: 6),
-              SizedBox(width: 100, child: _price(part)),
-            ],
           ]),
         ),
       )),
@@ -1370,98 +1386,131 @@ extension on _AliadoHomeDashboardState {
     ]);
   }
 
-  Widget _featuredProduct(PartModel part, double width) => _homePanel(
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-              child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => _openPart(part),
-            child: Padding(
-              padding: const EdgeInsets.only(right: 6, bottom: 6),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (part.category?.isNotEmpty == true)
-                      Row(children: [
-                        CatalogCategoryIcon(
-                          art: CatalogCategoryArt.forLabel(part.category!),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                            child: Text(
-                                catalogCategoryDisplayLabel(part.category!),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary))),
-                      ]),
-                    const SizedBox(height: 4),
-                    _partCaption(part),
-                    const SizedBox(height: 8),
-                    _price(part),
-                    const SizedBox(height: 3),
-                    if (part.hasSupplierMinOrderQty)
-                      Text(part.minOrderQtyLabelEs,
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary)),
-                  ]),
-            ),
-          )),
-          SizedBox(
-            width: (width * .41).clamp(96.0, 148.0),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  InkWell(
-                    onTap: () => _openPart(part),
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                        height: 100,
-                        child:
-                            _HomeProductPhoto(part: part, blendWithCard: true)),
-                  ),
-                  const SizedBox(height: 4),
-                  _HomeAddButton(
-                      part: part,
-                      profile: widget.profile,
-                      showLabel: true,
-                      onDetails: () => _openPart(part)),
-                ]),
-          ),
-        ]),
-      );
-
-  Widget _smallProduct(PartModel part, double width) => Material(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
+  Widget _featuredProduct(PartModel part, double width) {
+    if (MediaQuery.textScalerOf(context).scale(14) > 19) {
+      return _homePanel(
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
             onTap: () => _openPart(part),
             child: Row(children: [
+              Expanded(child: _partCaption(part)),
+              const SizedBox(width: 8),
               SizedBox(
-                width: width * .39,
-                height: 80,
-                child: _HomeProductPhoto(part: part, blendWithCard: true),
-              ),
-              Expanded(
-                  child: Padding(
-                padding: const EdgeInsets.fromLTRB(7, 8, 6, 8),
-                child: Column(
+                  width: 68,
+                  height: 80,
+                  child: _HomeProductPhoto(part: part, blendWithCard: true)),
+            ])),
+        const SizedBox(height: 8),
+        _priceAndMinimum(part),
+        const SizedBox(height: 8),
+        _HomeAddButton(
+            part: part,
+            profile: widget.profile,
+            showLabel: true,
+            onDetails: () => _openPart(part)),
+      ]));
+    }
+    return _homePanel(
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => _openPart(part),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 6, bottom: 6),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (part.category?.isNotEmpty == true)
+                Row(children: [
+                  CatalogCategoryIcon(
+                    art: CatalogCategoryArt.forLabel(part.category!),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                      child: Text(catalogCategoryDisplayLabel(part.category!),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 11, color: AppColors.textSecondary))),
+                ]),
+              const SizedBox(height: 4),
+              _partCaption(part),
+              const SizedBox(height: 8),
+              _priceAndMinimum(part),
+            ]),
+          ),
+        )),
+        SizedBox(
+          width: (width * .41).clamp(96.0, 148.0),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            InkWell(
+              onTap: () => _openPart(part),
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                  height: 100,
+                  child: _HomeProductPhoto(part: part, blendWithCard: true)),
+            ),
+            const SizedBox(height: 4),
+            _HomeAddButton(
+                part: part,
+                profile: widget.profile,
+                showLabel: true,
+                onDetails: () => _openPart(part)),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _smallProduct(PartModel part, double width) {
+    final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
+    final photo = SizedBox(
+      width: largeText ? 80 : (width * .29).clamp(76.0, 92.0),
+      height: largeText ? 88 : 96,
+      child: _HomeProductPhoto(part: part, blendWithCard: true),
+    );
+    final details = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _partCaption(part),
+        if (!largeText) ...[
+          const SizedBox(height: 6),
+          _priceAndMinimum(part, distribute: true),
+        ],
+      ],
+    );
+    return Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          onTap: () => _openPart(part),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: largeText
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _partCaption(part),
-                      const SizedBox(height: 4),
-                      _price(part),
-                      if (part.hasSupplierMinOrderQty)
-                        Text(part.minOrderQtyLabelEs,
-                            style: TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary)),
-                    ]),
-              )),
-            ])),
-      );
+                        Row(children: [
+                          photo,
+                          const SizedBox(width: 10),
+                          Expanded(child: details)
+                        ]),
+                        const SizedBox(height: 8),
+                        _priceAndMinimum(part, distribute: true),
+                      ])
+                : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    photo,
+                    const SizedBox(width: 10),
+                    Expanded(child: details),
+                  ]),
+          )),
+    );
+  }
 
   Widget _productSection(Widget heading, Iterable<PartModel> items,
           {bool featured = false}) =>
@@ -1481,29 +1530,30 @@ extension on _AliadoHomeDashboardState {
         final contentWidth = bounds.maxWidth - 2 * _homeSectionInset;
         final width = featured
             ? (contentWidth * .88).clamp(230.0, 360.0)
-            : (contentWidth * (scale > 1.35 ? .70 : .53)).clamp(162.0, 252.0);
+            : scale > 1.35
+                ? (contentWidth * .98).clamp(292.0, 380.0)
+                : (contentWidth * .76).clamp(272.0, 320.0);
         final extent = width + gap;
         final scrolls = products.length > 1 &&
             products.length * extent - gap > contentWidth;
+        final cards =
+            Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final (index, part) in products.indexed)
+            Padding(
+                padding: EdgeInsets.only(left: index == 0 ? 0 : gap),
+                child: SizedBox(
+                    width: width,
+                    child: featured
+                        ? _featuredProduct(part, width)
+                        : _smallProduct(part, width))),
+        ]);
         return SingleChildScrollView(
           key: ValueKey((extent, products.length)),
           scrollDirection: Axis.horizontal,
           physics:
               scrolls ? _HomeCardSnapPhysics(extent, products.length) : null,
           padding: const EdgeInsets.symmetric(horizontal: _homeSectionInset),
-          child: IntrinsicHeight(
-              child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                for (final (index, part) in products.indexed)
-                  Padding(
-                      padding: EdgeInsets.only(left: index == 0 ? 0 : gap),
-                      child: SizedBox(
-                          width: width,
-                          child: featured
-                              ? _featuredProduct(part, width)
-                              : _smallProduct(part, width))),
-              ])),
+          child: IntrinsicHeight(child: cards),
         );
       });
 }

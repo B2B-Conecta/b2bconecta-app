@@ -421,9 +421,6 @@ class _TransactionRequestDetailScreenState
     } else {
       title = r.tituloFichaPrincipalPedido;
     }
-    final totalRef = isGroup
-        ? lines.fold<double>(0, (a, e) => a + e.precioTotal)
-        : r.precioTotal;
     final statusSet = lines.map((e) => e.status).toSet();
     final estadoChip = isGroup && statusSet.length > 1
         ? 'Varios estados'
@@ -457,8 +454,7 @@ class _TransactionRequestDetailScreenState
               runSpacing: 6,
               children: [
                 _chip('Estado: $estadoChip'),
-                _chip(
-                    'Total ${orderAmountCurrency(lines)}: ${totalRef.toStringAsFixed(2)}'),
+                _chip('Total: ${orderAmountSummary(lines)}'),
               ],
             ),
             const SizedBox(height: 6),

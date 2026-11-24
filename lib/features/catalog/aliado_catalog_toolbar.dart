@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_quick_filter.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'aliado_catalog_quick_filters.dart';
@@ -24,8 +25,6 @@ class AliadoCatalogToolbar extends StatelessWidget {
   final CatalogSortMode sortMode;
   final VoidCallback onSortTap;
   final Widget? brandChip;
-
-  static const _metaColor = Color(0xFF000010);
 
   /// Altura fija del strip fijado bajo el chrome azul (scroll).
   static double pinnedHeight({required bool hasBrandChip}) =>
@@ -54,24 +53,9 @@ class AliadoCatalogToolbar extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text.rich(
-                TextSpan(
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                    height: 1.25,
-                    color: _metaColor,
-                  ),
-                  children: [
-                    TextSpan(text: countLabel),
-                    const TextSpan(text: ' · '),
-                    TextSpan(
-                      text: sortMode.compactLabelEs,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const TextSpan(text: ' ↓'),
-                  ],
-                ),
+              child: AliadoSortLabel(
+                resultCount: countLabel,
+                label: sortMode.compactLabelEs,
               ),
             ),
           ),
@@ -135,8 +119,8 @@ class _AliadoCatalogPinnedFiltersDelegate
       elevation: overlapsContent ? 1.5 : 0,
       shadowColor: AppColors.black.withOpacity(0.08),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-            horizontalPadding, 12, horizontalPadding, 8),
+        padding:
+            EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 8),
         child: child,
       ),
     );

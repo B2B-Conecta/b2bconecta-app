@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:flutter/services.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
@@ -295,13 +296,9 @@ class _AddUserModalState extends State<AddUserModal> {
   }
 
   void _snack(String text, {bool error = false}) {
-    final theme = B2BThemeExtension.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(text),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor:
-            error ? Theme.of(context).colorScheme.error : theme.textPrimary,
+        content: error ? AppNoticeMessage.error(text) : Text(text),
       ),
     );
   }

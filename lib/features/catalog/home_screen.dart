@@ -688,7 +688,6 @@ class _HomeScreenState extends State<HomeScreen>
           content: Text(
             'Active el GPS y conceda permiso de ubicación para ordenar por cercanía.',
           ),
-          backgroundColor: AppColors.brandBlue,
         ),
       );
       return false;
@@ -1312,7 +1311,7 @@ class _HomeScreenState extends State<HomeScreen>
                           iconColor: AppColors.white,
                           icon: Icons.shopping_bag_outlined,
                           iconWidget: const LucideIcon(
-                            LucideGlyph.shoppingBag,
+                            LucideGlyph.handbag,
                             size: 22,
                             color: AppColors.white,
                           ),
@@ -1871,6 +1870,7 @@ class _HomeScreenState extends State<HomeScreen>
                             catalogWidth: catalogWidth,
                             hPad: hPad,
                             crossAxisCount: crossAxisCount,
+                            navigationInset: MediaQuery.paddingOf(context).bottom,
                           ),
                         ],
                       );
@@ -1901,6 +1901,7 @@ class _HomeScreenState extends State<HomeScreen>
     required double catalogWidth,
     required double hPad,
     required int crossAxisCount,
+    required double navigationInset,
   }) {
     if (snapshot.connectionState == ConnectionState.waiting &&
         _loadedParts.isEmpty) {
@@ -2040,7 +2041,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
         ),
-      const SliverToBoxAdapter(child: SizedBox(height: 72)),
+      SliverToBoxAdapter(child: SizedBox(height: 72 + navigationInset)),
     ];
   }
 }

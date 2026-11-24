@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
@@ -13,10 +14,12 @@ class CatalogCartButton extends StatelessWidget {
       required this.part,
       required this.profile,
       this.cart,
+      this.storefront = false,
       this.onChooseVariant});
   final PartModel part;
   final ProfileModel profile;
   final CartService? cart;
+  final bool storefront;
 
   /// Override for tests or custom flows. Default opens the multi-qty sheet.
   final VoidCallback? onChooseVariant;
@@ -50,7 +53,7 @@ class CatalogCartButton extends StatelessWidget {
         builder: (context, _) {
           const ctaBlue = Color(0xFF004BDD);
           final ctaShape = RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999));
+              borderRadius: BorderRadius.circular(storefront ? 12 : 999));
           final ctaStyle = FilledButton.styleFrom(
               minimumSize: const Size(0, 42),
               backgroundColor: ctaBlue,
@@ -58,13 +61,14 @@ class CatalogCartButton extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               shape: ctaShape,
-              textStyle: const TextStyle(
+              textStyle: TextStyle(
+                  fontFamily: Theme.of(context).textTheme.labelLarge?.fontFamily,
                   fontSize: 13.5, fontWeight: FontWeight.w800));
           if (part.variantChoices.isNotEmpty) {
             return FilledButton.icon(
                 onPressed: () => _openVariantPicker(context, service),
                 style: ctaStyle,
-                icon: const Icon(Icons.shopping_cart_outlined, size: 17),
+                icon: const LucideIcon(LucideGlyph.handbag, size: 17),
                 label: const Text('Agregar'));
           }
           final line = CartProductActions.lineFor(part, service);
@@ -150,7 +154,7 @@ class CatalogCartButton extends StatelessWidget {
                         : '$label: ${part.nombre}',
                     child: ExcludeSemantics(
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.shopping_cart_outlined, size: 17),
+                      const LucideIcon(LucideGlyph.handbag, size: 17),
                       const SizedBox(width: 6),
                       Flexible(child: Text(label, textAlign: TextAlign.center)),
                     ]))),

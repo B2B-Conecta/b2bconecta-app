@@ -13,10 +13,8 @@ String adminCheckoutGroupTitle(List<TransactionRequestModel> lines) {
   if (lines.length == 1) {
     return lines.single.tituloFichaPrincipalPedido;
   }
-  final importers = lines
-      .map((e) => e.ownerId.trim())
-      .where((s) => s.isNotEmpty)
-      .toSet();
+  final importers =
+      lines.map((e) => e.ownerId.trim()).where((s) => s.isNotEmpty).toSet();
   final base = tituloCheckoutGrupoAliado(lines);
   if (importers.length > 1) {
     return '$base · ${importers.length} importadores';
@@ -44,17 +42,14 @@ int adminCheckoutGroupTotalUds(List<TransactionRequestModel> lines) =>
 
 String adminCheckoutGroupResumenLinea(List<TransactionRequestModel> lines) {
   final uds = adminCheckoutGroupTotalUds(lines);
-  final ref = adminCheckoutGroupTotalRef(lines);
   if (lines.length == 1) {
-    return '$uds uds · Total (tienda minorista) ${ref.toStringAsFixed(2)} ${orderAmountCurrency(lines)}';
+    return '$uds uds · Total (tienda minorista) ${orderAmountSummary(lines)}';
   }
-  final importers = lines
-      .map((e) => e.ownerId.trim())
-      .where((s) => s.isNotEmpty)
-      .toSet();
+  final importers =
+      lines.map((e) => e.ownerId.trim()).where((s) => s.isNotEmpty).toSet();
   return '$uds uds · ${lines.length} líneas · '
       '${importers.length} importador(es) · '
-      '${ref.toStringAsFixed(2)} ${orderAmountCurrency(lines)} total';
+      '${orderAmountSummary(lines)} total';
 }
 
 /// Primera línea morosa del grupo (para banner / acciones).

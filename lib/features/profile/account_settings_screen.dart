@@ -10,6 +10,8 @@ import 'package:motolink_pro_app/core/auth/auth_service.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_service.dart';
 import 'package:motolink_pro_app/core/notifications/web_push_status.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
+import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
@@ -38,6 +40,7 @@ class AccountSettingsScreen extends StatefulWidget {
     this.panel = AccountSettingsPanel.full,
     this.roleLabel,
     this.guideAlerts = false,
+    this.extraBottomPadding = 0,
   });
 
   /// Sin AppBar: se embebe como pestaña de Perfil.
@@ -48,6 +51,7 @@ class AccountSettingsScreen extends StatefulWidget {
 
   /// Rol visible en la tarjeta de sesión. Evita el texto de tienda minorista.
   final String? roleLabel;
+  final double extraBottomPadding;
 
   /// El recorrido de escritorio del mayorista señala activar avisos.
   final bool guideAlerts;
@@ -142,15 +146,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   void _showSnack(String message, {bool isError = false}) {
-    final theme = B2BThemeExtension.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: theme.surfaceCard),
-        ),
-        backgroundColor: isError ? theme.textPrimary : theme.brand,
-        behavior: SnackBarBehavior.floating,
+        content: isError
+            ? AppNoticeMessage.error(message)
+            : AppNoticeMessage.success(message),
       ),
     );
   }
@@ -1081,7 +1081,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             widget.embedded ? 0 : (width >= AppBreakpoints.mobileMenu ? 32 : 20),
             widget.embedded ? 0 : (width >= AppBreakpoints.mobileMenu ? 8 : 4),
             widget.embedded ? 0 : (width >= AppBreakpoints.mobileMenu ? 32 : 20),
-            32,
+            32 + widget.extraBottomPadding,
           ),
           child: Align(
             alignment: Alignment.topCenter,
@@ -1100,6 +1100,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
     if (widget.embedded) return scroll;
 
+    final material = Theme.of(context);
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
+    final title = Text(
+      'Cuenta y seguridad',
+      maxLines: mobile ? 1 : null,
+      overflow: mobile ? TextOverflow.ellipsis : null,
+      style: TextStyle(fontWeight: FontWeight.bold, color: theme.textPrimary),
+    );
     return Scaffold(
       backgroundColor: theme.background,
       appBar: AppBar(
@@ -1107,13 +1115,19 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         foregroundColor: theme.textPrimary,
         elevation: 0,
         surfaceTintColor: theme.surfaceCard.withOpacity(0),
-        title: Text(
-          'Cuenta y seguridad',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: theme.textPrimary,
-          ),
-        ),
+        toolbarHeight: mobile
+            ? B2bHeaderTitle.singleLineToolbarHeight(
+                context,
+                titleFontSize: material.appBarTheme.titleTextStyle?.fontSize ??
+                    material.textTheme.titleLarge?.fontSize ?? 22,
+              )
+            : null,
+        title: mobile
+            ? B2bHeaderTitle(
+                title: title,
+                signatureColor: material.colorScheme.primary,
+              )
+            : title,
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 12),

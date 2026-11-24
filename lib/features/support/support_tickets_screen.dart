@@ -9,6 +9,11 @@ import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'support_ticket_detail_screen.dart';
+import '../../core/layout/app_breakpoints.dart';
+import 'mobile_create_support_ticket_screen.dart';
+import 'mobile_support_widgets.dart';
+
+part 'support_tickets_mobile.dart';
 
 /// Listado y creación de reclamos (aliado / importador).
 class SupportTicketsScreen extends StatefulWidget {
@@ -30,6 +35,12 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   int _openCount = 0;
   bool _loading = true;
   String? _error;
+  SupportTicketFilter _mobileFilter = SupportTicketFilter.all;
+  int _loadVersion = 0;
+
+  void _setMobileFilter(SupportTicketFilter filter) {
+    setState(() => _mobileFilter = filter);
+  }
 
   @override
   void initState() {
@@ -38,6 +49,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Future<void> _load() async {
+    final version = ++_loadVersion;
     setState(() {
       _loading = true;
       _error = null;
@@ -47,14 +59,14 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
         SupabaseService.listMySupportTickets(),
         SupabaseService.countMyOpenSupportTickets(),
       ]);
-      if (!mounted) return;
+      if (!mounted || version != _loadVersion) return;
       setState(() {
         _rows = results[0] as List<SupportTicketModel>;
         _openCount = results[1] as int;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || version != _loadVersion) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -63,6 +75,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Future<void> _openCreateSheet() async {
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      await _openMobileCreate();
+      return;
+    }
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -84,6 +100,9 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      return _buildMobile();
+    }
     final active = _rows.where((ticket) => !ticket.isClosed).toList();
     final closed = _rows.where((ticket) => ticket.isClosed).toList();
 

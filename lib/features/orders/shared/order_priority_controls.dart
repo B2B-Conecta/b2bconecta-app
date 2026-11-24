@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_quick_filter.dart';
 import 'order_list_colors.dart';
 import 'order_list_entry.dart';
 import 'pedidos_scope_bar.dart';
@@ -36,7 +37,33 @@ class OrderPriorityControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = OrderListColors.of(context);
     Widget chip(String label, IconData icon, bool selected, VoidCallback tap,
-        {bool pending = false, int? count}) {
+        {bool pending = false, int? count, bool showCompactIcon = true}) {
+      if (compact) {
+        return AliadoQuickFilterChip(
+          label: label,
+          selected: selected,
+          onTap: tap,
+          icon: showCompactIcon ? Icon(icon) : null,
+          trailing: count == null
+              ? null
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.theme.warningBg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Text('$count',
+                        style: TextStyle(
+                            color: colors.pendingAccent,
+                            fontSize: 11,
+                            height: 1,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ),
+        );
+      }
       final tone = pending ? colors.pendingAccent : colors.accent;
       return Padding(
           padding: const EdgeInsets.only(right: 6),
@@ -74,37 +101,38 @@ class OrderPriorityControls extends StatelessWidget {
           ));
     }
 
-    final tabs = SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          chip(
-              'Todos',
-              Icons.receipt_long_outlined,
-              !pendingOnly && scope == PedidosListScope.todos,
-              () => onScope(PedidosListScope.todos)),
-          chip(
-              'Por gestionar',
-              Icons.schedule_outlined,
-              pendingOnly,
-              onPending,
-              pending: true,
-              count: pendingCount),
-          chip(
-              'En curso',
-              Icons.local_shipping_outlined,
-              !pendingOnly && scope == PedidosListScope.enCurso,
-              () => onScope(PedidosListScope.enCurso)),
-          chip(
-              'Entregados',
-              Icons.check_circle_outline,
-              !pendingOnly && scope == PedidosListScope.entregados,
-              () => onScope(PedidosListScope.entregados)),
-          chip(
-              'Cancelados',
-              Icons.block_outlined,
-              !pendingOnly && scope == PedidosListScope.cancelados,
-              () => onScope(PedidosListScope.cancelados)),
-        ]));
+    final chips = <Widget>[
+      chip(
+          'Todos',
+          Icons.receipt_long_outlined,
+          !pendingOnly && scope == PedidosListScope.todos,
+          () => onScope(PedidosListScope.todos),
+          showCompactIcon: false),
+      chip('Por gestionar', Icons.schedule_outlined, pendingOnly, onPending,
+          pending: true, count: pendingCount),
+      chip(
+          'En curso',
+          Icons.local_shipping_outlined,
+          !pendingOnly && scope == PedidosListScope.enCurso,
+          () => onScope(PedidosListScope.enCurso)),
+      chip(
+          'Entregados',
+          Icons.check_circle_outline,
+          !pendingOnly && scope == PedidosListScope.entregados,
+          () => onScope(PedidosListScope.entregados)),
+      chip(
+          'Cancelados',
+          Icons.block_outlined,
+          !pendingOnly && scope == PedidosListScope.cancelados,
+          () => onScope(PedidosListScope.cancelados)),
+    ];
+    final tabs = compact
+        ? AliadoQuickFilterRow(children: chips)
+        : SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: chips),
+          );
+    final sortLabel = pendingFirst ? 'Pendientes primero' : 'Orden habitual';
     final sort = PopupMenuButton<bool>(
       tooltip: 'Ordenar pedidos',
       initialValue: pendingFirst,
@@ -119,20 +147,21 @@ class OrderPriorityControls extends StatelessWidget {
             checked: !pendingFirst,
             child: const Text('Orden habitual')),
       ],
-      child: Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: 8, vertical: compact ? 7 : 12),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (!compact) ...[
-              Icon(Icons.swap_vert, size: 18, color: colors.secondary),
-              const SizedBox(width: 5),
-            ],
-            Text(pendingFirst ? 'Pendientes primero' : 'Orden habitual',
-                style: TextStyle(fontSize: 12, color: colors.secondary)),
-            const SizedBox(width: 4),
-            Icon(compact ? Icons.arrow_downward_rounded : Icons.expand_more,
-                size: compact ? 14 : 18, color: colors.secondary),
-          ])),
+      child: compact
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: AliadoSortLabel(label: sortLabel),
+            )
+          : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.swap_vert, size: 18, color: colors.secondary),
+                const SizedBox(width: 5),
+                Text(sortLabel,
+                    style: TextStyle(fontSize: 12, color: colors.secondary)),
+                const SizedBox(width: 4),
+                Icon(Icons.expand_more, size: 18, color: colors.secondary),
+              ])),
     );
     return LayoutBuilder(builder: (context, constraints) {
       if (constraints.maxWidth < 1000 ||

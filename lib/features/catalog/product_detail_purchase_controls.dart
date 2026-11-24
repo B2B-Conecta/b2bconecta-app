@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
@@ -8,7 +9,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'part_model.dart';
 import 'variant_cart_picker_sheet.dart';
 
-/// Compact purchase becomes a quantity control; desktop also allows preselection.
+/// Adding reveals the quantity control and changes the action to open the cart.
 class ProductDetailPurchaseControls extends StatefulWidget {
   const ProductDetailPurchaseControls(
       {super.key,
@@ -100,18 +101,11 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
 
   void _add() {
     final selected = _quantityKey.currentState?.commit() ?? _quantity;
-    final amount = CartProductActions.addQuantity(
+    CartProductActions.addQuantity(
         part: widget.part,
         profile: widget.profile,
         cart: _cart,
         quantity: selected);
-    if (amount == 0) return;
-    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
-        content: Text('$amount unidades añadidas al carrito.'),
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-            label: 'Ver carrito', onPressed: widget.onOpenCart)));
   }
 
   Future<void> _openMultiVariantPicker() async {
@@ -128,14 +122,13 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
     );
     if (result == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
+    messenger.showSnackBar(appActionNotice(
       content: Text(
         '${result.totalUnits} unidades (${result.addedLines} opción(es)) '
         'añadidas al carrito.',
       ),
-      behavior: SnackBarBehavior.floating,
-      action: SnackBarAction(
-          label: 'Ver carrito', onPressed: widget.onOpenCart),
+      actionLabel: 'Ver carrito',
+      onAction: widget.onOpenCart,
     ));
   }
 
@@ -192,22 +185,63 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (chat != null) ...[chat, const SizedBox(width: 8)],
-            selector,
-            const SizedBox(width: 10),
-            Expanded(
-              child: SizedBox(
-                key: const Key('compact-purchase-slot'),
-                height: 48,
-                child: action,
+        LayoutBuilder(builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 330 ||
+              MediaQuery.textScalerOf(context).scale(14) >= 21;
+          final actionRow = Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (chat != null) ...[chat, const SizedBox(width: 8)],
+              if (!stacked)
+                _revealQuantity(selector, inCart: inCart, horizontal: true),
+              Expanded(
+                child: SizedBox(
+                  key: const Key('compact-purchase-slot'),
+                  height: 48,
+                  child: action,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+          if (!stacked) return actionRow;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                  alignment: Alignment.centerLeft,
+                  child: _revealQuantity(selector, inCart: inCart)),
+              actionRow,
+            ],
+          );
+        }),
       ],
+    );
+  }
+
+  Widget _revealQuantity(Widget selector,
+      {required bool inCart, bool horizontal = false}) {
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
+    return AnimatedSwitcher(
+      duration:
+          reducedMotion ? Duration.zero : const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => SizeTransition(
+        sizeFactor: animation,
+        axis: horizontal ? Axis.horizontal : Axis.vertical,
+        axisAlignment: -1,
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: inCart
+          ? Padding(
+              key: ValueKey('quantity-${widget.part.id}'),
+              padding: horizontal
+                  ? const EdgeInsets.only(right: 10)
+                  : const EdgeInsets.only(bottom: 8),
+              child: selector,
+            )
+          : const SizedBox.shrink(key: ValueKey('no-quantity')),
     );
   }
 
@@ -277,12 +311,11 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
         ? widget.variantFamily
         : widget.part.variantChoices;
     final hasMultiVariants = multiFamily.length > 1;
-    final addAction =
-        hasMultiVariants ? _openMultiVariantPicker : _add;
+    final addAction = hasMultiVariants ? _openMultiVariantPicker : _add;
     final addLabel = enabled
         ? (widget.compact ? 'Agregar' : 'Agregar al carrito')
         : unavailable;
-    final showOpenCart = !widget.compact && line != null;
+    final showOpenCart = line != null;
 
     final action = FilledButton.icon(
         key: const Key('product-purchase-action'),
@@ -292,8 +325,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                 ? addAction
                 : null,
         style: FilledButton.styleFrom(
-            backgroundColor:
-                widget.compact ? const Color(0xFF004BDD) : null,
+            backgroundColor: widget.compact ? const Color(0xFF004BDD) : null,
             foregroundColor: widget.compact ? AppColors.white : null,
             minimumSize: const Size(0, 48),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -303,16 +335,15 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
             textStyle: TextStyle(
                 fontSize: widget.compact ? 14 : 15,
                 fontWeight: FontWeight.w700)),
-        icon: Icon(
-            showOpenCart
-                ? Icons.shopping_cart_outlined
-                : hasMultiVariants
-                    ? Icons.tune_rounded
-                    : Icons.add_shopping_cart_rounded,
-            size: 18),
-        label: Text(
-            showOpenCart ? 'Ver carrito' : addLabel,
-            textAlign: TextAlign.center));
+        icon: const LucideIcon(LucideGlyph.handbag, size: 18),
+        label: AnimatedSwitcher(
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          child: Text(showOpenCart ? 'Ver carrito' : addLabel,
+              key: ValueKey(showOpenCart ? 'open-cart' : addLabel),
+              textAlign: TextAlign.center),
+        ));
 
     final status = Semantics(
         liveRegion: true,
@@ -365,14 +396,16 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
                   return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Align(alignment: Alignment.centerLeft, child: selector),
-                        const SizedBox(height: 8),
+                        Align(
+                            alignment: Alignment.centerLeft,
+                            child: _revealQuantity(selector,
+                                inCart: line != null)),
                         action,
                       ]);
                 }
                 return Row(children: [
-                  selector,
-                  const SizedBox(width: 10),
+                  _revealQuantity(selector,
+                      inCart: line != null, horizontal: true),
                   Expanded(child: action)
                 ]);
               })

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -51,14 +52,10 @@ class _EntrepreneurWelcomeBodyState extends State<_EntrepreneurWelcomeBody> {
       if (mounted) {
         setState(() => _busy = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
+          const SnackBar(
+            content: AppNoticeMessage.error(
               'No se pudo guardar. Intenta de nuevo.',
-              style: TextStyle(
-                color: B2BThemeExtension.of(context).surfaceCard,
-              ),
             ),
-            backgroundColor: B2BThemeExtension.of(context).textPrimary,
           ),
         );
       }

@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 import 'order_rating_form.dart';
@@ -510,7 +511,13 @@ class _ReputationOverviewState extends State<ReputationOverview> {
                     onPressed: _refreshing ? null : _refresh,
                     icon: const Icon(Icons.refresh)),
               ]),
-              _summary(),
+              widget.isImporter && wide
+                  ? ImporterTourAnchor(
+                      target: ImporterTourTarget.reputationSummary,
+                      priority: 2,
+                      child: _summary(),
+                    )
+                  : _summary(),
               const SizedBox(height: 14),
               FutureBuilder(
                   future: _reviews,

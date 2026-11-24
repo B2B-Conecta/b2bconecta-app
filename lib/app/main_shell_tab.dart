@@ -95,6 +95,7 @@ class MainShellTabController {
   static VoidCallback? _notificationsReload;
   static GlobalKey? _kycDocumentationSectionKey;
   static void Function(int index)? _aliadoProfileSubTab;
+  static int _profileSubTabSerial = 0;
   static String? _pendingCommissionSettlementId;
   static VoidCallback? _adminCommissionSettlementDeepLink;
   static VoidCallback? _importerCommissionSettlementDeepLink;
@@ -527,12 +528,19 @@ class MainShellTabController {
   }
 
   /// Abre Perfil en la sub-pestaña indicada.
+  ///
+  /// Un llamado posterior anula el post-frame del anterior, para que
+  /// Datos no pise a Alertas si el recorrido cambia de paso enseguida.
   static void navigateToAliadoProfileSubTab(int index) {
+    final serial = ++_profileSubTabSerial;
     _goTo?.call(_resolvedB2BProfileTabIndex);
-    _aliadoProfileSubTab?.call(index);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
+    void apply() {
+      if (serial != _profileSubTabSerial) return;
       _aliadoProfileSubTab?.call(index);
-    });
+    }
+
+    apply();
+    SchedulerBinding.instance.addPostFrameCallback((_) => apply());
   }
 
   /// Pestaña Perfil → Verificación KYC + scroll a documentación.

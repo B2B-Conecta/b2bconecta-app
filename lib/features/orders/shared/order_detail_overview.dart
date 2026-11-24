@@ -23,7 +23,7 @@ class OrderDetailOverview extends StatelessWidget {
       this.cancelAction});
   final List<TransactionRequestModel> lines;
   final String nextStep;
-  final Widget chatAction;
+  final Widget? chatAction;
   final Widget? cancelAction;
   final AppHomeRole viewerRole;
   final bool actionsInHeader;
@@ -105,7 +105,7 @@ class OrderDetailOverview extends StatelessWidget {
                             : theme.textSecondary))),
           ]);
     final actions = Row(mainAxisSize: MainAxisSize.min, children: [
-      Flexible(child: chatAction),
+      if (chatAction != null) Flexible(child: chatAction!),
       if (cancelAction != null) ...[const SizedBox(width: 4), cancelAction!],
     ]);
     return Container(
@@ -205,10 +205,11 @@ class OrderDetailOverview extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(9, 2, 9, 9),
           child: Column(
             children: [
-              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                chatAction,
-                if (cancelAction != null) cancelAction!,
-              ]),
+              if (chatAction != null || cancelAction != null)
+                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  if (chatAction != null) chatAction!,
+                  if (cancelAction != null) cancelAction!,
+                ]),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 OrderThumbnail(entry: entry, size: 60),
                 const SizedBox(width: 9),

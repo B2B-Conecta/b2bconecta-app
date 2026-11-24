@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_order_detail_chrome.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -389,10 +390,9 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
     );
 
     final openSearch = widget.onOpenGlobalSearch;
-    if (openSearch == null || !widget.showGlobalSearch) return scaffold;
-
-    // Atajo global del shell (no solo cuando el top bar tiene foco).
-    return Shortcuts(
+    final Widget shell = openSearch == null || !widget.showGlobalSearch
+        ? scaffold
+        : Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.keyK, meta: true):
             _OpenGlobalSearchIntent(),
@@ -416,6 +416,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
         ),
       ),
     );
+    return ImporterWebTourLayer(viewToken: pageIdx, child: shell);
   }
 }
 
@@ -602,6 +603,42 @@ class _DesktopSideRail extends StatefulWidget {
 
   @override
   State<_DesktopSideRail> createState() => _DesktopSideRailState();
+}
+
+extension on _DesktopSideRailState {
+  Widget _accountFooter(bool extended) {
+    final menu = ShellUserMenu(
+      chrome: widget.chrome,
+      extended: extended,
+      profile: widget.profile,
+      signingOut: widget.signingOut,
+      selected: widget.accountFooterSelected,
+      importerAccountMenu: widget.importerAccountMenu,
+      openProfileOnTap:
+          widget.importerAccountMenu && !widget.accountOpensMenu,
+      openSettingsOnTap: !widget.importerAccountMenu &&
+          !widget.accountOpensMenu &&
+          widget.chrome != DesktopShellChrome.darkCorporate &&
+          widget.onOpenProfile != null,
+      onAction: (action) {
+        switch (action) {
+          case ShellUserMenuAction.profile:
+            (widget.onOpenProfile ?? widget.onOpenSettings)();
+          case ShellUserMenuAction.accountSettings:
+            widget.onOpenSettings();
+          case ShellUserMenuAction.notificationPrefs:
+            (widget.onOpenNotificationPrefs ?? widget.onOpenSettings)();
+          case ShellUserMenuAction.signOut:
+            widget.onSignOut?.call();
+        }
+      },
+    );
+    if (!widget.importerAccountMenu) return menu;
+    return ImporterTourAnchor(
+      target: ImporterTourTarget.navProfile,
+      child: menu,
+    );
+  }
 }
 
 class _DesktopSideRailState extends State<_DesktopSideRail> {
@@ -874,12 +911,27 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
                           widget.resolveNavBadge?.call(d.badgeKey),
                         );
 
+                  final navTarget = widget.importerAccountMenu
+                      ? switch (d.label) {
+                          'Inicio' => ImporterTourTarget.navHome,
+                          'Inventario' => ImporterTourTarget.navInventory,
+                          'Pedidos' => ImporterTourTarget.navOrders,
+                          'Reputación' => ImporterTourTarget.navReputation,
+                          _ => null,
+                        }
+                      : null;
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        tile,
+                        navTarget == null
+                            ? tile
+                            : ImporterTourAnchor(
+                                target: navTarget,
+                                child: tile,
+                              ),
                         if (d.hasChildren)
                           ClipRect(
                             child: AnimatedSize(
@@ -924,33 +976,7 @@ class _DesktopSideRailState extends State<_DesktopSideRail> {
             if (widget.statusBuilder != null) widget.statusBuilder!(extended),
             if (widget.showBcvFooter)
               _RailBcvFooter(extended: extended, dark: _themeDark),
-            ShellUserMenu(
-              chrome: widget.chrome,
-              extended: extended,
-              profile: widget.profile,
-              signingOut: widget.signingOut,
-              selected: widget.accountFooterSelected,
-              importerAccountMenu: widget.importerAccountMenu,
-              openProfileOnTap:
-                  widget.importerAccountMenu && !widget.accountOpensMenu,
-              openSettingsOnTap: !widget.importerAccountMenu &&
-                  !widget.accountOpensMenu &&
-                  widget.chrome != DesktopShellChrome.darkCorporate &&
-                  widget.onOpenProfile != null,
-              onAction: (action) {
-                switch (action) {
-                  case ShellUserMenuAction.profile:
-                    (widget.onOpenProfile ?? widget.onOpenSettings)();
-                  case ShellUserMenuAction.accountSettings:
-                    widget.onOpenSettings();
-                  case ShellUserMenuAction.notificationPrefs:
-                    (widget.onOpenNotificationPrefs ??
-                        widget.onOpenSettings)();
-                  case ShellUserMenuAction.signOut:
-                    widget.onSignOut?.call();
-                }
-              },
-            ),
+            _accountFooter(extended),
           ],
         ),
       ),

@@ -487,7 +487,10 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             ],
         OrderCardCollapsibleSection(
           title: 'Mensajes',
-          subtitle: 'Hilo con tienda minorista, importador y B2B Conecta',
+          subtitle: MediaQuery.sizeOf(context).width >=
+                  AppBreakpoints.mobileMenu
+              ? 'Conversación de la tienda con $impName'
+              : 'Hilo con tienda minorista, importador y B2B Conecta',
           infoMessage: OrderSectionHelp.chatPedido,
           initiallyExpanded: true,
           child: Column(
@@ -495,7 +498,16 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
             children: [
               OrderOpenChatButton(
                 relatedOrderIds: chunk.map((e) => e.id).toList(),
+                label: MediaQuery.sizeOf(context).width >=
+                        AppBreakpoints.mobileMenu
+                    ? 'Chat con $impName'
+                    : null,
                 onPressed: () {
+                  final desktop = MediaQuery.sizeOf(context).width >=
+                      AppBreakpoints.mobileMenu;
+                  final threads = desktop
+                      ? groupCheckoutLinesByImportador(allLines)
+                      : const <List<TransactionRequestModel>>[];
                   showOrderChatSheet(
                     context: context,
                     transactionRequestId: anchor.id,
@@ -503,6 +515,8 @@ class _AdminImporterOperationsPanel extends StatelessWidget {
                         ? chunk.map((e) => e.id).toList()
                         : null,
                     orderLines: chunk,
+                    supplierThreads: threads.length > 1 ? threads : null,
+                    initialSupplierIndex: index - 1,
                     allowReplyAsAliado: false,
                     allowReplyAsAdmin: true,
                     title: 'Chat del pedido',

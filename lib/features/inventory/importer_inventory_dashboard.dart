@@ -27,6 +27,7 @@ import 'package:motolink_pro_app/core/utils/excel_file_export.dart';
 import 'package:motolink_pro_app/core/utils/document_pick_utils.dart';
 import 'importer_inventory_layout.dart';
 import 'inventory_product_tile.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'product_delete_outcome_sheet.dart';
 import 'product_delete_result.dart';
@@ -1275,9 +1276,14 @@ class _ImporterInventoryDashboardState
     );
   }
 
-  Widget _buildProductTile(PartModel p, {required bool desktop}) {
+  Widget _buildProductTile(
+    PartModel p, {
+    required bool desktop,
+    bool guideAvailability = false,
+  }) {
     return InventoryProductTile(
         part: p,
+        guideAvailability: guideAvailability,
         soloDivisas: _pagoSoloDivisas,
         selecting: _inSelectionMode,
         selected: _selectedIds.contains(p.id),
@@ -1627,6 +1633,12 @@ class _ImporterInventoryDashboardState
                                         fontSize: 12,
                                         color: AppColors.textSecondary)),
                               ]))),
+              if (isDesktop)
+                ImporterSectionInductionButton(
+                  label: 'Inducción de inventario',
+                  onPressed: () =>
+                      ImporterWebInduction.showInventory(context),
+                ),
               IconButton(
                   tooltip: 'Actualizar inventario',
                   onPressed: _reload,
@@ -1726,7 +1738,13 @@ class _ImporterInventoryDashboardState
                                     onSelected: (_) =>
                                         _selectQuickView(index))),
                         ]))),
-                _toolsMenu(compact: !isDesktop),
+                isDesktop
+                    ? ImporterTourAnchor(
+                        target: ImporterTourTarget.inventoryTools,
+                        priority: 1,
+                        child: _toolsMenu(compact: false),
+                      )
+                    : _toolsMenu(compact: true),
               ]),
             if (_advancedFilterCount > 0)
               Row(children: [
@@ -1861,8 +1879,11 @@ class _ImporterInventoryDashboardState
         sliver: SliverList.separated(
           itemCount: parts.length,
           separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 10 : 8),
-          itemBuilder: (context, i) =>
-              _buildProductTile(parts[i], desktop: isDesktop),
+          itemBuilder: (context, i) => _buildProductTile(
+            parts[i],
+            desktop: isDesktop,
+            guideAvailability: isDesktop && i == 0,
+          ),
         ),
       ),
       if (_loadingMoreInventory)

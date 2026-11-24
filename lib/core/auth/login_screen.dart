@@ -16,6 +16,8 @@ import 'package:motolink_pro_app/features/kyc/aliado_doc_type.dart';
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_register_section.dart';
 import 'package:motolink_pro_app/features/onboarding/pending_signup_role_storage.dart';
 import 'auth_service.dart';
+import 'gmail_account.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_signup_draft.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
@@ -299,6 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    await GmailSignupIntent.clear();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -331,6 +334,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _register() async {
+    if (_gmailOnlyDesktop) {
+      _showSnackBar(
+        'En escritorio la cuenta se crea con Continuar con Gmail.',
+        isError: true,
+      );
+      return;
+    }
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
@@ -455,13 +465,43 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _localPhotos.add(picked));
   }
 
+  bool get _gmailOnlyDesktop =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.authDesktop;
+
   Future<void> _signInWithGoogle() async {
+    final gmailSignup = _mode == _AuthMode.register && _gmailOnlyDesktop;
     if (_mode == _AuthMode.register) {
+      if (_isEntrepreneurSignup) {
+        final phone = _phoneController.text.trim();
+        final rif = _rifController.text.trim();
+        final cedula = _cedulaController.text.trim();
+        final location = _locationController.text.trim();
+        if (phone.isEmpty || rif.isEmpty || cedula.isEmpty || location.isEmpty) {
+          _showSnackBar(
+            'Completa teléfono, RIF, cédula y ubicación.',
+            isError: true,
+          );
+          return;
+        }
+        await EntrepreneurSignupDraft.save(
+          phone: phone,
+          rif: rif,
+          cedula: cedula,
+          direccion: location,
+        );
+        await PendingSignupRoleStorage.clear();
+      } else {
+        final pendingRole = _signupRole == PublicSignupRole.importador
+            ? 'importador'
+            : 'aliado';
+        await PendingSignupRoleStorage.save(pendingRole);
+      }
       trackRegistrationStarted();
-      final pendingRole = _signupRole == PublicSignupRole.importador
-          ? 'importador'
-          : 'aliado';
-      await PendingSignupRoleStorage.save(pendingRole);
+    }
+    if (gmailSignup) {
+      await GmailSignupIntent.mark();
+    } else {
+      await GmailSignupIntent.clear();
     }
     setState(() => _isLoading = true);
     try {
@@ -470,15 +510,18 @@ class _LoginScreenState extends State<LoginScreen> {
       final launched = await AuthService.signInWithGoogle(
         referralCode: referral.isEmpty ? null : referral,
       );
-      if (!launched && mounted) {
-        _showSnackBar('No se pudo abrir Google.', isError: true);
+      if (!launched) {
+        await GmailSignupIntent.clear();
+        if (mounted) _showSnackBar('No se pudo abrir Google.', isError: true);
       }
     } on AuthException catch (e) {
       debugPrint('[google] ${e.message}');
+      await GmailSignupIntent.clear();
       if (!mounted) return;
       _showSnackBar(AuthService.mapAuthErrorMessage(e.message), isError: true);
     } catch (e, stackTrace) {
       debugPrint('[google] $e\n$stackTrace');
+      await GmailSignupIntent.clear();
       if (!mounted) return;
       _showSnackBar('No se pudo continuar con Google.', isError: true);
     } finally {
@@ -544,12 +587,35 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildFormFields() {
+  Widget _buildFormFields({required bool gmailOnly}) {
     final showEntrepreneurExtras = _isEntrepreneurSignup;
+    final theme = B2BThemeExtension.of(context);
     return AutofillGroup(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (gmailOnly) ...[
+            Text(
+              'En escritorio la cuenta se crea solo con Gmail.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                height: 1.4,
+                color: theme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Usa un correo @gmail.com. Si eliges otra cuenta de Google, el registro no se completa.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.4,
+                color: theme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
           if (_mode == _AuthMode.register) ...[
             PublicSignupRoleSection(
               role: _signupRole,
@@ -571,6 +637,22 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 18),
           ],
+          if (gmailOnly) ...[
+            if (showEntrepreneurExtras)
+              EntrepreneurSignupFields(
+                phoneController: _phoneController,
+                rifController: _rifController,
+                cedulaController: _cedulaController,
+                locationController: _locationController,
+                photos: _localPhotos,
+                onAddPhoto: _pickEntrepreneurPhoto,
+                onRemovePhoto: (i) {
+                  if (_isLoading) return;
+                  setState(() => _localPhotos.removeAt(i));
+                },
+                enabled: !_isLoading,
+              ),
+          ] else ...[
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
@@ -682,6 +764,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
             ),
           ],
+          ],
         ],
       ),
     );
@@ -727,28 +810,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildGoogleButton() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Divider(color: AppColors.borderSubtle)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                'o',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: AppColors.borderSubtle)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
+  Widget _buildGoogleButton({required bool gmailOnly}) {
+    final theme = B2BThemeExtension.of(context);
+    final onBrand = Theme.of(context).colorScheme.onPrimary;
+    final button = OutlinedButton(
           onPressed: _isLoading ? null : _signInWithGoogle,
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(double.infinity, 48),
@@ -757,32 +822,85 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _GoogleMark(),
-              SizedBox(width: 10),
+              if (_isLoading && gmailOnly)
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: gmailOnly ? onBrand : theme.brand,
+                  ),
+                )
+              else
+                const _GoogleMark(),
+              const SizedBox(width: 10),
               Flexible(
-                child: Text(
-                  'Continuar con Google',
+                child:                 Text(
+                  _isLoading && gmailOnly
+                      ? 'Abriendo Gmail…'
+                      : (gmailOnly
+                          ? 'Continuar con Gmail'
+                          : 'Continuar con Google'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
+                    color: gmailOnly ? onBrand : null,
                   ),
                 ),
               ),
             ],
           ),
+        );
+    if (!gmailOnly) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Divider(color: AppColors.borderSubtle)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  'o',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: AppColors.borderSubtle)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          button,
+        ],
+      );
+    }
+    return SizedBox(
+      height: 52,
+      child: FilledButton(
+        onPressed: _isLoading ? null : _signInWithGoogle,
+        style: FilledButton.styleFrom(
+          backgroundColor: theme.brand,
+          foregroundColor: onBrand,
+          disabledBackgroundColor: theme.brand.withOpacity(0.6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
-      ],
+        child: button.child ?? const SizedBox.shrink(),
+      ),
     );
   }
 
-  Widget _buildFooterLinks() {
+  Widget _buildFooterLinks({required bool gmailOnly}) {
     return Column(
       children: [
-        if (_mode == _AuthMode.login) ...[
+        if (_mode == _AuthMode.login && !gmailOnly) ...[
           TextButton(
             onPressed: _isLoading ? null : _showForgotPasswordDialog,
             child: Text(
@@ -906,7 +1024,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildAuthCard({required bool showHeader}) {
+  Widget _buildAuthCard({
+    required bool showHeader,
+    required bool gmailOnly,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: isDark ? AppColors.surfaceTinted : AppColors.white,
@@ -928,9 +1049,13 @@ class _LoginScreenState extends State<LoginScreen> {
               if (showHeader) ...[
                 // Desktop: logo va en el panel izquierdo; aquí solo el subtítulo.
                 Text(
-                  _mode == _AuthMode.login
-                      ? 'Ingrese a su cuenta'
-                      : 'Cree su cuenta B2B',
+                  gmailOnly
+                      ? (_mode == _AuthMode.login
+                          ? 'Ingrese con Gmail'
+                          : 'Cree su cuenta con Gmail')
+                      : (_mode == _AuthMode.login
+                          ? 'Ingrese a su cuenta'
+                          : 'Cree su cuenta B2B'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
@@ -944,15 +1069,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 _buildAuthLinkBanner(),
                 const SizedBox(height: 16),
               ],
-              _buildFormFields(),
-              const SizedBox(height: 24),
-              _buildPrimaryButton(),
-              if (_mode == _AuthMode.login || !_isEntrepreneurSignup) ...[
+              _buildFormFields(gmailOnly: gmailOnly),
+              if (!gmailOnly) ...[
+                const SizedBox(height: 24),
+                _buildPrimaryButton(),
+              ],
+              if (gmailOnly ||
+                  _mode == _AuthMode.login ||
+                  !_isEntrepreneurSignup) ...[
                 const SizedBox(height: 14),
-                _buildGoogleButton(),
+                _buildGoogleButton(gmailOnly: gmailOnly),
               ],
               const SizedBox(height: 8),
-              _buildFooterLinks(),
+              _buildFooterLinks(gmailOnly: gmailOnly),
             ],
           ),
         ),
@@ -1052,7 +1181,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             constraints: const BoxConstraints(
                               maxWidth: AppBreakpoints.authFormMaxWidth,
                             ),
-                            child: _buildAuthCard(showHeader: true),
+                            child: _buildAuthCard(
+                              showHeader: true,
+                              gmailOnly: _mode == _AuthMode.register,
+                            ),
                           ),
                         ),
                       ),
@@ -1074,7 +1206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         _buildAuthHeader(compact: false),
                         const SizedBox(height: 28),
-                        _buildAuthCard(showHeader: false),
+                        _buildAuthCard(showHeader: false, gmailOnly: false),
                       ],
                     ),
                   ),

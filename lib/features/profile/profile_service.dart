@@ -12,6 +12,18 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 class ProfileService {
   ProfileService._();
 
+  /// Null vuelve al defecto de 5 unidades. Un entero positivo lo reemplaza.
+  static Future<void> updateMyMinimumOrderUnits(int? units) async {
+    if (units != null && units < 1) {
+      throw ArgumentError('Indique al menos 1 unidad, o déjelo vacío para usar 5.');
+    }
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) throw StateError('Inicie sesión para guardar.');
+    await SupabaseAccess.client.from('profiles').update({
+      'min_order_units': units,
+    }).eq('id', uid).select('id').single();
+  }
+
   static Future<void> updateMyMinimumOrder({required double amount, required String currency}) async {
     if (!amount.isFinite || amount < 0 || !{'ref', 'usd'}.contains(currency)) {
       throw ArgumentError('Indique un monto válido y su moneda.');

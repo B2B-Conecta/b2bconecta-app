@@ -9,6 +9,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_summary_header.dar
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
+import 'package:motolink_pro_app/features/profile/importer_commercial_settings.dart';
+import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -23,6 +25,7 @@ import 'package:motolink_pro_app/features/kyc/importer_kyc_approved_aliados_pane
 import 'package:motolink_pro_app/features/orders/shared/order_card_collapsible_layout.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/orders/admin/transaction_request_admin_sections.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 
 /// Ficha de pedido importador: cabecera clara, fecha visible y detalle simplificado.
 class ImporterExpandableOrderCard extends StatelessWidget {
@@ -214,31 +217,60 @@ class ImporterExpandableOrderCard extends StatelessWidget {
           title: 'Pago y factura',
           icon: Icons.account_balance_wallet_outlined,
           child: expandedFooter ?? const SizedBox.shrink());
+      final confirmButton = nextStatus != null &&
+              nextActionLabel != null &&
+              onAdvance != null
+          ? FilledButton(onPressed: onAdvance, child: Text(nextActionLabel!))
+          : null;
+      final qtyButton = canNotifyQtyAdjustment || qtyAdjustmentDisabledHint != null
+          ? OutlinedButton.icon(
+              onPressed: onNotifyQtyAdjustment,
+              icon: const Icon(Icons.inventory_2_outlined, size: 19),
+              label: const Text('Proponer ajuste de cantidad'),
+            )
+          : null;
+      final actionButtons = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (confirmButton != null)
+            web
+                ? ImporterTourAnchor(
+                    target: ImporterTourTarget.orderAdvance,
+                    priority: 2,
+                    child: confirmButton,
+                  )
+                : confirmButton,
+          if (qtyButton != null) ...[
+            const SizedBox(height: 8),
+            web
+                ? ImporterTourAnchor(
+                    target: ImporterTourTarget.orderQty,
+                    priority: 2,
+                    child: qtyButton,
+                  )
+                : qtyButton,
+            if (qtyAdjustmentDisabledHint != null &&
+                onNotifyQtyAdjustment == null)
+              Text(
+                qtyAdjustmentDisabledHint!,
+                style: TextStyle(fontSize: 12, color: colors.secondary),
+              ),
+          ],
+          if (lines.any((l) => l.qtyAdjustmentPendienteAliado))
+            const Text(
+              'Cantidad pendiente de respuesta de la tienda minorista.',
+            ),
+        ],
+      );
       final actions = OrderDetailSection(
           title: 'Gestión del pedido',
           icon: Icons.inventory_2_outlined,
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (nextStatus != null &&
-                nextActionLabel != null &&
-                onAdvance != null)
-              FilledButton(onPressed: onAdvance, child: Text(nextActionLabel!)),
-            if (canNotifyQtyAdjustment ||
-                qtyAdjustmentDisabledHint != null) ...[
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                  onPressed: onNotifyQtyAdjustment,
-                  icon: const Icon(Icons.inventory_2_outlined, size: 19),
-                  label: const Text('Proponer ajuste de cantidad')),
-              if (qtyAdjustmentDisabledHint != null &&
-                  onNotifyQtyAdjustment == null)
-                Text(qtyAdjustmentDisabledHint!,
-                    style: TextStyle(fontSize: 12, color: colors.secondary)),
-            ],
-            if (lines.any((l) => l.qtyAdjustmentPendienteAliado))
-              const Text(
-                  'Cantidad pendiente de respuesta de la tienda minorista.'),
-          ]));
+          child: web
+              ? ImporterTourAnchor(
+                  target: ImporterTourTarget.orderActions,
+                  child: actionButtons,
+                )
+              : actionButtons);
       final hasAfterSales = lines.any((l) =>
           l.postventaDevolucionAt != null ||
           l.postventaQuejaAt != null ||
@@ -296,10 +328,23 @@ class ImporterExpandableOrderCard extends StatelessWidget {
                 actionsInHeader: true,
                 onCancel: canCancelByImporter ? onCancelByImporter : null,
                 cancelBusy: cancelBusy,
-                chatAction: OrderChatIconButton(
-                    showLabel: false,
-                    relatedOrderIds: lines.map((e) => e.id).toList(),
-                    onOpen: () => _openChat(context, lines, isCheckoutGroup)))),
+                chatAction: web
+                    ? ImporterTourAnchor(
+                        target: ImporterTourTarget.orderChat,
+                        priority: 2,
+                        child: OrderChatIconButton(
+                          showLabel: false,
+                          relatedOrderIds: lines.map((e) => e.id).toList(),
+                          onOpen: () =>
+                              _openChat(context, lines, isCheckoutGroup),
+                        ),
+                      )
+                    : OrderChatIconButton(
+                        showLabel: false,
+                        relatedOrderIds: lines.map((e) => e.id).toList(),
+                        onOpen: () =>
+                            _openChat(context, lines, isCheckoutGroup),
+                      ))),
         const SizedBox(height: 16),
         if (promoChip != null) ...[promoChip, const SizedBox(height: 12)],
         if (creditApplied > 0) ...[
@@ -312,6 +357,8 @@ class ImporterExpandableOrderCard extends StatelessWidget {
               storeName: lines.first.aliadoBusinessName),
           const SizedBox(height: 12)
         ],
+        if (web)
+          _ImporterUnsetConditionsNotice(onAdjust: onNotifyQtyAdjustment),
         if (anyPagoPendienteTrasEntrega) ...[
           MorosoOrderCardNotice(
               request: lines.firstWhere((x) => x.esPedidoMoroso),
@@ -920,6 +967,131 @@ class _ImporterContactActions extends StatelessWidget {
           if (showKyc)
             button(Icons.verified_user_outlined, 'Ver expediente KYC', onKyc),
         ],
+      ),
+    );
+  }
+}
+
+/// Aviso de escritorio cuando el proveedor aún no guardó condiciones mínimas.
+class _ImporterUnsetConditionsNotice extends StatefulWidget {
+  const _ImporterUnsetConditionsNotice({this.onAdjust});
+
+  final VoidCallback? onAdjust;
+
+  @override
+  State<_ImporterUnsetConditionsNotice> createState() =>
+      _ImporterUnsetConditionsNoticeState();
+}
+
+class _ImporterUnsetConditionsNoticeState
+    extends State<_ImporterUnsetConditionsNotice> {
+  ProfileModel? _profile;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final profile = await SupabaseService.fetchMyProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _ready = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _ready = true);
+    }
+  }
+
+  bool get _hasConditions {
+    final profile = _profile;
+    if (profile == null) return true;
+    final units = profile.minOrderUnits;
+    return profile.hasMinOrderAmount || (units != null && units >= 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready || _hasConditions || _profile == null) {
+      return const SizedBox.shrink();
+    }
+    final theme = B2BThemeExtension.of(context);
+    final profile = _profile!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.surfaceCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.borderSubtle),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Sin condiciones mínimas',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: theme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.onAdjust != null
+                    ? 'Este pedido sigue sin monto ni unidades mínimas. '
+                        'Defínelas para las próximas compras. Si la tienda sigue '
+                        'interesada, puedes ajustar las cantidades de esta compra.'
+                    : 'Este pedido sigue sin monto ni unidades mínimas. '
+                        'Defínelas para las próximas compras.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: theme.textSecondary,
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: () => ImporterCommercialSettings.openDesktop(
+                      context,
+                      profile: profile,
+                      onChanged: _load,
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.brand,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                    ),
+                    child: const Text(
+                      'Definir condiciones',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (widget.onAdjust != null)
+                    TextButton(
+                      onPressed: widget.onAdjust,
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.brand,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Ajustar esta compra',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

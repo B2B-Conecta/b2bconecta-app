@@ -8,6 +8,8 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 import 'package:motolink_pro_app/features/commissions/importer_commission_settlements_section.dart';
 import 'package:motolink_pro_app/features/kyc/authorization_status_section.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
+
 import 'account_settings_screen.dart';
 import 'importer_commercial_settings.dart';
 import 'profile_model.dart';
@@ -282,21 +284,7 @@ class ProfileOverview extends StatelessWidget {
                 ),
               ),
             ],
-            if (profile.isImportador)
-              _entry(
-                context,
-                Icons.storefront_outlined,
-                'Configuración comercial',
-                'Pedido mínimo y pagos',
-                () => _open(
-                  context,
-                  'Configuración comercial',
-                  ImporterCommercialSettings(
-                    profile: profile,
-                    onChanged: onChanged,
-                  ),
-                ),
-              ),
+            if (profile.isImportador) _commercialEntry(context),
             if (profile.isAliado) ...[
               _entry(
                 context,
@@ -464,6 +452,31 @@ class ProfileOverview extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _commercialEntry(BuildContext context) {
+    final tile = _entry(
+      context,
+      Icons.storefront_outlined,
+      'Configuración comercial',
+      'Pedido mínimo y pagos',
+      () => _open(
+        context,
+        'Configuración comercial',
+        ImporterCommercialSettings(
+          profile: profile,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      return tile;
+    }
+    return ImporterTourAnchor(
+      target: ImporterTourTarget.commercialSettings,
+      priority: 2,
+      child: tile,
     );
   }
 

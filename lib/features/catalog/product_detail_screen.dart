@@ -9,6 +9,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'product_detail_commerce.dart';
 import 'product_detail_purchase_controls.dart';
@@ -429,12 +430,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
       const SizedBox(height: 14),
       ProductDetailPurchaseSummary(part: part),
-      if (part.hasOwnerMinOrderAmount) ...[
+      if (!desktop && part.hasOwnerMinOrderAmount) ...[
         const SizedBox(height: 8),
         Text('${part.ownerMinOrderAmountLabelEs} por despacho.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       ],
-      if (EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
+      if (desktop && _profile?.isAliado == true) ...[
+        const SizedBox(height: 8),
+        _RetailerSupplierMinimumNotice(part: part),
+        const SizedBox(height: 8),
+        _RetailerShippingNotice(
+          part: part,
+          estadoComprador: _profile?.estado,
+        ),
+      ],
+      if (!(desktop && _profile?.isAliado == true) &&
+          EnvioPolitica.muestraBadge(part.ownerEnvioTipo)) ...[
         const SizedBox(height: 8),
         Align(
             alignment: Alignment.centerLeft,
@@ -584,6 +595,159 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(height: 8),
             _buildActionButtons(compact: true),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RetailerSupplierMinimumNotice extends StatelessWidget {
+  const _RetailerSupplierMinimumNotice({required this.part});
+
+  final PartModel part;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final defined = part.hasOwnerMinOrderAmount;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: defined ? theme.successBg : theme.surfaceSubtle,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: defined
+              ? theme.successFg.withOpacity(0.35)
+              : theme.borderSubtle,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Text(
+          defined
+              ? '${part.ownerMinOrderAmountLabelEs} para pedir a este proveedor.'
+              : 'Este proveedor aún no definió un monto mínimo.',
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.35,
+            fontWeight: FontWeight.w700,
+            color: defined ? theme.successFg : theme.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RetailerShippingNotice extends StatelessWidget {
+  const _RetailerShippingNotice({
+    required this.part,
+    required this.estadoComprador,
+  });
+
+  final PartModel part;
+  final String? estadoComprador;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final ficha = EnvioPolitica.evaluarCobertura(
+      tipo: part.ownerEnvioTipo,
+      minimoGratis: part.ownerEnvioGratisMinimo,
+      gratisTodos: part.ownerEnvioGratisTodos,
+      gratisEstados: part.ownerEnvioGratisEstados,
+      estadoComprador: estadoComprador,
+    );
+    final tone = ficha.etiqueta == 'Cobro adicional'
+        ? (
+            theme.warningBg,
+            theme.warningFg.withOpacity(0.35),
+            theme.warningFg,
+          )
+        : _shippingTone(theme, ficha.vista);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: tone.$1,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tone.$2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ShippingPill(label: ficha.etiqueta, color: tone.$3),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                ficha.texto,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                  color: tone.$3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+(Color, Color, Color) _shippingTone(
+  B2BThemeExtension theme,
+  EnvioCoberturaVista vista,
+) {
+  switch (vista) {
+    case EnvioCoberturaVista.costoAdicional:
+      return (
+        theme.warningBg,
+        theme.warningFg.withOpacity(0.35),
+        theme.warningFg,
+      );
+    case EnvioCoberturaVista.gratisAqui:
+    case EnvioCoberturaVista.politica:
+      return (
+        theme.successBg,
+        theme.successFg.withOpacity(0.35),
+        theme.successFg,
+      );
+    case EnvioCoberturaVista.sinPolitica:
+    case EnvioCoberturaVista.sinUbicacion:
+      return (theme.surfaceSubtle, theme.borderSubtle, theme.textPrimary);
+  }
+}
+
+class _ShippingPill extends StatelessWidget {
+  const _ShippingPill({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
         ),
       ),
     );

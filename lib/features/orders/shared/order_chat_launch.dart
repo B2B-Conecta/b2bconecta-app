@@ -82,6 +82,8 @@ Future<void> showOrderChatSheet({
   required String transactionRequestId,
   List<String>? mergedThreadRequestIds,
   List<TransactionRequestModel> orderLines = const [],
+  List<List<TransactionRequestModel>>? supplierThreads,
+  int initialSupplierIndex = 0,
   required bool allowReplyAsAliado,
   required bool allowReplyAsAdmin,
   bool allowReplyAsImportador = false,
@@ -99,6 +101,8 @@ Future<void> showOrderChatSheet({
       transactionRequestId: transactionRequestId,
       mergedThreadRequestIds: mergedThreadRequestIds,
       orderLines: orderLines,
+      supplierThreads: supplierThreads ?? const [],
+      initialSupplierIndex: initialSupplierIndex,
       allowReplyAsAliado: allowReplyAsAliado,
       allowReplyAsAdmin: allowReplyAsAdmin,
       allowReplyAsImportador: allowReplyAsImportador,
@@ -329,10 +333,14 @@ class OrderOpenChatButton extends StatelessWidget {
     super.key,
     required this.relatedOrderIds,
     required this.onPressed,
+    this.label,
   });
 
   final List<String> relatedOrderIds;
   final VoidCallback onPressed;
+
+  /// Si viene vacío, el botón conserva el texto «Abrir chat».
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -365,7 +373,8 @@ class OrderOpenChatButton extends StatelessWidget {
               ),
             ),
             label: Text(
-              unread > 0 ? 'Abrir chat ($unread)' : 'Abrir chat',
+              label ??
+                  (unread > 0 ? 'Abrir chat ($unread)' : 'Abrir chat'),
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,

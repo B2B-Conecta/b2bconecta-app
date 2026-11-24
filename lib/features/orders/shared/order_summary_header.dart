@@ -32,7 +32,7 @@ class OrderSummaryHeader extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final String statusLabel;
-  final Widget chatAction;
+  final Widget? chatAction;
   final VoidCallback? onCancel;
   final bool cancelBusy;
   final bool showToggle;
@@ -255,8 +255,10 @@ class OrderSummaryHeader extends StatelessWidget {
                         height: 1.3,
                         color:
                             warning ? scheme.error : AppColors.textSecondary))),
-            const SizedBox(width: 8),
-            chatAction,
+            if (chatAction != null) ...[
+              const SizedBox(width: 8),
+              chatAction!,
+            ],
             if (onCancel != null) cancelAction,
           ])
         else
@@ -289,8 +291,10 @@ class OrderSummaryHeader extends StatelessWidget {
                           : 'Consultar al proveedor',
                       style: TextStyle(
                           fontSize: 13, color: AppColors.textSecondary))),
-            const SizedBox(width: 8),
-            chatAction,
+            if (chatAction != null) ...[
+              const SizedBox(width: 8),
+              chatAction!,
+            ],
             if (onCancel != null) cancelAction,
           ]),
       ]),

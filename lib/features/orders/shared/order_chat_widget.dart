@@ -24,6 +24,8 @@ class OrderFloatingChat {
     required String transactionRequestId,
     List<String>? mergedThreadRequestIds,
     List<TransactionRequestModel> orderLines = const [],
+    List<List<TransactionRequestModel>> supplierThreads = const [],
+    int initialSupplierIndex = 0,
     required bool allowReplyAsAliado,
     required bool allowReplyAsAdmin,
     bool allowReplyAsImportador = false,
@@ -43,6 +45,8 @@ class OrderFloatingChat {
         transactionRequestId: transactionRequestId,
         mergedThreadRequestIds: mergedThreadRequestIds,
         orderLines: orderLines,
+        supplierThreads: supplierThreads,
+        initialSupplierIndex: initialSupplierIndex,
         allowReplyAsAliado: allowReplyAsAliado,
         allowReplyAsAdmin: allowReplyAsAdmin,
         allowReplyAsImportador: allowReplyAsImportador,
@@ -83,6 +87,8 @@ class OrderChatWidget extends StatefulWidget {
     required this.onDismiss,
     this.mergedThreadRequestIds,
     this.orderLines = const [],
+    this.supplierThreads = const [],
+    this.initialSupplierIndex = 0,
     this.allowReplyAsImportador = false,
     this.deliveryGrace = false,
     this.title,
@@ -93,6 +99,10 @@ class OrderChatWidget extends StatefulWidget {
   final String transactionRequestId;
   final List<String>? mergedThreadRequestIds;
   final List<TransactionRequestModel> orderLines;
+
+  /// Un hilo por proveedor. Vacío: el chat usa [orderLines].
+  final List<List<TransactionRequestModel>> supplierThreads;
+  final int initialSupplierIndex;
   final bool allowReplyAsAliado;
   final bool allowReplyAsAdmin;
   final bool allowReplyAsImportador;
@@ -108,37 +118,57 @@ class OrderChatWidget extends StatefulWidget {
 
 class _OrderChatWidgetState extends State<OrderChatWidget> {
   late bool _minimized;
+  late int _supplier;
 
   @override
   void initState() {
     super.initState();
     _minimized = widget.initiallyMinimized;
+    final last = widget.supplierThreads.length - 1;
+    _supplier = last < 0 ? 0 : widget.initialSupplierIndex.clamp(0, last);
+  }
+
+  bool get _canSwitch => widget.supplierThreads.length > 1;
+
+  List<TransactionRequestModel> get _lines {
+    if (!_canSwitch) return widget.orderLines;
+    return widget.supplierThreads[_supplier];
+  }
+
+  List<String>? get _mergedIds {
+    final lines = _lines;
+    if (_canSwitch) {
+      return lines.length > 1 ? lines.map((line) => line.id).toList() : null;
+    }
+    return widget.mergedThreadRequestIds;
+  }
+
+  String get _requestId {
+    final lines = _lines;
+    if (lines.isNotEmpty) return lines.first.id;
+    return widget.transactionRequestId;
   }
 
   String get _title {
     final custom = widget.title?.trim();
     if (custom != null && custom.isNotEmpty) return custom;
-    if (widget.orderLines.isEmpty) return 'Chat del pedido';
+    if (_lines.isEmpty) return 'Chat del pedido';
     final ref = OrderListEntry(
-      widget.orderLines,
+      _lines,
       viewerRole: AppHomeRole.administrador,
     ).reference;
     return 'Chat Pedido $ref';
   }
 
   String get _subtitle {
-    final lines = widget.orderLines;
-    if (lines.isEmpty) {
-      return 'Taller · Importador · B2B Conecta';
-    }
+    final lines = _lines;
+    if (lines.isEmpty) return 'Minorista · Proveedor';
     final retail = lines.first.aliadoBusinessName?.trim();
     final importer = lines.first.ownerBusinessName?.trim();
-    final parts = <String>[
-      if (retail != null && retail.isNotEmpty) retail else 'Taller minorista',
-      if (importer != null && importer.isNotEmpty) importer else 'Importador',
-      'B2B Conecta',
-    ];
-    return parts.join(' · ');
+    final shop = retail != null && retail.isNotEmpty ? retail : 'Tienda';
+    final supplier =
+        importer != null && importer.isNotEmpty ? importer : 'Proveedor';
+    return 'Minorista · $shop\nProveedor · $supplier';
   }
 
   bool get _canReply =>
@@ -147,11 +177,10 @@ class _OrderChatWidgetState extends State<OrderChatWidget> {
       widget.allowReplyAsImportador;
 
   List<String> get _relatedIds {
-    final merged = widget.mergedThreadRequestIds;
+    final merged = _mergedIds;
     if (merged != null && merged.isNotEmpty) return merged;
-    if (widget.orderLines.isNotEmpty) {
-      return widget.orderLines.map((e) => e.id).toList();
-    }
+    final lines = _lines;
+    if (lines.isNotEmpty) return lines.map((e) => e.id).toList();
     return [widget.transactionRequestId];
   }
 
@@ -182,16 +211,27 @@ class _OrderChatWidgetState extends State<OrderChatWidget> {
                       theme: theme,
                       title: _title,
                       subtitle: _subtitle,
+                      supplierNames: _canSwitch
+                          ? [
+                              for (final group in widget.supplierThreads)
+                                (group.first.ownerBusinessName?.trim().isNotEmpty ==
+                                        true)
+                                    ? group.first.ownerBusinessName!.trim()
+                                    : 'Proveedor',
+                            ]
+                          : const [],
+                      selectedSupplier: _supplier,
+                      onSupplier: (index) => setState(() => _supplier = index),
                       relatedOrderIds: _relatedIds,
                       onMinimize: () => setState(() => _minimized = true),
                       onClose: widget.onDismiss,
                       child: OrderMotolinkThreadSection(
                         key: ValueKey<String>(
-                          'float-${widget.mergedThreadRequestIds?.join('-') ?? widget.transactionRequestId}',
+                          'float-${_mergedIds?.join('-') ?? _requestId}',
                         ),
-                        transactionRequestId: widget.transactionRequestId,
-                        mergedThreadRequestIds: widget.mergedThreadRequestIds,
-                        orderLines: widget.orderLines,
+                        transactionRequestId: _requestId,
+                        mergedThreadRequestIds: _mergedIds,
+                        orderLines: _lines,
                         allowReplyAsAliado: widget.allowReplyAsAliado,
                         allowReplyAsAdmin: widget.allowReplyAsAdmin,
                         allowReplyAsImportador: widget.allowReplyAsImportador,
@@ -300,6 +340,9 @@ class _Panel extends StatelessWidget {
     required this.theme,
     required this.title,
     required this.subtitle,
+    this.supplierNames = const [],
+    this.selectedSupplier = 0,
+    this.onSupplier,
     required this.relatedOrderIds,
     required this.onMinimize,
     required this.onClose,
@@ -309,6 +352,9 @@ class _Panel extends StatelessWidget {
   final B2BThemeExtension theme;
   final String title;
   final String subtitle;
+  final List<String> supplierNames;
+  final int selectedSupplier;
+  final ValueChanged<int>? onSupplier;
   final List<String> relatedOrderIds;
   final VoidCallback onMinimize;
   final VoidCallback onClose;
@@ -388,6 +434,29 @@ class _Panel extends StatelessWidget {
                             color: theme.textSecondary,
                           ),
                         ),
+                        if (supplierNames.length > 1) ...[
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (var i = 0; i < supplierNames.length; i++)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      right: i == supplierNames.length - 1
+                                          ? 0
+                                          : 6,
+                                    ),
+                                    child: _SupplierChatChip(
+                                      label: supplierNames[i],
+                                      selected: i == selectedSupplier,
+                                      onTap: () => onSupplier?.call(i),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -446,6 +515,50 @@ class _Panel extends StatelessWidget {
             ),
             Expanded(child: child),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupplierChatChip extends StatelessWidget {
+  const _SupplierChatChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return Material(
+      color: selected ? theme.brandContainer : theme.surfaceSubtle,
+      borderRadius: BorderRadius.circular(99),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(99),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+              color: selected ? theme.brand : theme.borderSubtle,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: selected ? theme.brand : theme.textSecondary,
+            ),
+          ),
         ),
       ),
     );

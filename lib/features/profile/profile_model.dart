@@ -53,8 +53,11 @@ class ProfileModel {
     this.envioTipo = EnvioPolitica.noDefinido,
     this.montoMinimoEnvioGratis,
     this.transportistasHabilitados = const [],
+    this.envioGratisTodos = false,
+    this.envioGratisEstados = const [],
     this.minOrderAmountRef = 0,
     this.minOrderCurrency = 'ref',
+    this.minOrderUnits,
     this.catalogFeaturedUntil,
     this.catalogVerifiedAt,
     this.referralCode,
@@ -196,11 +199,25 @@ class ProfileModel {
   /// `profiles.transportistas_habilitados`.
   final List<String> transportistasHabilitados;
 
+  /// Envío gratis en todos los estados solo si el proveedor lo marcó.
+  final bool envioGratisTodos;
+
+  /// Estados donde el envío gratis aplica. Vacío si no hay alcance parcial.
+  final List<String> envioGratisEstados;
+
   /// Piso de compra por importador en REF (`profiles.min_order_amount_ref`). 0 = sin mínimo.
   final double minOrderAmountRef;
 
   /// Presentación del piso: `ref` o `usd` (`profiles.min_order_currency`).
   final String minOrderCurrency;
+
+  /// Unidades mínimas por pedido (`profiles.min_order_units`).
+  /// Null = la plataforma usa 5. Un valor guardado reemplaza ese defecto.
+  final int? minOrderUnits;
+
+  /// Mínimo que ve el aliado: el del proveedor, o 5 si no lo configuró.
+  int get minOrderUnitsEffective =>
+      minOrderUnits != null && minOrderUnits! >= 1 ? minOrderUnits! : 5;
 
   /// Destacado manual en catálogo (`profiles.catalog_featured_until`).
   final DateTime? catalogFeaturedUntil;
@@ -449,6 +466,7 @@ class ProfileModel {
       pagoSoloDivisas: pagoSoloDivisas,
       minOrderAmountRef: minOrderAmountRef,
       minOrderCurrency: minOrderCurrency,
+      minOrderUnits: minOrderUnits,
       catalogFeaturedUntil: catalogFeaturedUntil,
       catalogVerifiedAt: catalogVerifiedAt,
       referralCode: referralCode,
@@ -595,8 +613,12 @@ class ProfileModel {
           _asDoubleNullable(json['monto_minimo_envio_gratis']),
       transportistasHabilitados:
           EnvioPolitica.parseNombres(json['transportistas_habilitados']),
+      envioGratisTodos: _parseBool(json['envio_gratis_todos']),
+      envioGratisEstados:
+          EnvioPolitica.parseNombres(json['envio_gratis_estados']),
       minOrderAmountRef: _asDoubleNullable(json['min_order_amount_ref']) ?? 0,
       minOrderCurrency: _text(json['min_order_currency']) ?? 'ref',
+      minOrderUnits: _positiveIntOrNull(json['min_order_units']),
       catalogFeaturedUntil: json['catalog_featured_until'] != null
           ? DateTime.tryParse(json['catalog_featured_until'].toString())
           : null,
@@ -659,6 +681,12 @@ class ProfileModel {
     if (v is int) return v;
     if (v is num) return v.toInt();
     return int.tryParse(v.toString());
+  }
+
+  static int? _positiveIntOrNull(dynamic v) {
+    final n = _asIntNullable(v);
+    if (n == null || n < 1) return null;
+    return n;
   }
 
   static double? _asDoubleNullable(dynamic v) {

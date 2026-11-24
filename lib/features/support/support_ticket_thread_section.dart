@@ -140,6 +140,8 @@ class _SupportTicketThreadSectionState
   @override
   Widget build(BuildContext context) {
     final uid = SupabaseService.currentUserId;
+    final mobile = !widget.canReplyAsAdmin &&
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -176,6 +178,7 @@ class _SupportTicketThreadSectionState
                           icon: Icons.headset_mic_outlined,
                         )
                       : ChatTimeline(
+                          mobileStyle: mobile,
                           itemCount: _items.length,
                           dateAt: (i) => _items[i].createdAt,
                           messageAt: (i) {
@@ -185,6 +188,7 @@ class _SupportTicketThreadSectionState
                                 AppBreakpoints.mobileMenu;
                             final other = widget.counterpartName?.trim();
                             return ChatMessageBubble(
+                              mobileStyle: mobile,
                               key: ValueKey(message.id),
                               mine: mine,
                               at: message.createdAt,
@@ -208,8 +212,8 @@ class _SupportTicketThreadSectionState
         ),
         if (_canReply)
           Builder(builder: (context) {
-            final desktop = MediaQuery.sizeOf(context).width >=
-                AppBreakpoints.mobileMenu;
+            final desktop =
+                MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
             return AnimatedPadding(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
@@ -217,6 +221,7 @@ class _SupportTicketThreadSectionState
                   ? const EdgeInsets.fromLTRB(8, 0, 8, 8)
                   : EdgeInsets.zero,
               child: ChatComposer(
+                mobileStyle: mobile,
                 controller: _ctrl,
                 onSend: _send,
                 sending: _sending,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'mobile_payment_declaration_summary.dart';
 
 import 'package:motolink_pro_app/core/utils/stored_file_page.dart';
 
@@ -271,7 +272,7 @@ class _ImporterOrderPagoVerificationSectionState
             Text(
               'Estado de revisión distinto entre líneas —detalle: '
               '${_lines.map((r) => _etiquetaEstado(r.pagoEstadoRevisionEfectivo)).join(", ")}',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 11,
                 color: AppColors.brandBlue,
                 height: 1.3,
@@ -286,6 +287,7 @@ class _ImporterOrderPagoVerificationSectionState
             style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
           ),
           if (ref.comprobantePagoSubmittedAt != null) ...[
+            MobilePaymentDeclarationSummary(request: ref),
             const SizedBox(height: 4),
             Text(
               'Registrado: ${formatEsShortDateTime(ref.comprobantePagoSubmittedAt)}',
@@ -426,7 +428,7 @@ class _ImporterOrderPagoVerificationSectionState
               r.status == TransactionRequestStatus.entregado &&
               mostrarAcciones) ...[
             const SizedBox(height: 6),
-            Text(
+            const Text(
               'La tienda minorista recibió el pedido con pago pendiente. Revise el comprobante y confirme el pago.',
               style: TextStyle(
                 fontSize: 11.5,

@@ -33,6 +33,9 @@ class AliadoProductCard extends StatelessWidget {
       this.compact = false,
       this.webChrome = false,
       this.showDistanceChips = false,
+      this.showSupplier = true,
+      this.adaptiveColors = false,
+      this.storefront = false,
       this.onTap,
       this.onImporterTap});
   final PartModel part;
@@ -42,6 +45,9 @@ class AliadoProductCard extends StatelessWidget {
   /// Proporción y botón de la grilla de escritorio. El móvil deja esto en falso.
   final bool webChrome;
   final bool showDistanceChips;
+  final bool showSupplier;
+  final bool adaptiveColors;
+  final bool storefront;
   final VoidCallback? onTap;
   final VoidCallback? onImporterTap;
 
@@ -76,7 +82,7 @@ class AliadoProductCard extends StatelessWidget {
           borderRadius: radius,
           child: Builder(builder: (context) {
             final details = Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                padding: storefront ? const EdgeInsets.fromLTRB(8, 6, 8, 0) : const EdgeInsets.fromLTRB(12, 10, 12, 0),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -88,15 +94,18 @@ class AliadoProductCard extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  fontSize: compact ? 13.5 : 14.5,
+                                  fontSize: storefront ? 15 : compact ? 13.5 : 14.5,
                                   height: 1.2,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.black))),
-                      const SizedBox(height: 8),
+                                  color: adaptiveColors ? theme.textPrimary : AppColors.black))),
+                      SizedBox(height: storefront ? 4 : 8),
                       CatalogCartPrice(
-                          part: part, compact: true, catalogGrid: true),
+                          part: part, compact: true, catalogGrid: true,
+                          usdColor: adaptiveColors && brightness == Brightness.dark
+                              ? const Color(0xFF69DB92) : null,
+                          bsColor: adaptiveColors ? theme.textSecondary : null),
                       const SizedBox(height: 8),
-                      ProductStockSummary(part: part),
+                      ProductStockSummary(part: part, minimumColor: adaptiveColors ? theme.textSecondary : null),
                       if (hasCustomFields) ...[
                         const SizedBox(height: 4),
                         ProductCustomFieldsAliadoChips(
@@ -114,13 +123,13 @@ class AliadoProductCard extends StatelessWidget {
                       ],
                     ]));
             final footer = Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: storefront ? const EdgeInsets.fromLTRB(8, 0, 8, 8) : const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 8),
-                      Tooltip(
+                      if (showSupplier) const SizedBox(height: 8),
+                      if (showSupplier) Tooltip(
                           message: onImporterTap == null
                               ? supplier
                               : 'Ver catálogo de $supplier',
@@ -167,7 +176,7 @@ class AliadoProductCard extends StatelessWidget {
                         if (webChrome)
                           AliadoCatalogWebAddButton(part: part, profile: profile)
                         else
-                          CatalogCartButton(part: part, profile: profile),
+                          CatalogCartButton(part: part, profile: profile, storefront: storefront),
                       ] else if (onTap != null) ...[
                         const SizedBox(height: 10),
                         FilledButton(
@@ -203,13 +212,13 @@ class AliadoProductCard extends StatelessWidget {
                         )
                       else
                       Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                          padding: storefront ? const EdgeInsets.fromLTRB(4, 4, 4, 0) : const EdgeInsets.fromLTRB(8, 8, 8, 0),
                           child: AspectRatio(
-                              aspectRatio: AliadoCatalogLayout.cardImageAspect,
+                              aspectRatio: storefront ? 1.15 : AliadoCatalogLayout.cardImageAspect,
                               child: ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: ColoredBox(
-                                      color: AppColors.photoFrameFor(brightness),
+                                      color: storefront ? AppColors.card : AppColors.photoFrameFor(brightness),
                                       child: Stack(
                                           fit: StackFit.expand,
                                           children: [
@@ -357,7 +366,7 @@ class AliadoProductCard extends StatelessWidget {
     }
     return Image.network(
       url,
-      fit: webChrome ? BoxFit.contain : BoxFit.cover,
+      fit: webChrome || storefront ? BoxFit.contain : BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
       excludeFromSemantics: true,

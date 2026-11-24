@@ -6,8 +6,9 @@ import 'part_model.dart';
 /// The same stock meaning and contrast in a catalog card and a product detail.
 class ProductStockSummary extends StatelessWidget {
   const ProductStockSummary(
-      {super.key, required this.part, this.inline = false});
+      {super.key, required this.part, this.inline = false, this.minimumColor});
   final PartModel part;
+  final Color? minimumColor;
 
   /// Detalle: Wrap suelto. Ficha catálogo: fila con divisor vertical (mock).
   final bool inline;
@@ -53,7 +54,7 @@ class ProductStockSummary extends StatelessWidget {
             fontSize: inline ? 14.5 : 12,
             height: inline ? 1.3 : 1.2,
             fontWeight: FontWeight.w600,
-            color: short ? color : const Color(0xFF0A1F44)));
+            color: short ? color : minimumColor ?? const Color(0xFF0A1F44)));
     final stockGlyph = short
         ? LucideGlyph.package
         : enough
@@ -101,7 +102,7 @@ class ProductStockSummary extends StatelessWidget {
             fontSize: 11.5,
             height: 1.2,
             fontWeight: FontWeight.w600,
-            color: short ? color : const Color(0xFF0A1F44)));
+            color: short ? color : minimumColor ?? const Color(0xFF0A1F44)));
     return Align(
       alignment: Alignment.centerLeft,
       child: FittedBox(

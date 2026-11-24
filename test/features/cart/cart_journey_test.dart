@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
+import 'package:motolink_pro_app/features/cart/mobile_checkout_screen.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -42,10 +43,21 @@ void main() {
               profile: ProfileModel(id: 'ally', role: 'aliado'),
               liveTasaBcv: 881.8769)));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('REF / Bs'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('REF / Bs'));
-      await tester.pumpAndSettle();
+      if (scenario.size.width >= 768) {
+        await tester.ensureVisible(find.text('REF / Bs'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('REF / Bs'));
+        await tester.pumpAndSettle();
+      } else {
+        expect(find.text('REF / Bs'), findsNothing);
+        await tester.scrollUntilVisible(find.text('Resumen de tu compra'), 120,
+            scrollable: find
+                .descendant(
+                    of: find.byType(ListView),
+                    matching: find.byType(Scrollable))
+                .first);
+        await tester.pumpAndSettle();
+      }
       final amounts = find.text('Bs 229.287,99');
       expect(amounts, findsAtLeastNWidgets(1));
       expect(find.text('260.00 REF'), findsAtLeastNWidgets(1));
@@ -155,12 +167,24 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.textContaining('repuesto'), findsWidgets);
+      if (size.width < 768) {
+        expect(find.text('REF / Bs'), findsNothing);
+        expect(find.textContaining('Elige la moneda en cada proveedor'),
+            findsOneWidget);
+      } else {
+        expect(find.text('REF / Bs'), findsOneWidget);
+        expect(find.text('USD'), findsOneWidget);
+      }
       final productScroll = find
           .descendant(
               of: find.byType(ListView), matching: find.byType(Scrollable))
           .first;
       await tester.scrollUntilVisible(find.byType(CartQuantityField), 80,
           scrollable: productScroll);
+      if (size.width < 768) {
+        expect(find.text('USD'), findsOneWidget);
+        expect(find.text('Bolívares'), findsOneWidget);
+      }
       await tester.enterText(find.byType(TextField), '12');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
@@ -168,21 +192,29 @@ void main() {
       await tester.scrollUntilVisible(find.text('Resumen de tu compra'), 100,
           scrollable: productScroll);
       expect(find.text('Resumen de tu compra'), findsOneWidget);
-      if (size.width == 390) {
-        await tester.ensureVisible(find.textContaining('Continuar con la entrega'));
+      if (size.width == 390 || size.width == 1440) {
+        await tester
+            .ensureVisible(find.textContaining('Continuar con la entrega'));
         await tester.pumpAndSettle();
         await tester.tap(find.textContaining('Continuar con la entrega'));
         await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsOneWidget);
-        expect(find.text('Confirmar pedido'), findsOneWidget);
-        await tester.tap(find.text('Cancelar'));
+        if (size.width == 390) {
+          expect(find.byType(MobileCheckoutScreen), findsOneWidget);
+          expect(find.text('Dirección de entrega'), findsOneWidget);
+          expect(find.text('Confirmar pedido'), findsNothing);
+          await tester.tap(find.byType(BackButton).first);
+        } else {
+          expect(find.byType(AlertDialog), findsOneWidget);
+          expect(find.text('Confirmar pedido'), findsOneWidget);
+          expect(find.byType(MobileCheckoutScreen), findsNothing);
+          await tester.tap(find.text('Cancelar'));
+        }
         await tester.pumpAndSettle();
         expect(cart.itemCount, 12);
       }
       await tester.scrollUntilVisible(find.byTooltip('Eliminar'), -80,
           scrollable: productScroll);
-      await Scrollable.ensureVisible(
-          tester.element(find.byTooltip('Eliminar')),
+      await Scrollable.ensureVisible(tester.element(find.byTooltip('Eliminar')),
           alignment: 0.5);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Eliminar'));
@@ -242,20 +274,27 @@ void main() {
           .descendant(
               of: find.byType(ListView), matching: find.byType(Scrollable))
           .first;
-      await tester.scrollUntilVisible(find.text('REF / Bs'), 150,
-          scrollable: productScroll);
-      await tester.ensureVisible(find.text('REF / Bs'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('REF / Bs'));
-      await tester.pumpAndSettle();
+      if (scenario.size.width >= 768) {
+        await tester.scrollUntilVisible(find.text('REF / Bs'), 150,
+            scrollable: productScroll);
+        await tester.ensureVisible(find.text('REF / Bs'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('REF / Bs'));
+        await tester.pumpAndSettle();
+      } else {
+        expect(find.text('REF / Bs'), findsNothing);
+        await tester.scrollUntilVisible(find.text('Resumen de tu compra'), 150,
+            scrollable: productScroll);
+        await tester.pumpAndSettle();
+      }
       expect(find.textContaining('Bs'), findsWidgets);
       await tester.scrollUntilVisible(
           find.textContaining('Continuar con la entrega'), 120,
           scrollable: productScroll);
       expect(
           tester
-              .widget<FilledButton>(
-                  find.widgetWithText(FilledButton, 'Continuar con la entrega →'))
+              .widget<FilledButton>(find.widgetWithText(
+                  FilledButton, 'Continuar con la entrega →'))
               .onPressed,
           isNull);
       expect(cart.supplierGroups.length, 2);

@@ -7,6 +7,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/widgets/bandeja_sheet.dart';
 import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
+import 'aliado_header_metrics.dart';
 import 'package:motolink_pro_app/core/widgets/ios_chrome.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
@@ -57,15 +58,14 @@ class AliadoBrandedHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     // viewPadding sobrevive a SafeArea anidados; asegura hueco para notch / status bar.
-    final top = MediaQuery.viewPaddingOf(context).top;
     final color = dark ? blueDark : blue;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final compact = searchCollapseProgress > .3;
     final progress =
-        reduceMotion ? (compact ? 1.0 : 0.0) : searchCollapseProgress;
+        (reduceMotion ? (compact ? 1.0 : 0.0) : searchCollapseProgress)
+            .clamp(0.0, 1.0);
     final footerOpacity =
         1 - Curves.easeOut.transform((progress / .7).clamp(0.0, 1.0));
-    final bottomPad = footer == null || onSearchTap != null ? 14.0 : 0.0;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
@@ -78,60 +78,64 @@ class AliadoBrandedHeader extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(height: top + 6),
-            Padding(
-              padding: EdgeInsets.fromLTRB(14, 10, 10, bottomPad),
-              child: Row(
-                children: [
-                  Expanded(child: _Identity(profile: profile)),
-                  if (onSearchTap != null && compact)
-                    Opacity(
-                      opacity: ((progress - .3) / .7).clamp(0.0, 1.0),
-                      child: _ToolbarIcon(
-                        label: searchActionLabel,
-                        icon: LucideGlyph.search,
-                        onTap: onSearchTap!,
+            SizedBox(height: AliadoHeaderMetrics.topInset(context)),
+            SizedBox(
+              height: AliadoHeaderMetrics.toolbarHeight(context),
+              child: Padding(
+                padding: AliadoHeaderMetrics.toolbarPadding,
+                child: Row(
+                  children: [
+                    Expanded(
+                        child: _Identity(profile: profile, compact: compact)),
+                    if (onSearchTap != null && compact)
+                      Opacity(
+                        opacity: ((progress - .3) / .7).clamp(0.0, 1.0),
+                        child: _ToolbarIcon(
+                          label: searchActionLabel,
+                          icon: LucideGlyph.search,
+                          onTap: onSearchTap!,
+                        ),
                       ),
-                    ),
-                  if (showCart)
-                    ListenableBuilder(
-                      listenable: CartService.instance,
-                      builder: (_, __) => _ToolbarIcon(
-                        label: 'Bolsa',
-                        icon: LucideGlyph.handbag,
-                        count: CartService.instance.itemCount,
-                        onTap: () {
-                          Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (_) => CartScreen(
-                                profile: profile,
-                                liveTasaBcv: BcvBasePrice.cachedRate,
+                    if (showCart)
+                      ListenableBuilder(
+                        listenable: CartService.instance,
+                        builder: (_, __) => _ToolbarIcon(
+                          label: 'Bolsa',
+                          icon: LucideGlyph.handbag,
+                          count: CartService.instance.itemCount,
+                          onTap: () {
+                            Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => CartScreen(
+                                  profile: profile,
+                                  liveTasaBcv: BcvBasePrice.cachedRate,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  if (showBcv)
-                    const BcvRateBadge(
-                      alwaysVisible: true,
-                      iconColor: Colors.white,
-                      size: Size(44, 44),
-                    ),
-                  if (onMessagesTap != null || onNotificationTap != null)
-                    _ToolbarIcon(
-                      label: 'Bandeja',
-                      icon: LucideGlyph.inbox,
-                      unread: unreadNotifications > 0 || unreadMessages > 0,
-                      onTap: () => showBandejaSheet(
-                        context: context,
-                        onMessagesTap: onMessagesTap,
-                        onNotificationTap: onNotificationTap,
-                        unreadMessages: unreadMessages,
-                        unreadNotifications: unreadNotifications,
+                    if (showBcv)
+                      const BcvRateBadge(
+                        alwaysVisible: true,
+                        iconColor: Colors.white,
+                        size: Size(44, 44),
                       ),
-                    ),
-                ],
+                    if (onMessagesTap != null || onNotificationTap != null)
+                      _ToolbarIcon(
+                        label: 'Bandeja',
+                        icon: LucideGlyph.inbox,
+                        unread: unreadNotifications > 0 || unreadMessages > 0,
+                        onTap: () => showBandejaSheet(
+                          context: context,
+                          onMessagesTap: onMessagesTap,
+                          onNotificationTap: onNotificationTap,
+                          unreadMessages: unreadMessages,
+                          unreadNotifications: unreadNotifications,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             if (footer != null && progress < 1)
@@ -147,10 +151,8 @@ class AliadoBrandedHeader extends StatelessWidget {
                         ignoring: compact,
                         child: Opacity(
                           opacity: footerOpacity,
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              bottom: onSearchTap == null ? 0 : 10,
-                            ),
+                          child: SizedBox(
+                            height: AliadoHeaderMetrics.searchHeight(context),
                             child: footer,
                           ),
                         ),
@@ -167,8 +169,9 @@ class AliadoBrandedHeader extends StatelessWidget {
 }
 
 class _Identity extends StatelessWidget {
-  const _Identity({required this.profile});
+  const _Identity({required this.profile, required this.compact});
   final ProfileModel profile;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -212,12 +215,13 @@ class _Identity extends StatelessWidget {
                   height: 1.12,
                 ),
               ),
-              const Text(
-                'Tienda minorista',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Color(0xFFE5EFFF), fontSize: 12),
-              ),
+              if (!compact)
+                const Text(
+                  'Tienda minorista',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Color(0xFFE5EFFF), fontSize: 12),
+                ),
             ],
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/cart/cart_product_actions.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
@@ -375,7 +376,7 @@ class _VariantCartPickerSheetState extends State<VariantCartPickerSheet> {
                                 : AppColors.brandBlue.withOpacity(0.45),
                             foregroundColor: Colors.white,
                           ),
-                          icon: const Icon(Icons.add_shopping_cart_outlined),
+                          icon: const LucideIcon(LucideGlyph.handbag),
                           label: const Text('Agregar al carrito'),
                         ),
                       ),

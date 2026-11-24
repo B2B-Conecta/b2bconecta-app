@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../core/layout/app_breakpoints.dart';
+import '../../../core/data/supabase_service.dart';
+import 'order_chat_launch.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'order_card_collapsible_layout.dart';
@@ -198,15 +201,49 @@ class OrderReturnButtons extends StatelessWidget {
     );
   }
 
-  Future<void> _openReport(BuildContext context, {required bool viewOnly}) async {
+  Future<void> _openReport(BuildContext context,
+      {required bool viewOnly}) async {
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => OrderIssueReportScreen(
           lines: lines,
           viewOnly: viewOnly,
+          onSubmitted: mobile
+              ? (reportContext, reportedIds) async {
+                  final fresh = await SupabaseService
+                      .fetchCheckoutGroupLinesForTransactionRequest(
+                          lines.first.id);
+                  final ids = lines.map((line) => line.id).toSet();
+                  final chunk = fresh
+                      .where((line) =>
+                          ids.contains(line.id) &&
+                          line.ownerId == lines.first.ownerId)
+                      .toList();
+                  if (chunk.isEmpty ||
+                      !reportedIds
+                          .every((id) => chunk.any((line) => line.id == id))) {
+                    throw StateError(
+                        'No se pudo recuperar el pedido del reporte.');
+                  }
+                  if (!reportContext.mounted) return;
+                  await showOrderChatSheet(
+                    context: reportContext,
+                    transactionRequestId: chunk.first.id,
+                    mergedThreadRequestIds: chunk.length > 1
+                        ? chunk.map((line) => line.id).toList()
+                        : null,
+                    orderLines: chunk,
+                    allowReplyAsAliado: orderLinesAllowChatReply(chunk),
+                    allowReplyAsAdmin: false,
+                    deliveryGrace: orderLinesChatDeliveryGrace(chunk),
+                    onThreadChanged: onChanged,
+                  );
+                }
+              : null,
         ),
       ),
     );
-    if (saved == true) onChanged?.call();
+    if (saved == true || mobile) onChanged?.call();
   }
 }

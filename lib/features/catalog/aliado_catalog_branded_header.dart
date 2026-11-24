@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/widgets/aliado_branded_header.dart';
 import 'package:motolink_pro_app/core/widgets/aliado_home_header.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_header_metrics.dart';
 import 'package:motolink_pro_app/core/widgets/bandeja_sheet.dart';
 import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
 import 'package:motolink_pro_app/core/widgets/ios_chrome.dart';
@@ -47,7 +48,8 @@ class AliadoCatalogBrandedHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AliadoHomeHeader(
-      identity: (compact) => _CatalogIdentity(profile: profile, compact: compact),
+      identity: (compact) =>
+          _CatalogIdentity(profile: profile, compact: compact),
       search: CatalogCollapsingSearchField(
         controller: searchController,
         onSubmitted: onSearchSubmitted,
@@ -129,7 +131,7 @@ class CatalogCollapsingSearchField extends StatelessWidget {
       borderSide: BorderSide.none,
     );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+      padding: AliadoHeaderMetrics.searchPadding,
       child: TextField(
         controller: controller,
         autofocus: autofocus,

@@ -716,7 +716,12 @@ class TransactionRequestDestinoEntregaSection extends StatelessWidget {
           ),
           SizedBox(height: density.isDesktop ? 4 : 6),
         ],
-        if (usa) ...[
+        if(r.checkoutDeliveryAddress.isNotEmpty) ...[
+          if(r.customerPickup) const Text('Retiro en tienda · Sin costo',style:TextStyle(fontWeight:FontWeight.w700)),
+          Text(r.checkoutDeliveryAddress,style:TextStyle(fontSize:bodySize,height:1.4)),
+          if((r.customerDeliverySnapshot['instructions'] as String? ?? '').isNotEmpty)
+            Text(r.customerDeliverySnapshot['instructions'] as String),
+        ] else if (usa) ...[
           if (fiscalBloque != null && fiscalBloque.isNotEmpty)
             Text(
               fiscalBloque,

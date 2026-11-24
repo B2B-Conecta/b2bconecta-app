@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'importer_min_order.dart';
 import 'cart_draft_storage.dart';
+import 'checkout_attempt.dart';
 
 /// Línea del carrito. Sus precios y disponibilidad se actualizan al restaurar.
 class CartLine {
@@ -39,6 +40,15 @@ class CartService extends ChangeNotifier {
   bool _restoreFailed = false;
   int get accountRevision => _generation;
   bool invalidDraft = false;
+  CheckoutAttempt? _checkoutAttempt;
+  CheckoutAttempt? get pendingCheckoutAttempt => _checkoutAttempt;
+  String get checkoutCartSignature {
+    final entries = [
+      for (final line in _lines) '${line.part.id}:${line.quantity}'
+    ]..sort();
+    return CheckoutAttempt.signatureFor(
+        {'lines': entries, 'campaigns': promoAttributionPayloadForCheckout()});
+  }
 
   /// Isolated by environment and user; changing accounts immediately clears RAM.
   Future<void> openAccount({
@@ -53,7 +63,9 @@ class CartService extends ChangeNotifier {
     _storage = storage;
     _loadProduct = loadProduct;
     _lines.clear();
+    _checkoutAttempt = null;
     _promoCampaignByImportadorId.clear();
+    _supplierCurrencies.clear();
     storageMessage = null;
     restoreMessage = null;
     _restoreFailed = false;
@@ -70,6 +82,7 @@ class CartService extends ChangeNotifier {
         if (draft['version'] != 1 || draft['lines'] is! List) {
           throw const FormatException('Carrito incompatible');
         }
+        _checkoutAttempt = CheckoutAttempt.fromJson(draft['checkout_attempt']);
         final entries = (draft['lines'] as List).take(200);
         var adjusted = false;
         final restored = <CartLine>[];
@@ -112,6 +125,16 @@ class CartService extends ChangeNotifier {
         if (adjusted) {
           restoreMessage =
               'Actualizamos tu carrito según la disponibilidad. Revisa las cantidades y los precios.';
+        }
+        final currencies = draft['supplier_currencies'];
+        if (currencies is Map) {
+          for (final entry in currencies.entries) {
+            if (entry.key is String &&
+                entry.value is bool &&
+                _lines.any((line) => line.part.ownerId == entry.key)) {
+              _supplierCurrencies[entry.key as String] = entry.value as bool;
+            }
+          }
         }
       }
     } on FormatException {
@@ -170,6 +193,9 @@ class CartService extends ChangeNotifier {
           {'id': line.part.id, 'quantity': line.quantity}
       ],
       'campaigns': promoAttributionPayloadForCheckout(),
+      'supplier_currencies': supplierCurrencyPreferences,
+      if (_checkoutAttempt != null)
+        'checkout_attempt': _checkoutAttempt!.toJson(),
     });
     final generation = _generation;
     _pendingWrite = _pendingWrite.then((_) async {
@@ -188,8 +214,69 @@ class CartService extends ChangeNotifier {
 
   Future<void> get saved => _pendingWrite;
 
+  Future<CheckoutAttempt> prepareCheckoutAttempt(String signature,
+      {required Future<String?> Function(String id) resolve}) async {
+    final generation = _generation;
+    final previous = _checkoutAttempt;
+    if (previous != null) {
+      final orderId = await resolve(previous.id);
+      if (generation != _generation) throw StateError('La cuenta cambió.');
+      if (orderId != null && orderId.isNotEmpty) {
+        throw CheckoutRecoveredException(orderId,
+            samePayload: previous.signature == signature);
+      }
+      _checkoutAttempt = null;
+    }
+    _checkoutAttempt ??=
+        CheckoutAttempt.create(signature, cartSignature: checkoutCartSignature);
+    _changed();
+    await saved;
+    if (generation != _generation || storageMessage != null) {
+      throw StateError(
+          'No se pudo guardar la confirmación. Intenta de nuevo antes de enviar.');
+    }
+    return _checkoutAttempt!;
+  }
+
+  void completeCheckout() {
+    _checkoutAttempt = null;
+    clear();
+  }
+
+  void acknowledgeCheckout() {
+    _checkoutAttempt = null;
+    _changed();
+  }
+
   final List<CartLine> _lines = [];
   final Map<String, String> _promoCampaignByImportadorId = {};
+  final Map<String, bool> _supplierCurrencies = {};
+
+  Map<String, bool> get supplierCurrencyPreferences => {
+        for (final owner in _lines
+            .map((line) => line.part.ownerId)
+            .whereType<String>()
+            .toSet())
+          if (_supplierCurrencies.containsKey(owner))
+            owner: _supplierCurrencies[owner]!,
+      };
+
+  void setSupplierCurrencies(Map<String, bool> choices) {
+    if (!canEdit) return;
+    var changed = false;
+    for (final entry in choices.entries) {
+      final lines =
+          _lines.where((line) => line.part.ownerId == entry.key).toList();
+      if (lines.isEmpty) continue;
+      final usd =
+          entry.value || lines.any((line) => line.part.ownerPagoSoloDivisas);
+      if (_supplierCurrencies[entry.key] != usd) {
+        _supplierCurrencies[entry.key] = usd;
+        changed = true;
+      }
+    }
+    if (changed) _changed();
+  }
 
   List<CartLine> get lines => List.unmodifiable(_lines);
 
@@ -359,6 +446,7 @@ class CartService extends ChangeNotifier {
     if (!canEdit) return;
     _lines.clear();
     _promoCampaignByImportadorId.clear();
+    _supplierCurrencies.clear();
     _changed();
   }
 

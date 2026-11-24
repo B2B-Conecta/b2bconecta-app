@@ -20,6 +20,7 @@ class OrderSummaryHeader extends StatelessWidget {
       required this.statusLabel,
       required this.chatAction,
       this.onCancel,
+      this.cancelLabel = 'Cancelar pedido',
       this.showToggle = true,
       this.detailSummary = false,
       this.compactDetail = false,
@@ -34,6 +35,7 @@ class OrderSummaryHeader extends StatelessWidget {
   final String statusLabel;
   final Widget? chatAction;
   final VoidCallback? onCancel;
+  final String cancelLabel;
   final bool cancelBusy;
   final bool showToggle;
   final bool detailSummary;
@@ -72,7 +74,6 @@ class OrderSummaryHeader extends StatelessWidget {
               };
     final date = ImporterOrderDate.fechaGrupoParaFiltro(lines);
     final quantities = lines.fold<int>(0, (sum, l) => sum + l.cantidad);
-    final total = lines.fold<double>(0, (sum, l) => sum + l.precioTotal);
     final parties =
         orderCardRelatedParties(lines: lines, viewerRole: viewerRole);
     final partyLabel = parties.isEmpty
@@ -90,14 +91,13 @@ class OrderSummaryHeader extends StatelessWidget {
         : pendingQty && viewerRole == AppHomeRole.aliado
             ? 'Revisar cantidad'
             : 'Ver pedido';
-    final amount = '${formatRefAmount(total)} ${orderAmountCurrency(lines)}';
+    final amount = orderAmountSummary(lines);
     final cancelAction = PopupMenuButton<String>(
       tooltip: 'Más opciones del pedido',
       enabled: !cancelBusy,
       onSelected: (_) => onCancel!(),
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 'cancel', child: Text('Cancelar pedido'))
-      ],
+      itemBuilder: (_) =>
+          [PopupMenuItem(value: 'cancel', child: Text(cancelLabel))],
       icon: cancelBusy
           ? const SizedBox(
               width: 18,

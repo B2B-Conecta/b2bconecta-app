@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_actions_flow_copy.dart';
 
 /// Devuelve el motivo o null si cancela.
-Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) async {
+Future<String?> showAliadoCancelarPedidoPendienteDialog(
+    BuildContext context) async {
   final ctrl = TextEditingController();
+  final form = GlobalKey<FormState>();
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) {
@@ -19,17 +21,22 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
               style: TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              maxLines: 4,
-              maxLength: 4000,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: OrderActionsFlowCopy.cancelarMotivoLabel,
-                alignLabelWithHint: true,
-                border: OutlineInputBorder(),
-              ),
-            ),
+            Form(
+                key: form,
+                child: TextFormField(
+                  controller: ctrl,
+                  maxLines: 4,
+                  maxLength: 4000,
+                  autofocus: true,
+                  validator: (value) => (value?.trim().length ?? 0) < 3
+                      ? 'Escribe el motivo (mínimo 3 caracteres).'
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: OrderActionsFlowCopy.cancelarMotivoLabel,
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                )),
           ],
         ),
         actions: [
@@ -43,7 +50,7 @@ Future<String?> showAliadoCancelarPedidoPendienteDialog(BuildContext context) as
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              if (ctrl.text.trim().length < 3) return;
+              if (!form.currentState!.validate()) return;
               Navigator.pop(ctx, true);
             },
             child: const Text(OrderActionsFlowCopy.cancelarConfirmar),

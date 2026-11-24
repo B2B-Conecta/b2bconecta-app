@@ -160,6 +160,8 @@ class _MainShellState extends State<MainShell> {
     });
     if (widget.homeRole == AppHomeRole.aliado) {
       _tabIndex = AliadoShellTabs.inicio;
+      MainShellTabController.registerAliadoTabSelection(
+          (index) => _onB2bTabSelected(index, AppHomeRole.aliado));
       MainShellTabController.registerB2BNavigation(
         home: AliadoShellTabs.inicio,
         pedidos: AliadoShellTabs.pedidos,
@@ -598,9 +600,9 @@ class _MainShellState extends State<MainShell> {
       bottomContentPadding: 8,
     ),
     ShellDestination(
-      icon: Icons.shopping_cart_outlined,
-      selectedIcon: Icons.shopping_cart,
-      lucideIcon: LucideGlyph.shoppingCart,
+      icon: Icons.shopping_bag_outlined,
+      selectedIcon: Icons.shopping_bag,
+      lucideIcon: LucideGlyph.handbag,
       label: 'Pedidos',
       title: 'Pedidos',
       subtitle: 'En curso · entregas',
@@ -662,9 +664,9 @@ class _MainShellState extends State<MainShell> {
       compactHeaderOnScroll: true,
     ),
     ShellDestination(
-      icon: Icons.shopping_cart_outlined,
-      selectedIcon: Icons.shopping_cart,
-      lucideIcon: LucideGlyph.shoppingCart,
+      icon: Icons.shopping_bag_outlined,
+      selectedIcon: Icons.shopping_bag,
+      lucideIcon: LucideGlyph.handbag,
       badgeKey: ImporterShellBadgeKey.pedidos,
       label: 'Pedidos',
       title: 'Pedidos',
@@ -1037,7 +1039,8 @@ class _MainShellState extends State<MainShell> {
           tooltip: 'Carrito',
           onPressed: _openAliadoCart,
           count: n,
-          icon: n > 0 ? Icons.shopping_cart : Icons.shopping_cart_outlined,
+          icon: Icons.shopping_bag_outlined,
+          iconWidget: const LucideIcon(LucideGlyph.handbag, size: 22),
         );
       },
     );
@@ -1244,18 +1247,19 @@ class _MainShellState extends State<MainShell> {
 
   void _openAliadoReputation() {
     Navigator.of(context).push<void>(MaterialPageRoute(
-        builder: (_) => Scaffold(
-              appBar: AppBar(title: const Text('Mi reputación')),
-              body: StatefulBuilder(
-                  builder: (context, update) => ReputationOverview(
-                      profile: _profile,
-                      isImporter: false,
-                      showHeading: false,
-                      onProfileRefresh: () async {
-                        await _refreshProfile();
-                        if (context.mounted) update(() {});
-                      })),
-            )));
+      builder: (_) => StatefulBuilder(
+        builder: (context, update) => ReputationOverview(
+          profile: _profile,
+          isImporter: false,
+          showHeading: false,
+          standaloneRetailer: true,
+          onProfileRefresh: () async {
+            await _refreshProfile();
+            if (context.mounted) update(() {});
+          },
+        ),
+      ),
+    ));
   }
 
   Widget _buildB2bDesktopShell({
@@ -1355,8 +1359,7 @@ class _MainShellState extends State<MainShell> {
         final theme = B2BThemeExtension.of(context);
         return ResponsiveScaffold(
           scaffoldKey: _b2bMobileScaffoldKey,
-          extendBody:
-              role == AppHomeRole.aliado && _tabIndex == AliadoShellTabs.inicio,
+          extendBody: role == AppHomeRole.aliado,
           drawer: AdminShellDrawer(
             profile: _profile,
             destinations: destinations,
@@ -1946,7 +1949,7 @@ class _ProfileTabState extends State<_ProfileTab>
         widget.embedInDesktopShell ? 0 : 20,
         widget.embedInDesktopShell ? 0 : 8,
         widget.embedInDesktopShell ? 0 : 20,
-        24,
+        24 + _navigationInset,
       ),
       child: Align(
         alignment: Alignment.topCenter,
@@ -1959,6 +1962,11 @@ class _ProfileTabState extends State<_ProfileTab>
       ),
     );
   }
+
+  double get _navigationInset =>
+      widget.homeRole == AppHomeRole.aliado && !widget.embedInDesktopShell
+          ? MediaQuery.paddingOf(context).bottom
+          : 0;
 
   @override
   Widget build(BuildContext context) {
@@ -2064,6 +2072,7 @@ class _ProfileTabState extends State<_ProfileTab>
         child: AccountSettingsScreen(
           embedded: true,
           panel: panel,
+          extraBottomPadding: _navigationInset,
           roleLabel: ProfileRoleLabels.labelEs(widget.profile.role),
           guideAlerts: widget.embedInDesktopShell &&
               widget.homeRole == AppHomeRole.importador &&
@@ -2095,6 +2104,7 @@ class _ProfileTabState extends State<_ProfileTab>
 
     final profileBody = SafeArea(
       top: !useBranded && !widget.embedInDesktopShell,
+      bottom: !useBranded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

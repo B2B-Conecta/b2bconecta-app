@@ -139,7 +139,7 @@ class _PaletteState extends State<_Palette> {
           kind: _HitKind.action,
           title: 'Pedidos por confirmar',
           subtitle: 'Abrir la bandeja con el filtro de pendientes',
-          glyph: LucideGlyph.shoppingCart,
+          glyph: LucideGlyph.handbag,
           onOpen: () {
             Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.navigateToImporterPedidosExplore('nuevos');
@@ -240,7 +240,7 @@ class _PaletteState extends State<_Palette> {
           kind: _HitKind.order,
           title: name.isEmpty ? 'Pedido' : name,
           subtitle: '$status · USD $amount',
-          glyph: LucideGlyph.shoppingCart,
+          glyph: LucideGlyph.handbag,
           onOpen: () {
             Navigator.of(context, rootNavigator: true).pop();
             MainShellTabController.openImporterOrder(id);

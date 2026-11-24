@@ -44,18 +44,24 @@ class _AliadoPedidoCarrierSelectionSectionState
   }
 
   @override
-  void didUpdateWidget(covariant AliadoPedidoCarrierSelectionSection oldWidget) {
+  void didUpdateWidget(
+      covariant AliadoPedidoCarrierSelectionSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.request.id != widget.request.id ||
         oldWidget.request.status != widget.request.status ||
         oldWidget.request.carrierDecision != widget.request.carrierDecision ||
-        oldWidget.request.importerCarrierId != widget.request.importerCarrierId) {
+        oldWidget.request.importerCarrierId !=
+            widget.request.importerCarrierId) {
       _load();
     }
   }
 
   Future<void> _load() async {
     final r = widget.request;
+    if (r.customerPickup) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     final shouldQuery = r.status == TransactionRequestStatus.pedidoListo &&
         (r.carrierDecision == CarrierDecision.pending ||
             r.carrierDecision == CarrierDecision.notApplicable);
@@ -69,8 +75,7 @@ class _AliadoPedidoCarrierSelectionSectionState
       return;
     }
 
-    final wasNotApplicable =
-        r.carrierDecision == CarrierDecision.notApplicable;
+    final wasNotApplicable = r.carrierDecision == CarrierDecision.notApplicable;
 
     setState(() {
       _loading = true;
@@ -129,7 +134,8 @@ class _AliadoPedidoCarrierSelectionSectionState
       widget.onChanged();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Transportista elegido. El importador verá su selección.'),
+          content:
+              Text('Transportista elegido. El importador verá su selección.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -188,6 +194,7 @@ class _AliadoPedidoCarrierSelectionSectionState
 
   @override
   Widget build(BuildContext context) {
+    if (widget.request.customerPickup) return const SizedBox.shrink();
     final r = widget.request;
     if (r.status != TransactionRequestStatus.pedidoListo) {
       return const SizedBox.shrink();
@@ -207,9 +214,10 @@ class _AliadoPedidoCarrierSelectionSectionState
       return _buildSelectedCarrierCard(r, allowChange: false);
     }
 
-    final awaitingCarrierChoice = r.status == TransactionRequestStatus.pedidoListo &&
-        (r.carrierDecision == CarrierDecision.pending ||
-            r.carrierDecision == CarrierDecision.notApplicable);
+    final awaitingCarrierChoice =
+        r.status == TransactionRequestStatus.pedidoListo &&
+            (r.carrierDecision == CarrierDecision.pending ||
+                r.carrierDecision == CarrierDecision.notApplicable);
 
     if (!awaitingCarrierChoice) {
       return const SizedBox.shrink();
@@ -248,7 +256,8 @@ class _AliadoPedidoCarrierSelectionSectionState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_error != null) ...[
-            Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+            Text(_error!,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
             const SizedBox(height: 8),
           ],
           OutlinedButton.icon(
@@ -329,7 +338,8 @@ class _AliadoPedidoCarrierSelectionSectionState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_error != null) ...[
-            Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+            Text(_error!,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
             const SizedBox(height: 8),
           ],
           if (selected) ...[
@@ -381,7 +391,8 @@ class _AliadoPedidoCarrierSelectionSectionState
                         ),
                       )
                     : const Icon(Icons.swap_horiz),
-                label: const Text(OrderPickupFlowCopy.aliadoCambiarTransportista),
+                label:
+                    const Text(OrderPickupFlowCopy.aliadoCambiarTransportista),
               ),
           ],
         ],
@@ -480,7 +491,8 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
                     _CarrierOptionCard(
                       carrier: carrier,
                       selected: carrier.id == _carrierId,
-                      selectedDriverId: carrier.id == _carrierId ? _driverId : null,
+                      selectedDriverId:
+                          carrier.id == _carrierId ? _driverId : null,
                       onTap: () => setState(() {
                         _carrierId = carrier.id;
                         _driverId = null;
@@ -516,7 +528,8 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
               onChanged: (v) => setState(() => _fletePagoModo = v!),
               contentPadding: EdgeInsets.zero,
               title: const Text(OrderPickupFlowCopy.aliadoFleteIncluidoTitulo),
-              subtitle: const Text(OrderPickupFlowCopy.aliadoFleteIncluidoCuerpo),
+              subtitle:
+                  const Text(OrderPickupFlowCopy.aliadoFleteIncluidoCuerpo),
             ),
             RadioListTile<String>(
               value: CarrierFletePagoModo.pagoSeparado,
@@ -524,7 +537,8 @@ class _CarrierPickerSheetState extends State<_CarrierPickerSheet> {
               onChanged: (v) => setState(() => _fletePagoModo = v!),
               contentPadding: EdgeInsets.zero,
               title: const Text(OrderPickupFlowCopy.aliadoFleteSeparadoTitulo),
-              subtitle: const Text(OrderPickupFlowCopy.aliadoFleteSeparadoCuerpo),
+              subtitle:
+                  const Text(OrderPickupFlowCopy.aliadoFleteSeparadoCuerpo),
             ),
           ],
           const SizedBox(height: 12),

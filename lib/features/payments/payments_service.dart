@@ -7,9 +7,69 @@ import 'package:motolink_pro_app/features/payments/pago_revision_estado.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/features/payments/broker_pricing.dart';
+import '../../core/utils/document_pick_utils.dart';
+import '../../core/utils/upload_file_guard.dart';
+import 'mobile_supplier_payment_model.dart';
 
 class PaymentsService {
   PaymentsService._();
+
+  /// Explicit mobile submission; one RPC commits all supplier lines atomically.
+  /// Stable file names make a retry safe after an uncertain network response.
+  static Future<void> submitMobileSupplierPayment({
+    required List<TransactionRequestModel> lines,
+    required SupplierPaymentDeclaration declaration,
+    PickedDocumentBytes? proof,
+  }) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) throw StateError('No hay sesión activa.');
+    if (lines.isEmpty ||
+        !lines.every((line) =>
+            line.aliadoId == uid &&
+            line.ownerId == lines.first.ownerId &&
+            line.checkoutGroupId == lines.first.checkoutGroupId) ||
+        lines.map((line) => line.id).toSet().length != lines.length) {
+      throw ArgumentError('Elige los productos de un solo proveedor y pedido.');
+    }
+    if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(declaration.submissionId)) {
+      throw ArgumentError('Referencia de envío inválida.');
+    }
+    String? path, name;
+    if (proof != null) {
+      final checked = UploadFileGuard.check(proof.bytes, proof.fileName,
+          kind: UploadKind.imageOrPdf);
+      name = checked.fileName;
+      path =
+          '${lines.first.id}/payment_${declaration.submissionId}.${checked.extension}';
+      // Reusing this ID is allowed only for the same immutable declaration.
+      // Never overwrite a proof already attached to a submitted/approved payment.
+      final existing = await SupabaseAccess.client
+          .from('transaction_requests')
+          .select('pago_declaracion')
+          .eq('id', lines.first.id)
+          .maybeSingle();
+      final sameSubmission =
+          (existing?['pago_declaracion'] as Map?)?['submission_id'] ==
+              declaration.submissionId;
+      if (!sameSubmission) {
+        await SupabaseAccess.client.storage
+            .from(SupabaseAccess.orderPaymentProofsBucket)
+            .uploadBinary(path, checked.bytes,
+                fileOptions:
+                    FileOptions(contentType: checked.mime, upsert: true));
+      }
+    }
+    await SupabaseAccess.client
+        .rpc('aliado_submit_supplier_payment_v1', params: {
+      'p_request_ids': lines.map((line) => line.id).toList(),
+      'p_metodo': declaration.method,
+      'p_declaration': declaration.toJson(),
+      'p_storage_path': path,
+      'p_file_name': name,
+    });
+    // Keep previous proofs: deleting one here could break another historical
+    // line's attachment or a concurrent supplier review. No removal on errors.
+  }
 
   static double get logisticFeeRate => BrokerPricing.feeRate;
 
@@ -280,8 +340,9 @@ class PaymentsService {
   static Future<void> aliadoDeclaraPagoEfectivo({
     required String transactionRequestId,
   }) async {
-    if (SupabaseAccess.currentUserId == null)
+    if (SupabaseAccess.currentUserId == null) {
       throw StateError('No hay sesión activa.');
+    }
     await SupabaseAccess.client.rpc(
       'aliado_declara_pago_efectivo',
       params: <String, dynamic>{'p_request_id': transactionRequestId},
@@ -324,8 +385,9 @@ class PaymentsService {
     required String nuevoEstado,
     String? rechazoNota,
   }) async {
-    if (SupabaseAccess.currentUserId == null)
+    if (SupabaseAccess.currentUserId == null) {
       throw StateError('No hay sesión activa.');
+    }
     await SupabaseAccess.client.rpc(
       'importador_set_pago_revision_estado',
       params: <String, dynamic>{

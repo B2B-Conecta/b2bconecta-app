@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:motolink_pro_app/core/layout/aliado_bottom_nav.dart';
+import 'package:motolink_pro_app/core/layout/list_page_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 
@@ -30,6 +32,51 @@ TransactionRequestModel fixture(String id,
     });
 
 void main() {
+  testWidgets('orders scroll behind navigation and the pager stays reachable',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        extendBody: true,
+        bottomNavigationBar: AliadoBottomNav(currentIndex: 1, onTap: (_) {}),
+        body: OrderWorkspace(
+          groups: List.generate(15, (index) => [fixture('sample-$index')]),
+          selectedKey: null,
+          onSelect: (_) {},
+          onClose: () {},
+          controls: const SizedBox.shrink(),
+          detailBuilder: (_) => const SizedBox.shrink(),
+          onRefresh: () async {},
+          resetKey: 'orders',
+          onClearFilters: () {},
+          headerBuilder: (_, __) => const SizedBox(height: 56),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final navigation = tester.getRect(find.byType(AliadoBottomNav));
+    final list = find.byType(ListView);
+    expect(tester.getRect(list).bottom, greaterThan(navigation.top));
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)).first,
+        )
+        .position;
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byTooltip('Siguiente')).bottom,
+        lessThanOrEqualTo(navigation.top));
+    await tester.tap(find.byTooltip('Siguiente'));
+    await tester.pumpAndSettle();
+    expect(position.pixels, 0);
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(tester.widget<ListPageBar>(find.byType(ListPageBar)).pageIndex, 1);
+  });
+
   test('order projection keeps USD offers separate from the REF conversion',
       () {
     final usd = OrderListEntry([fixture('one')]);
@@ -108,47 +155,60 @@ void main() {
     }
   }
 
-  testWidgets('mobile back preserves the page and scroll position',
-      (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    String? selected;
-    final groups = List.generate(23, (i) => [fixture('page$i')]);
-    await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-            body: StatefulBuilder(
-                builder: (context, setState) => OrderWorkspace(
-                      groups: groups,
-                      selectedKey: selected,
-                      onSelect: (key) => setState(() => selected = key),
-                      onClose: () => setState(() => selected = null),
-                      controls: const Text('Buscar'),
-                      detailBuilder: (_) => const Text('Detalle seleccionado'),
-                      onRefresh: () async {},
-                      resetKey: 'all',
-                      onClearFilters: () {},
-                    )))));
-    await tester.tap(find.byTooltip('Siguiente'));
-    await tester.pumpAndSettle();
-    final list = find.byType(Scrollable).first;
-    await tester.drag(list, const Offset(0, -100));
-    await tester.pumpAndSettle();
-    final before = tester.state<ScrollableState>(list).position.pixels;
-    await tester.tap(find.textContaining('#PAGE11').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Volver a pedidos'));
-    await tester.pumpAndSettle();
-    expect(find.text('11–20 de 23'), findsOneWidget);
-    expect(
-        tester
-            .state<ScrollableState>(find.byType(Scrollable).first)
-            .position
-            .pixels,
-        before);
-    expect(tester.takeException(), isNull);
-  });
+  for (final compact in [false, true]) {
+    testWidgets('mobile back preserves page and scroll, compact=$compact',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      String? selected;
+      final groups = List.generate(23, (i) => [fixture('page$i')]);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: StatefulBuilder(
+                  builder: (context, setState) => OrderWorkspace(
+                        groups: groups,
+                        selectedKey: selected,
+                        onSelect: (key) => setState(() => selected = key),
+                        onClose: () => setState(() => selected = null),
+                        controls: const Text('Buscar'),
+                        headerBuilder: compact
+                            ? (_, __) => const SizedBox(height: 60)
+                            : null,
+                        detailBuilder: (_) =>
+                            const Text('Detalle seleccionado'),
+                        onRefresh: () async {},
+                        resetKey: 'all',
+                        onClearFilters: () {},
+                      )))));
+      await tester.tap(find.byTooltip('Siguiente'));
+      await tester.pumpAndSettle();
+      final list = find.byType(Scrollable).first;
+      await tester.drag(list, const Offset(0, -100));
+      await tester.pumpAndSettle();
+      final before = tester.state<ScrollableState>(list).position.pixels;
+      await tester.tap(find.textContaining('#PAGE11').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Volver a pedidos'));
+      await tester.pumpAndSettle();
+      final pager = tester.widget<ListPageBar>(find.byType(ListPageBar));
+      expect(pager.pageIndex, 1);
+      expect(pager.pageSize, 10);
+      expect(pager.compact, compact);
+      expect(find.text(compact ? '11–20 de 23' : 'Mostrando 11–20 de 23'),
+          findsOneWidget);
+      expect(find.textContaining('#PAGE11'), findsWidgets);
+      expect(find.textContaining('#PAGE0'), findsNothing);
+      expect(
+          tester
+              .state<ScrollableState>(find.byType(Scrollable).first)
+              .position
+              .pixels,
+          before);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('empty results offer recovery without a stale detail',
       (tester) async {

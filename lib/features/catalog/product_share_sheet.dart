@@ -74,9 +74,9 @@ Future<void> showProductShareSheet(
               ),
               ListTile(
                 leading: const Icon(Icons.qr_code_2, color: AppColors.brand),
-                title: const Text('Compartir QR'),
+                title: const Text('Mostrar QR del producto'),
                 subtitle: const Text(
-                  'Código de la ficha pública, sin datos de sesión.',
+                  'Muéstralo o compártelo. Es el mismo QR de las etiquetas impresas.',
                 ),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -84,7 +84,8 @@ Future<void> showProductShareSheet(
                     context,
                     title: name,
                     url: url,
-                    subtitle: 'Ficha del producto',
+                    heading: 'QR del producto',
+                    subtitle: 'El mismo QR que aparece en las etiquetas impresas.',
                   );
                 },
               ),

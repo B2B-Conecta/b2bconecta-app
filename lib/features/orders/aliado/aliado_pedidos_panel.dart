@@ -1,5 +1,6 @@
 import '../shared/order_priority_controls.dart';
 import 'package:flutter/material.dart';
+import '../../../core/layout/app_breakpoints.dart';
 
 import 'aliado_pedidos_filters_draft.dart';
 import 'package:motolink_pro_app/core/widgets/aliado_header_search.dart';
@@ -19,11 +20,13 @@ import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'aliado_cancelar_pedido_dialog.dart';
+import 'mobile_cancel_order_screen.dart';
 import 'aliado_expandable_order_card.dart';
 import 'aliado_order_detail_view.dart';
 import 'aliado_confirmar_recepcion_section.dart';
 import 'package:motolink_pro_app/features/reputation/aliado_experience_utils.dart';
 import 'package:motolink_pro_app/features/payments/aliado_order_pago_section.dart';
+import 'package:motolink_pro_app/features/payments/mobile_supplier_payment_screen.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_payment_pricing.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
@@ -342,14 +345,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       ));
     }
 
-    if (_creditOnly)
+    if (_creditOnly) {
       chips.add(_activeFilterChip(
           label: 'Saldo aplicado',
           onDeleted: () => setState(() => _creditOnly = false)));
-    if (_replacementOnly)
+    }
+    if (_replacementOnly) {
       chips.add(_activeFilterChip(
           label: 'Cambio de producto',
           onDeleted: () => setState(() => _replacementOnly = false)));
+    }
     if (chips.isEmpty) return null;
 
     return Padding(
@@ -441,6 +446,31 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     List<TransactionRequestModel> rows,
   ) async {
     if (_cancelarBusyId != null) return;
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      final cancellable = rows
+          .where((line) => line.aliadoPuedeCancelarHastaFacturaProveedor)
+          .toList();
+      if (cancellable.isEmpty) return;
+      await Navigator.of(context).push<bool>(MaterialPageRoute(
+          builder: (_) => MobileCancelOrderScreen(
+                lines: cancellable,
+                cancelLine: (line, reason) =>
+                    SupabaseService.aliadoCancelaPedidoPendiente(
+                        transactionRequestId: line.id, motivo: reason),
+                loadLines:
+                    SupabaseService.fetchMyPedidosActivosYCerradosForAliado,
+                onRate: (ratingContext, cancelled, reason) =>
+                    _abrirValoracionTrasCancelacionAliado(
+                        ratingContext, cancelled,
+                        motivo: reason),
+                onExplore: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  MainShellTabController.navigateToAliadoCatalog();
+                },
+              )));
+      if (mounted) await _refreshExpandedCard();
+      return;
+    }
     final expandKey = checkoutGroupExpandKey(rows);
     final m = await showAliadoCancelarPedidoPendienteDialog(context);
     if (m == null) return;
@@ -510,9 +540,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   ) {
     return chunk
         .where(
-          (r) =>
-              r.status == TransactionRequestStatus.enTransito ||
-              r.status == TransactionRequestStatus.enviado,
+          (r) => r.puedeConfirmarRecepcionAliado,
         )
         .toList();
   }
@@ -544,8 +572,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         );
       } else {
         for (final r in chunk) {
-          if (r.status == TransactionRequestStatus.enTransito ||
-              r.status == TransactionRequestStatus.enviado) {
+          if (r.puedeConfirmarRecepcionAliado) {
             await SupabaseService.aliadoMarcarPedidoEntregado(r.id);
           }
         }
@@ -1078,6 +1105,31 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final hasAfterSales =
         delivered || chunk.any((l) => l.postventaDevolucionAt != null);
     return AliadoOrderDetailSections(
+      onOpenPayment: MediaQuery.sizeOf(context).width < 768
+          ? () async {
+              await Navigator.of(context).push<void>(MaterialPageRoute(
+                  builder: (paymentContext) => MobileSupplierPaymentScreen(
+                        lines: chunk,
+                        onChanged: _refreshExpandedCard,
+                        loadLines: () => SupabaseService
+                            .fetchCheckoutGroupLinesForTransactionRequest(r.id),
+                        onMessage: () => showOrderChatSheet(
+                          context: paymentContext,
+                          transactionRequestId: r.id,
+                          mergedThreadRequestIds: chunk.length > 1
+                              ? chunk.map((l) => l.id).toList()
+                              : null,
+                          orderLines: chunk,
+                          allowReplyAsAliado: orderLinesAllowChatReply(chunk),
+                          allowReplyAsAdmin: false,
+                          deliveryGrace: orderLinesChatDeliveryGrace(chunk),
+                          title: 'Chat · ${r.ownerBusinessName ?? 'Proveedor'}',
+                          onThreadChanged: _refreshExpandedCard,
+                        ),
+                      )));
+              if (mounted) _refreshExpandedCard();
+            }
+          : null,
       attention: chunk.any((l) => l.qtyAdjustmentPendienteAliado)
           ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               for (final line
@@ -1202,6 +1254,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       onCancelarSolicitudPendiente: _grupoPuedeCancelar(g)
           ? () => _cancelarGrupoPendiente(context, g)
           : null,
+      onCancelarProveedor: (chunk) => _cancelarGrupoPendiente(context, chunk),
       cancelarSolicitudPendienteBusy: _cancelarBusyId == expandKey,
       expandedFooter: isMulti ? null : _orderCardFooter(context, g),
       multiImporterPanelBuilder: isMulti

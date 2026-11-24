@@ -900,7 +900,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         actions: [
           if (_isEdit && !wide)
             IconButton(
-              tooltip: 'Descargar etiqueta QR de inventario',
+              tooltip: 'Imprimir etiqueta QR',
               onPressed: _saving || _exportingLabel ? null : _downloadQrLabel,
               icon: const Icon(Icons.qr_code_2),
             ),

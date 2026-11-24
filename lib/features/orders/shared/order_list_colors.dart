@@ -27,4 +27,33 @@ class OrderListColors {
       dark ? AppColors.warningAmberOnDark : AppColors.warningAmber;
   Color get pendingSurface =>
       Color.alphaBlend(pendingAccent.withOpacity(dark ? .10 : .045), surface);
+
+  Color statusForeground(Color preferred) {
+    // Compact badges use a 14% tint over both neutral and pending cards.
+    final backdrops = [
+      surface,
+      soft,
+      pendingSurface,
+      if (!dark) ...[const Color(0xFFF2F4F7), const Color(0xFFFFF5E3)],
+    ];
+    final target = dark ? Colors.white : Colors.black;
+    for (var step = 0; step <= 20; step++) {
+      final foreground = Color.lerp(preferred, target, step / 20)!;
+      final foregroundLuminance = foreground.computeLuminance();
+      final readable = backdrops.every((backdrop) {
+        final background =
+            Color.alphaBlend(foreground.withOpacity(.14), backdrop);
+        final backgroundLuminance = background.computeLuminance();
+        final lighter = foregroundLuminance > backgroundLuminance
+            ? foregroundLuminance
+            : backgroundLuminance;
+        final darker = foregroundLuminance < backgroundLuminance
+            ? foregroundLuminance
+            : backgroundLuminance;
+        return (lighter + .05) / (darker + .05) >= 4.5;
+      });
+      if (readable) return foreground;
+    }
+    return target;
+  }
 }

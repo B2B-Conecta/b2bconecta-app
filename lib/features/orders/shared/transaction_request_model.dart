@@ -12,12 +12,35 @@ import 'order_flow_copy/order_vocab.dart';
 import 'order_flow_copy/order_status_flow_copy.dart';
 import 'package:motolink_pro_app/core/utils/business_calendar.dart';
 import 'order_payment_pricing.dart';
+import '../../../core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/inventory/product_volume_tiers.dart';
 
+bool orderHasMixedCurrencies(Iterable<TransactionRequestModel> lines) =>
+    lines.map((line) => line.amountCurrencyLabel).toSet().length > 1;
+
 String orderAmountCurrency(Iterable<TransactionRequestModel> lines) =>
-    lines.isNotEmpty && lines.every((line) => line.amountCurrencyLabel == 'USD')
-        ? 'USD'
-        : 'REF';
+    orderHasMixedCurrencies(lines)
+        ? 'MIXTO'
+        : lines.isNotEmpty &&
+                lines.every((line) => line.amountCurrencyLabel == 'USD')
+            ? 'USD'
+            : 'REF';
+
+/// Never add REF and USD into a single currency label for a mixed checkout.
+String orderAmountSummary(Iterable<TransactionRequestModel> lines) {
+  if (!orderHasMixedCurrencies(lines)) {
+    return '${formatRefAmount(lines.fold<double>(0, (sum, line) => sum + line.precioTotal))} ${orderAmountCurrency(lines)}';
+  }
+  final dollars = lines.where((line) => line.amountCurrencyLabel == 'USD');
+  final reference = lines.where((line) => line.amountCurrencyLabel == 'REF');
+  final usd = formatRefAmount(
+      dollars.fold<double>(0, (sum, line) => sum + line.precioTotal));
+  final bs = reference.every((line) => line.precioTotalBsUi != null)
+      ? formatBsLabel(
+          reference.fold<double>(0, (sum, line) => sum + line.precioTotalBsUi!))
+      : '${formatRefAmount(reference.fold<double>(0, (sum, line) => sum + line.precioTotal))} REF';
+  return '$usd USD + $bs';
+}
 
 /// Fila de `transaction_requests` con joins opcionales (producto, aliado, importador).
 class TransactionRequestModel {
@@ -88,6 +111,7 @@ class TransactionRequestModel {
     this.transitEtaHours,
     this.transitEtaSetAt,
     this.pagoMetodo,
+    this.pagoDeclaracion = const {},
     this.comprobantePagoStoragePath,
     this.comprobantePagoFileName,
     this.comprobantePagoSubmittedAt,
@@ -98,6 +122,9 @@ class TransactionRequestModel {
     this.efectivoRespaldoFileName,
     this.efectivoRespaldoSubmittedAt,
     this.destinoEntregaUsaPerfil = true,
+    this.customerDeliveryMode = 'DELIVERY',
+    this.customerDeliverySnapshot = const {},
+    this.customerPickupLocationId,
     this.destinoEntregaTexto,
     this.destinoEntregaMapsUrl,
     this.adminRutaMapsUrl,
@@ -308,6 +335,15 @@ class TransactionRequestModel {
   final String? pickupMapsUrl;
   final String? pickupLocationId;
   final String? pickupCarrierId;
+  final String customerDeliveryMode;
+  final Map<String, dynamic> customerDeliverySnapshot;
+  final String? customerPickupLocationId;
+  bool get customerPickup => customerDeliveryMode == 'PICKUP';
+  String get checkoutDeliveryAddress => [
+        customerDeliverySnapshot['estado'],
+        customerDeliverySnapshot['ciudad'],
+        customerDeliverySnapshot['direccion']
+      ].whereType<String>().where((s) => s.trim().isNotEmpty).join('\n');
 
   /// Flete a criterio del proveedor (`null` = aún no definido en el pedido).
   final bool? shippingIncluded;
@@ -358,10 +394,12 @@ class TransactionRequestModel {
       CarrierDecision.isResolved(carrierDecision);
 
   bool get aliadoDebeDecidirTransportista =>
+      !customerPickup &&
       status == TransactionRequestStatus.pedidoListo &&
       carrierDecision == CarrierDecision.pending;
 
   bool get importadorPuedeConfirmarRecoleccion =>
+      !customerPickup &&
       status == TransactionRequestStatus.pedidoListo &&
       carrierDecision != CarrierDecision.pending &&
       importadorTransporteResueltoPorAliado &&
@@ -369,6 +407,7 @@ class TransactionRequestModel {
 
   /// Recolección visible solo tras decisión del aliado (elegir, omitir o sin catálogo).
   bool get importadorMuestraSeccionRecoleccion =>
+      !customerPickup &&
       status == TransactionRequestStatus.pedidoListo &&
       carrierDecision != CarrierDecision.pending &&
       importadorTransporteResueltoPorAliado;
@@ -422,6 +461,7 @@ class TransactionRequestModel {
 
   /// Moneda elegida en el carrito: `DIVISAS` o `BOLIVARES`.
   final String? metodoPagoMoneda;
+  final Map<String, dynamic> pagoDeclaracion;
 
   /// Tasa BCV congelada al confirmar (`transaction_requests.tasa_bcv_aplicada`).
   final double? tasaBcvAplicada;
@@ -550,6 +590,7 @@ class TransactionRequestModel {
 
   /// El aliado puede confirmar recepción cuando el pedido está en tránsito o enviado.
   bool get puedeConfirmarRecepcionAliado =>
+      (customerPickup && status == TransactionRequestStatus.pedidoListo) ||
       status == TransactionRequestStatus.enTransito ||
       status == TransactionRequestStatus.enviado;
 
@@ -982,6 +1023,9 @@ class TransactionRequestModel {
 
   /// Texto de destino de entrega (Bloque A2: fiscal o alternativo).
   String get destinoEntregaTextoParaMapa {
+    if (checkoutDeliveryAddress.isNotEmpty) {
+      return checkoutDeliveryAddress.replaceAll('\n', ', ');
+    }
     if (destinoEntregaUsaPerfil) {
       return aliadoDireccionFiscalMultilineaEs?.trim().isNotEmpty == true
           ? aliadoDireccionFiscalMultilineaEs!.replaceAll('\n', ', ')
@@ -994,6 +1038,12 @@ class TransactionRequestModel {
 
   /// Una línea para fichas compactas de pedido.
   String get destinoEntregaLineaCompactaEs {
+    if (customerPickup) {
+      return 'Retiro en tienda · ${customerDeliverySnapshot['label'] ?? 'Proveedor'}';
+    }
+    if (checkoutDeliveryAddress.isNotEmpty) {
+      return 'Entrega: ${checkoutDeliveryAddress.replaceAll('\n', ' · ')}';
+    }
     if (destinoEntregaUsaPerfil) {
       final e = aliadoEstado?.trim();
       final c = aliadoCiudad?.trim();
@@ -1089,7 +1139,9 @@ class TransactionRequestModel {
     Map<String, dynamic>? productMap;
     if (products is Map) {
       productMap = Map<String, dynamic>.from(products);
-    } else if (products is List && products.isNotEmpty && products.first is Map) {
+    } else if (products is List &&
+        products.isNotEmpty &&
+        products.first is Map) {
       productMap = Map<String, dynamic>.from(products.first as Map);
     }
     if (productMap != null) {
@@ -1273,6 +1325,12 @@ class TransactionRequestModel {
           json['carrier_decision']?.toString() ?? CarrierDecision.notApplicable,
       carrierDecisionAt: _parseDate(json['carrier_decision_at']),
       pickupLocationMode: _nullableText(json['pickup_location_mode']),
+      customerDeliveryMode:
+          json['customer_delivery_mode'] as String? ?? 'DELIVERY',
+      customerPickupLocationId: json['customer_pickup_location_id'] as String?,
+      customerDeliverySnapshot: json['customer_delivery_snapshot'] is Map
+          ? Map<String, dynamic>.from(json['customer_delivery_snapshot'] as Map)
+          : const {},
       pickupConfirmedAt: _parseDate(json['pickup_confirmed_at']),
       pickupLabel: _nullableText(json['pickup_label']),
       pickupEstado: _nullableText(json['pickup_estado']),
@@ -1325,6 +1383,9 @@ class TransactionRequestModel {
           _parseDate(json['aliado_experience_submitted_at']),
       tasaBcvSnapshot: _asNullableDouble(json['tasa_bcv_snapshot']),
       metodoPagoMoneda: _nullableText(json['metodo_pago_moneda']),
+      pagoDeclaracion: json['pago_declaracion'] is Map
+          ? Map<String, dynamic>.from(json['pago_declaracion'] as Map)
+          : const {},
       tasaBcvAplicada: _asNullableDouble(json['tasa_bcv_aplicada']),
       tasaBcvRecalcAt: _parseDate(json['tasa_bcv_recalc_at']),
       totalRef: _asNullableDouble(json['total_ref']),

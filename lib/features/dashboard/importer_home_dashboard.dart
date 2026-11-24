@@ -116,7 +116,7 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   label: 'Pedidos por confirmar',
                   value: _count(orders),
                   icon: Icons.inbox_outlined,
-                  glyph: LucideGlyph.shoppingCart,
+                  glyph: LucideGlyph.handbag,
                   cta: 'Gestionar pedidos →',
                   attention: pending != null && pending > 0,
                   onTap: () =>

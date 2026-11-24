@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -307,9 +308,7 @@ class _OwnerAccountDossierFormState extends State<OwnerAccountDossierForm> {
   void _snack(String text, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(text),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Colors.red.shade700 : null,
+        content: error ? AppNoticeMessage.error(text) : Text(text),
       ),
     );
   }

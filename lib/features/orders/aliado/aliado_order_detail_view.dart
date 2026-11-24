@@ -28,6 +28,7 @@ class AliadoOrderDetailSections {
     this.receipt,
     this.deliveryActions,
     this.afterSales,
+    this.onOpenPayment,
   });
   final Widget payment;
   final String paymentStatus;
@@ -36,6 +37,7 @@ class AliadoOrderDetailSections {
   final Widget? receipt;
   final Widget? deliveryActions;
   final Widget? afterSales;
+  final VoidCallback? onOpenPayment;
 }
 
 typedef AliadoDetailSectionsBuilder = AliadoOrderDetailSections Function(
@@ -54,9 +56,15 @@ class AliadoOrderDetailView extends StatefulWidget {
     this.compact = false,
     this.viewerProfile,
     this.onMessageProvider,
+    this.summaryBuilder,
   });
   final List<TransactionRequestModel> lines;
   final Widget summary;
+
+  /// Receives the selected supplier so its actions never target other suppliers.
+  final Widget Function(
+          BuildContext context, List<TransactionRequestModel> selected)?
+      summaryBuilder;
   final AliadoDetailSectionsBuilder sectionsBuilder;
   final bool compact;
   final ProfileModel? viewerProfile;
@@ -161,15 +169,19 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
         ],
       ),
     );
-    final deliveryLabel = request.destinoEntregaUsaPerfil
-        ? 'Dirección de tu tienda'
-        : 'Dirección alterna';
-    final deliveryAddress = request.destinoEntregaUsaPerfil
-        ? request.aliadoDireccionFiscalMultilineaEs ??
-            'Dirección de la tienda aún no disponible.'
-        : request.destinoEntregaTexto?.trim().isNotEmpty == true
-            ? request.destinoEntregaTexto!.trim()
-            : 'Otro destino (sin texto guardado)';
+    final deliveryLabel = request.customerPickup
+        ? 'Retiro en tienda · ${request.customerDeliverySnapshot['label'] ?? 'Proveedor'}'
+        : request.destinoEntregaUsaPerfil
+            ? 'Dirección de tu tienda'
+            : 'Dirección alterna';
+    final deliveryAddress = request.checkoutDeliveryAddress.isNotEmpty
+        ? request.checkoutDeliveryAddress
+        : request.destinoEntregaUsaPerfil
+            ? request.aliadoDireccionFiscalMultilineaEs ??
+                'Dirección de la tienda aún no disponible.'
+            : request.destinoEntregaTexto?.trim().isNotEmpty == true
+                ? request.destinoEntregaTexto!.trim()
+                : 'Otro destino (sin texto guardado)';
     final delivery = OrderDetailSection(
       title: 'Entrega',
       compact: compact,
@@ -213,7 +225,30 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
           Text(deliveryAddress,
               style: TextStyle(fontSize: 13, height: 1.5, color: colors.ink)),
         ],
-        if (sections.deliveryActions != null) ...[
+        if (request.customerPickup) ...[
+          const Text('Retiro sin costo',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          if ((request.customerDeliverySnapshot['instructions'] as String? ??
+                  '')
+              .isNotEmpty)
+            Text(request.customerDeliverySnapshot['instructions'] as String),
+        ],
+        if (request.customerDeliverySnapshot['maps_url'] case final String maps)
+          Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                  icon: const Icon(Icons.location_on_outlined, size: 18),
+                  label: const Text('Ver ubicación de entrega'),
+                  onPressed: () async {
+                    final uri = Uri.tryParse(maps);
+                    if (uri != null &&
+                        ['https', 'http'].contains(uri.scheme) &&
+                        uri.host.isNotEmpty) {
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  })),
+        if (sections.deliveryActions != null && !request.customerPickup) ...[
           const SizedBox(height: 12),
           sections.deliveryActions!,
         ],
@@ -221,21 +256,35 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
     );
     final payment = compact
         ? _DetailTile(
-            child: ExpansionTile(
-              key: PageStorageKey('payment-${request.id}'),
-              initiallyExpanded: sections.paymentOpen,
-              maintainState: true,
-              dense: true,
-              tilePadding: const EdgeInsets.symmetric(horizontal: 10),
-              childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              leading: const Icon(Icons.receipt_long_outlined, size: 19),
-              title: Text('Pago y factura',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800, color: colors.ink)),
-              subtitle: Text(sections.paymentStatus,
-                  style: TextStyle(fontSize: 12, color: colors.secondary)),
-              children: [sections.payment],
-            ),
+            child: sections.onOpenPayment != null
+                ? ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    leading: const Icon(Icons.receipt_long_outlined, size: 19),
+                    title: Text('Pago y factura',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, color: colors.ink)),
+                    subtitle: Text(sections.paymentStatus,
+                        style:
+                            TextStyle(fontSize: 12, color: colors.secondary)),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: sections.onOpenPayment,
+                  )
+                : ExpansionTile(
+                    key: PageStorageKey('payment-${request.id}'),
+                    initiallyExpanded: sections.paymentOpen,
+                    maintainState: true,
+                    dense: true,
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+                    childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                    leading: const Icon(Icons.receipt_long_outlined, size: 19),
+                    title: Text('Pago y factura',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, color: colors.ink)),
+                    subtitle: Text(sections.paymentStatus,
+                        style:
+                            TextStyle(fontSize: 12, color: colors.secondary)),
+                    children: [sections.payment],
+                  ),
           )
         : OrderDetailSection(
             title: 'Pago y factura',
@@ -279,7 +328,7 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
     final secondary = [delivery, supplier];
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      widget.summary,
+      widget.summaryBuilder?.call(context, chunk) ?? widget.summary,
       SizedBox(height: gap),
       if (providers.length > 1) ...[
         _ProviderSelector(

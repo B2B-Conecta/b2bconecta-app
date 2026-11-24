@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_layout.dart';
 import 'package:motolink_pro_app/features/catalog/aliado_catalog_quick_filters.dart';
@@ -6,6 +7,7 @@ import 'package:motolink_pro_app/features/catalog/aliado_product_card.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_filters.dart';
 import 'package:motolink_pro_app/features/catalog/catalog_product_price_display.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/product_detail_commerce.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -175,10 +177,94 @@ void main() {
                   bcvRate: 10,
                   catalogGrid: true))));
       await tester.pump();
-      expect(find.textContaining('52.00 USD'), findsOneWidget);
+      expect(find.textContaining('52.00 USD'), findsNothing);
       expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('Bs 520,00'), findsOneWidget);
       expect(find.text('Precio USD'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scenario in [
+    (sale: null, rules: <String, dynamic>{}, usd: null),
+    (sale: 52.0, rules: <String, dynamic>{}, usd: null),
+    (sale: 60.0, rules: <String, dynamic>{}, usd: null),
+    (
+      sale: null,
+      rules: <String, dynamic>{'usd_payment_discount_pct': 0},
+      usd: null
+    ),
+    (sale: 48.0, rules: <String, dynamic>{}, usd: '48.00 USD'),
+    (
+      sale: null,
+      rules: <String, dynamic>{'usd_payment_discount_pct': 10},
+      usd: '46.80 USD'
+    ),
+  ]) {
+    for (final surface in ['grid', 'list', 'detail']) {
+      testWidgets('USD needs a real benefit on $surface: $scenario',
+          (tester) async {
+        final part = PartModel(
+            id: 'price',
+            nombre: 'Repuesto',
+            precio: 52,
+            salePriceUsd: scenario.sale,
+            discountRules: scenario.rules,
+            stock: 10);
+        await tester.pumpWidget(MaterialApp(
+            home: Scaffold(
+                body: SizedBox(
+                    width: surface == 'grid' ? 168 : 360,
+                    child: surface == 'detail'
+                        ? ProductDetailPurchaseSummary(part: part, bcvRate: 10)
+                        : CatalogProductPriceDisplay(
+                            listPriceUsd: part.precio,
+                            salePriceUsd: part.salePriceUsd,
+                            discountRules: part.discountRules,
+                            catalogGrid: surface == 'grid',
+                            bcvRate: 10)))));
+        await tester.pump();
+        expect(find.text('52.00 REF'), findsOneWidget);
+        expect(find.text('52.00 USD'), findsNothing);
+        final usdAmounts = find.byWidgetPredicate((widget) =>
+            widget is Text && (widget.data?.endsWith(' USD') ?? false));
+        expect(
+            usdAmounts, scenario.usd == null ? findsNothing : findsOneWidget);
+          if (scenario.usd != null) {
+          expect(find.text(scenario.usd!), findsOneWidget);
+          }
+        expect(find.text('Bs 520,00'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final surface in ['grid', 'list', 'detail']) {
+    testWidgets(
+        'divisas-only supplier keeps USD without inventing REF on $surface',
+        (tester) async {
+      const part = PartModel(
+          id: 'usd-only',
+          nombre: 'Repuesto',
+          precio: 52,
+          ownerPagoSoloDivisas: true,
+          stock: 10);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: SizedBox(
+                  width: 360,
+                  child: surface == 'detail'
+                      ? const ProductDetailPurchaseSummary(
+                          part: part, bcvRate: 10)
+                      : CatalogProductPriceDisplay(
+                          listPriceUsd: part.precio,
+                          ownerPagoSoloDivisas: true,
+                          catalogGrid: surface == 'grid',
+                          bcvRate: 10)))));
+      await tester.pump();
+      expect(find.text('52.00 USD'), findsOneWidget);
+      expect(find.text('52.00 REF'), findsNothing);
+      expect(find.text('Bs 520,00'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -344,11 +430,11 @@ void main() {
       expect(buttons[0].bottom, closeTo(buttons[1].bottom, 24));
       final firstPrice = find.descendant(
           of: find.byKey(const ValueKey('natural-0')),
-          matching: find.textContaining('12.00 USD'));
+          matching: find.text('12.00 REF'));
       final secondPrice = find.descendant(
           of: find.byKey(const ValueKey('natural-1')),
-          matching: find.textContaining(
-              withPromotion ? '10.00 USD' : '12.00 USD'));
+          matching:
+              find.text(withPromotion ? '10.00 USD' : '12.00 REF'));
       expect(tester.getTopLeft(firstPrice).dy,
           closeTo(tester.getTopLeft(secondPrice).dy, 24));
       final minimum = tester.getRect(find.text('Mín. 5 uds').first);
@@ -382,7 +468,8 @@ void main() {
                         compact: true,
                         onTap: () => detailOpened = true))))));
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byWidgetPredicate((widget) =>
+        widget is LucideIcon && widget.glyph == LucideGlyph.handbag));
     await tester.pump();
     expect(detailOpened, isFalse);
     expect(cart.lines.single.quantity, 1);

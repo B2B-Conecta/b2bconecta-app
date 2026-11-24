@@ -6,6 +6,9 @@ import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
+import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 import 'order_rating_form.dart';
@@ -13,6 +16,8 @@ import 'rating_dimension_summary.dart';
 import 'rating_dimension_stat_model.dart';
 import 'rating_questionnaire_model.dart';
 import 'reputation_weekly_snapshot_model.dart';
+
+part 'reputation_mobile.dart';
 
 typedef _Review = ({
   String author,
@@ -37,12 +42,14 @@ class ReputationOverview extends StatefulWidget {
     required this.isImporter,
     required this.showHeading,
     required this.onProfileRefresh,
+    this.standaloneRetailer = false,
   });
 
   final ProfileModel profile;
   final bool isImporter;
   final bool showHeading;
   final Future<void> Function() onProfileRefresh;
+  final bool standaloneRetailer;
 
   @override
   State<ReputationOverview> createState() => _ReputationOverviewState();
@@ -150,8 +157,7 @@ class _ReputationOverviewState extends State<ReputationOverview> {
 
   void _showDetails(String title, Widget content) {
     final theme = B2BThemeExtension.of(context);
-    final wide =
-        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     Widget body(BuildContext ctx) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 8, 16),
@@ -224,7 +230,7 @@ class _ReputationOverviewState extends State<ReputationOverview> {
     );
   }
 
-  Widget _summary() {
+  ({double? average, int? count, String period}) get _summaryStats {
     final profile = widget.profile;
     final rolling = widget.isImporter
         ? profile.ratingAvgReceivedRolling100
@@ -242,6 +248,24 @@ class _ReputationOverviewState extends State<ReputationOverview> {
             : profile.ratingAsPayerCount);
     final period =
         rolling != null ? 'Últimas 100 valoraciones' : 'Historial acumulado';
+    return (average: average, count: count, period: period);
+  }
+
+  void _showCalculation() => _showDetails(
+        'Cómo se calcula',
+        Text(
+          'La nota general usa las valoraciones de 1 a 5. '
+          'Se muestran hasta las últimas 100. '
+          'Cada criterio y cada semana tienen su propio promedio.',
+          style: TextStyle(
+            color: B2BThemeExtension.of(context).textSecondary,
+            height: 1.4,
+          ),
+        ),
+      );
+
+  Widget _summary() {
+    final (:average, :count, :period) = _summaryStats;
     return _ReputationCard(
       child: Wrap(
         spacing: 22,
@@ -269,17 +293,7 @@ class _ReputationOverviewState extends State<ReputationOverview> {
               Text(period, style: TextStyle(color: AppColors.textSecondary)),
           ]),
           TextButton(
-            onPressed: () => _showDetails(
-                'Cómo se calcula',
-                Text(
-                  'La nota general usa las valoraciones de 1 a 5. '
-                  'Se muestran hasta las últimas 100. '
-                  'Cada criterio y cada semana tienen su propio promedio.',
-                  style: TextStyle(
-                    color: B2BThemeExtension.of(context).textSecondary,
-                    height: 1.4,
-                  ),
-                )),
+            onPressed: _showCalculation,
             child: const Text('Cómo se calcula'),
           ),
         ],
@@ -360,42 +374,38 @@ class _ReputationOverviewState extends State<ReputationOverview> {
                                 : '${latest.ratingCount} valoraciones'),
                             if (weeks.length > 1)
                               TextButton(
-                                  onPressed: () => _showDetails(
-                                        'Historial semanal',
-                                        Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              for (final week in weeks)
-                                                ListTile(
-                                                  contentPadding:
-                                                      EdgeInsets.zero,
-                                                  title: Text(formatEsWeekRange(
-                                                      week.weekStart)),
-                                                  subtitle: Text(week
-                                                              .ratingCount ==
-                                                          1
-                                                      ? '1 valoración'
-                                                      : '${week.ratingCount} valoraciones'),
-                                                  trailing: Text(week
-                                                              .avgOverall ==
-                                                          null
-                                                      ? '—'
-                                                      : '${_score(week.avgOverall!)} / 5'),
-                                                ),
-                                            ]),
-                                      ),
+                                  onPressed: () => _showWeeklyHistory(weeks),
                                   child: const Text('Ver historial')),
                           ]),
           );
         },
       );
 
+  void _showWeeklyHistory(List<ReputationWeeklySnapshotModel> weeks) =>
+      _showDetails(
+        'Historial semanal',
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final week in weeks)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(formatEsWeekRange(week.weekStart)),
+              subtitle: Text(_ratingCountLabel(week.ratingCount)),
+              trailing: Text(week.avgOverall == null
+                  ? '—'
+                  : '${_score(week.avgOverall!)} / 5'),
+            ),
+        ]),
+      );
+
+  List<_Review> _sortedReviews(_ReviewData? data) =>
+      [...?data?.reviews]..sort((a, b) {
+          if (a.date == null) return b.date == null ? 0 : 1;
+          return b.date == null ? -1 : b.date!.compareTo(a.date!);
+        });
+
   Widget _recent(AsyncSnapshot<_ReviewData> snapshot) {
     final data = snapshot.data;
-    final reviews = [...?data?.reviews]..sort((a, b) {
-        if (a.date == null) return b.date == null ? 0 : 1;
-        return b.date == null ? -1 : b.date!.compareTo(a.date!);
-      });
+    final reviews = _sortedReviews(data);
     return _ReputationCard(
       title: 'Valoraciones recientes',
       child: data == null
@@ -490,8 +500,18 @@ class _ReputationOverviewState extends State<ReputationOverview> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      LayoutBuilder(builder: (context, constraints) {
+  Widget build(BuildContext context) {
+    if (!widget.standaloneRetailer) return _legacyOverview();
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      return _mobileOverview();
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Mi reputación')),
+      body: _legacyOverview(),
+    );
+  }
+
+  Widget _legacyOverview() => LayoutBuilder(builder: (context, constraints) {
         final wide = constraints.maxWidth >= 760;
         return RefreshIndicator(
           onRefresh: _refresh,

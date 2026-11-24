@@ -1579,7 +1579,8 @@ class _ImporterInventoryDashboardState
             ),
             const PopupMenuDivider(),
             header('Varios'),
-            const PopupMenuItem(value: 'labels', child: Text('Etiquetas QR')),
+            const PopupMenuItem(
+                value: 'labels', child: Text('Imprimir etiquetas QR')),
             const PopupMenuItem(
               value: 'select',
               child: Text('Publicar o pausar varios'),

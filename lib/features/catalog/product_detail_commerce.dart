@@ -56,6 +56,9 @@ class _DualCurrencyPriceCard extends StatelessWidget {
     final discount = ProductCatalogPricing.directSaleDiscountChipEs(
         listPriceUsd: list, salePriceUsd: usd);
     final soloDivisas = part.ownerPagoSoloDivisas;
+    final showUsd = soloDivisas ||
+        ProductCatalogPricing.hasDirectSale(
+            listPriceUsd: list, salePriceUsd: usd);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -67,33 +70,37 @@ class _DualCurrencyPriceCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-                child: _PriceColumn(
-                  amount: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        '${usd.toStringAsFixed(2)} USD',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.successGreen,
-                          height: 1.15,
+            if (showUsd)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                  child: _PriceColumn(
+                    amount: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          '${usd.toStringAsFixed(2)} USD',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.successGreen,
+                            height: 1.15,
+                          ),
                         ),
-                      ),
-                      if (discount != null) _DetailDiscountChip(label: discount),
-                    ],
+                        if (discount != null)
+                          _DetailDiscountChip(label: discount),
+                      ],
+                    ),
+                    caption: 'Pago en divisas',
                   ),
-                  caption: 'Pago en divisas',
                 ),
               ),
-            ),
             if (!soloDivisas) ...[
-              VerticalDivider(width: 1, thickness: 1, color: AppColors.divider),
+              if (showUsd)
+                VerticalDivider(
+                    width: 1, thickness: 1, color: AppColors.divider),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 12, 14, 12),

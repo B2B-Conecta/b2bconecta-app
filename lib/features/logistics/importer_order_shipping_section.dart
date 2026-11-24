@@ -65,8 +65,7 @@ class _ImporterOrderShippingSectionState
   void _syncFromLines() {
     _included = _primary.shippingIncluded ?? true;
     final cost = _primary.shippingCostUsd;
-    _costCtrl.text =
-        (!_included && cost != null) ? formatRefAmount(cost) : '';
+    _costCtrl.text = (!_included && cost != null) ? formatRefAmount(cost) : '';
   }
 
   @override
@@ -110,10 +109,17 @@ class _ImporterOrderShippingSectionState
 
   @override
   Widget build(BuildContext context) {
+    if (_primary.customerPickup) {
+      return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+              'Retiro en tienda · Sin costo\n${_primary.checkoutDeliveryAddress}'));
+    }
     final rate = _primary.tasaBcvAplicada;
     final previewUsd = !_included ? parseVesOrEnDecimal(_costCtrl.text) : null;
-    final previewBs =
-        (previewUsd != null && rate != null && rate > 0) ? previewUsd * rate : null;
+    final previewBs = (previewUsd != null && rate != null && rate > 0)
+        ? previewUsd * rate
+        : null;
     if (MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu) {
       return _webBody(context, rate: rate, previewBs: previewBs);
     }
@@ -251,9 +257,8 @@ class _ImporterOrderShippingSectionState
         ? 'Pedido cerrado. El flete ya no se puede cambiar.'
         : 'Indica si el flete va incluido o el monto adicional. El equivalente en Bs usa la tasa del pedido.';
     final status = _included ? 'Envío incluido' : 'Flete adicional';
-    final detail = _included
-        ? 'No se suma al pedido.'
-        : 'Se cobra aparte del pedido.';
+    final detail =
+        _included ? 'No se suma al pedido.' : 'Se cobra aparte del pedido.';
     final column = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

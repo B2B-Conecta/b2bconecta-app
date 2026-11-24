@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -88,10 +89,9 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: AppNoticeMessage.error(
             e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
           ),
-          backgroundColor: Colors.red.shade800,
         ),
       );
     }
@@ -137,10 +137,9 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: AppNoticeMessage.error(
             e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
           ),
-          backgroundColor: Colors.red.shade800,
         ),
       );
     }
@@ -389,7 +388,7 @@ class _AdminReferralsPanelState extends State<AdminReferralsPanel> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: Colors.red.shade800),
+        SnackBar(content: AppNoticeMessage.error('$e')),
       );
     }
   }
@@ -633,10 +632,9 @@ class _ExternalReferrerFormSheetState extends State<_ExternalReferrerFormSheet> 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: AppNoticeMessage.error(
             e.toString().replaceFirst(RegExp(r'^Exception:\s*'), ''),
           ),
-          backgroundColor: Colors.red.shade800,
         ),
       );
     } finally {

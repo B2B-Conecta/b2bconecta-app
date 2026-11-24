@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Only product IDs, quantities and campaign IDs belong in the local draft.
+/// Product IDs, quantities, campaign IDs, supplier currencies and confirmation reference.
 /// Prices, permissions and stock are read again from the catalog on restore.
 abstract interface class CartDraftStorage {
   Future<String?> read(String key);

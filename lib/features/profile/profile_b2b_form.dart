@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -501,28 +502,23 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
     final rif = _rifController.text.trim();
     final cedula = _cedulaController.text.trim();
     final location = _fiscalAddressController.text.trim();
-    final theme = B2BThemeExtension.of(context);
 
     if (phone.isEmpty || rif.isEmpty || cedula.isEmpty || location.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+        const SnackBar(
+          content: AppNoticeMessage.error(
             'Completa teléfono, RIF, cédula y ubicación.',
-            style: TextStyle(color: theme.surfaceCard),
           ),
-          backgroundColor: theme.textPrimary,
         ),
       );
       return;
     }
     if (!_hasAcceptedTerms && !_termsPersisted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+        const SnackBar(
+          content: AppNoticeMessage.error(
             'Debes aceptar los términos y la política de privacidad.',
-            style: TextStyle(color: theme.surfaceCard),
           ),
-          backgroundColor: theme.textPrimary,
         ),
       );
       return;
@@ -547,12 +543,10 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       debugPrint('completeEntrepreneurRegistration error: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+        const SnackBar(
+          content: AppNoticeMessage.error(
             'No se pudo activar la cuenta emprendedor.',
-            style: TextStyle(color: theme.surfaceCard),
           ),
-          backgroundColor: theme.textPrimary,
         ),
       );
     } finally {
@@ -638,8 +632,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(SupabaseService.profileSaveErrorMessage(e)),
-          backgroundColor: Colors.red.shade800,
+          content: AppNoticeMessage.error(
+            SupabaseService.profileSaveErrorMessage(e),
+          ),
         ),
       );
     } finally {
@@ -687,8 +682,9 @@ class _ProfileB2BFormState extends State<ProfileB2BForm> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(SupabaseService.profileSaveErrorMessage(e)),
-          backgroundColor: Colors.red.shade800,
+          content: AppNoticeMessage.error(
+            SupabaseService.profileSaveErrorMessage(e),
+          ),
         ),
       );
     } finally {

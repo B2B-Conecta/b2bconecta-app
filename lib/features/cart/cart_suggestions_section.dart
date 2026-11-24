@@ -33,8 +33,7 @@ class CartSuggestionsSection extends StatelessWidget {
   static const cardHeight = 300.0;
 
   bool get _allSameSupplier =>
-      suggestions.isNotEmpty &&
-      suggestions.every((s) => !s.differentSupplier);
+      suggestions.isNotEmpty && suggestions.every((s) => !s.differentSupplier);
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +316,7 @@ class _AddButton extends StatelessWidget {
           ),
         ),
         icon: const LucideIcon(
-          LucideGlyph.shoppingCart,
+          LucideGlyph.handbag,
           size: 15,
           color: AppColors.white,
         ),

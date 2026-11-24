@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
@@ -107,15 +108,9 @@ class _EntrepreneurDocumentsSectionState
         fileName: picked.fileName,
       );
       if (!mounted) return;
-      final theme = B2BThemeExtension.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Documento subido.',
-            style: TextStyle(color: theme.surfaceCard),
-          ),
-          backgroundColor: theme.brand,
-          behavior: SnackBarBehavior.floating,
+        const SnackBar(
+          content: AppNoticeMessage.success('Documento subido.'),
         ),
       );
       await _load();

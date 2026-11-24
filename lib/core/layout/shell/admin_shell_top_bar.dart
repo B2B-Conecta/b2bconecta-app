@@ -6,6 +6,7 @@ import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/messages_icon_button.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'shell_destination.dart';
 import 'shell_user_menu.dart';
@@ -189,10 +190,20 @@ class _AdminShellTopBarState extends State<AdminShellTopBar> {
                           onPressed: widget.onMessagesTap!,
                           unreadCount: widget.unreadMessages,
                         ),
-                      _NotificationBell(
-                        unread: widget.unreadNotifications,
-                        onTap: widget.onNotificationTap,
-                      ),
+                      MediaQuery.sizeOf(context).width >=
+                              AppBreakpoints.mobileMenu
+                          ? ImporterTourAnchor(
+                              target: ImporterTourTarget.notifications,
+                              priority: 1,
+                              child: _NotificationBell(
+                                unread: widget.unreadNotifications,
+                                onTap: widget.onNotificationTap,
+                              ),
+                            )
+                          : _NotificationBell(
+                              unread: widget.unreadNotifications,
+                              onTap: widget.onNotificationTap,
+                            ),
                       if (widget.showThemeToggle) ...[
                         const SizedBox(width: 4),
                         const ThemeModeBubble(),

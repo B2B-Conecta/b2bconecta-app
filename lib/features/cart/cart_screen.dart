@@ -22,6 +22,7 @@ import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'cart_product_actions.dart';
@@ -309,12 +310,30 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
+  /// En escritorio, un proveedor bajo su monto mínimo en USD no puede enviarse.
+  bool get _desktopShortOnUsdMinimum {
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      return false;
+    }
+    return !_cart.supplierGroups.values.every(SupplierUsdMinOrder.meetsLines);
+  }
+
+  /// En escritorio, un proveedor bajo su mínimo de unidades no puede enviarse.
+  bool get _desktopShortOnUnits {
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      return false;
+    }
+    return !_cart.supplierGroups.values.every(SupplierOrderMinUnits.meets);
+  }
+
   Future<void> _checkout() async {
     if (!_cart.canEdit ||
         _cart.isEmpty ||
         _submitting ||
         _choosingDelivery ||
-        !_cart.meetsAllImporterMinOrders) {
+        !_cart.meetsAllImporterMinOrders ||
+        _desktopShortOnUsdMinimum ||
+        _desktopShortOnUnits) {
       return;
     }
 
@@ -336,7 +355,9 @@ class _CartScreenState extends State<CartScreen> {
         !_cart.canEdit ||
         _cart.isEmpty ||
         accountRevision != _cart.accountRevision ||
-        !_cart.meetsAllImporterMinOrders) return;
+        !_cart.meetsAllImporterMinOrders ||
+        _desktopShortOnUsdMinimum ||
+        _desktopShortOnUnits) return;
 
     setState(() => _submitting = true);
     if (!mounted) return;

@@ -328,7 +328,9 @@ class _HomeRecentSectionState extends State<_HomeRecentSection> {
 
   void _reload() {
     final next = _load();
-    setState(() => _items = next);
+    setState(() {
+      _items = next;
+    });
   }
 
   Future<List<PartModel>> _load() => CatalogService.fetchHomeProducts(

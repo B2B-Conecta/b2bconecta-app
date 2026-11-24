@@ -368,12 +368,14 @@ class AdminExpandableOrderCard extends StatelessWidget {
           actionsInHeader: true,
           onCancel: null,
           cancelBusy: false,
-          chatAction: _chatButton(
-            context,
-            lines: lines,
-            isCheckoutGroup: isCheckoutGroup,
-            showLabel: false,
-          ),
+          chatAction: desktop
+              ? null
+              : _chatButton(
+                  context,
+                  lines: lines,
+                  isCheckoutGroup: isCheckoutGroup,
+                  showLabel: false,
+                ),
         ),
         const SizedBox(height: 12),
         OrderDetailColumns(

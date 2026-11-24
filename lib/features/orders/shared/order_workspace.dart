@@ -191,6 +191,14 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                                     context)
                                                                 .scale(14) <
                                                             20;
+                                                final guideImporterRow =
+                                                    viewerRole ==
+                                                            AppHomeRole
+                                                                .importador &&
+                                                        constraints.maxWidth >=
+                                                            AppBreakpoints
+                                                                .mobileMenu;
+                                                var guidedPending = false;
                                                 return Column(
                                                     crossAxisAlignment:
                                                         CrossAxisAlignment
@@ -252,11 +260,23 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                                           8),
                                                                   onRefresh:
                                                                       onRefresh,
-                                                                  itemBuilder: (g) => OrderListRow(
-                                                                      entry: OrderListEntry(
-                                                                          g,
-                                                                          viewerRole:
-                                                                              viewerRole),
+                                                                  itemBuilder: (g) {
+                                                                    final entry =
+                                                                        OrderListEntry(
+                                                                            g,
+                                                                            viewerRole:
+                                                                                viewerRole);
+                                                                    final guide =
+                                                                        guideImporterRow &&
+                                                                            !guidedPending &&
+                                                                            entry.awaitingConfirmation;
+                                                                    if (guide) {
+                                                                      guidedPending =
+                                                                          true;
+                                                                    }
+                                                                    return OrderListRow(
+                                                                      entry:
+                                                                          entry,
                                                                       table:
                                                                           table,
                                                                       retailerCard: headerBuilder !=
@@ -264,12 +284,16 @@ class _OrderWorkspaceState extends State<OrderWorkspace> {
                                                                           viewerRole ==
                                                                               AppHomeRole
                                                                                   .aliado,
+                                                                      guidePending:
+                                                                          guide,
                                                                       selected:
                                                                           _keyOf(g) ==
                                                                               selectedKey,
                                                                       onOpen: () =>
                                                                           onSelect(
-                                                                              _keyOf(g))),
+                                                                              _keyOf(g)),
+                                                                    );
+                                                                  },
                                                                 )),
                                                     ]);
                                               }))))),

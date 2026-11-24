@@ -145,7 +145,7 @@ void main() {
               body: SingleChildScrollView(
                   child: ImporterCommercialSettings(profile: profile)))));
       await tester.pumpAndSettle();
-      expect(find.text('Transportistas'), findsOneWidget);
+      expect(find.text('Política de envío'), findsOneWidget);
       await tester.enterText(find.byType(TextFormField).first, '25,50');
       await tester.tap(find.text('Cancelar').first);
       await tester.pumpAndSettle();

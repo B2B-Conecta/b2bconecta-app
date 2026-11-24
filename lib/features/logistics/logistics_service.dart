@@ -567,6 +567,23 @@ class LogisticsService {
     );
   }
 
+  static Future<void> importadorSetEnvioPoliticaWeb({
+    required String tipo,
+    double? montoMinimo,
+    required bool gratisTodos,
+    required List<String> gratisEstados,
+  }) async {
+    await SupabaseAccess.client.rpc(
+      'importador_set_envio_politica_web',
+      params: <String, dynamic>{
+        'p_tipo': tipo,
+        'p_monto_minimo': montoMinimo,
+        'p_gratis_todos': gratisTodos,
+        'p_gratis_estados': gratisEstados,
+      },
+    );
+  }
+
   static Future<void> importadorSetEnvioPolitica({
     required String tipo,
     double? montoMinimo,

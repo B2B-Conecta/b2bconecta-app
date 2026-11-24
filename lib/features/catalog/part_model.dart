@@ -37,6 +37,7 @@ class PartModel {
     this.ownerCatalogPaidOrders30d,
     this.ownerMinOrderAmountRef = 0,
     this.ownerMinOrderCurrency = MinOrderCurrency.ref,
+    this.ownerMinOrderUnits,
     this.ownerCatalogFeaturedUntil,
     this.ownerCatalogVerifiedAt,
     this.priceBs,
@@ -47,6 +48,8 @@ class PartModel {
     this.ownerPagoSoloDivisas = false,
     this.ownerEnvioTipo = EnvioPolitica.noDefinido,
     this.ownerEnvioGratisMinimo,
+    this.ownerEnvioGratisTodos = false,
+    this.ownerEnvioGratisEstados = const [],
     this.ownerTransportistas = const [],
     this.hasWarranty = false,
     this.customFields = const {},
@@ -134,6 +137,10 @@ class PartModel {
   /// Presentación del piso (`profiles.min_order_currency`).
   final MinOrderCurrency ownerMinOrderCurrency;
 
+  /// Unidades mínimas por pedido del proveedor (`profiles.min_order_units`).
+  /// Null = todavía no lo configuró y aplica el defecto de 5.
+  final int? ownerMinOrderUnits;
+
   /// Destacado admin — dorado (`profiles.catalog_featured_until`).
   final DateTime? ownerCatalogFeaturedUntil;
 
@@ -172,6 +179,12 @@ class PartModel {
 
   /// Monto opcional de envío gratis (`profiles.monto_minimo_envio_gratis`).
   final double? ownerEnvioGratisMinimo;
+
+  /// Envío gratis en todos los estados solo si el proveedor lo marcó.
+  final bool ownerEnvioGratisTodos;
+
+  /// Estados donde aplica el envío gratis.
+  final List<String> ownerEnvioGratisEstados;
 
   /// Agencias que el proveedor ofrece.
   final List<String> ownerTransportistas;
@@ -292,6 +305,7 @@ class PartModel {
     final boost = _ownerCatalogBoostFromProfiles(json['profiles']);
     final minOrder = _ownerMinOrderAmountFromProfiles(json['profiles']);
     final minCurrency = _ownerMinOrderCurrencyFromProfiles(json['profiles']);
+    final minUnits = _ownerMinOrderUnitsFromProfiles(json['profiles']);
     final featuredUntil = _ownerFeaturedUntilFromProfiles(json['profiles']);
     final verifiedAt = _ownerVerifiedAtFromProfiles(json['profiles']);
     final soloDivisas = _ownerPagoSoloDivisasFromProfiles(json['profiles']);
@@ -321,12 +335,18 @@ class PartModel {
       ownerCatalogPaidOrders30d: boost,
       ownerMinOrderAmountRef: minOrder,
       ownerMinOrderCurrency: minCurrency,
+      ownerMinOrderUnits: minUnits,
       ownerCatalogFeaturedUntil: featuredUntil,
       ownerCatalogVerifiedAt: verifiedAt,
       ownerPagoSoloDivisas: soloDivisas,
       ownerEnvioTipo: EnvioPolitica.normalize(ownerProfile?['envio_tipo']),
       ownerEnvioGratisMinimo:
           _asNullableDouble(ownerProfile?['monto_minimo_envio_gratis']),
+      ownerEnvioGratisTodos: ownerProfile?['envio_gratis_todos'] == true ||
+          ownerProfile?['envio_gratis_todos']?.toString().toLowerCase() ==
+              'true',
+      ownerEnvioGratisEstados:
+          EnvioPolitica.parseNombres(ownerProfile?['envio_gratis_estados']),
       ownerTransportistas: EnvioPolitica.parseNombres(
           ownerProfile?['transportistas_habilitados']),
       nombre: nombreRaw?.toString() ?? '',
@@ -385,6 +405,7 @@ class PartModel {
     int? ownerCatalogPaidOrders30d,
     double? ownerMinOrderAmountRef,
     MinOrderCurrency? ownerMinOrderCurrency,
+    int? ownerMinOrderUnits,
     DateTime? ownerCatalogFeaturedUntil,
     DateTime? ownerCatalogVerifiedAt,
     double? salePriceUsd,
@@ -394,6 +415,8 @@ class PartModel {
     bool? ownerPagoSoloDivisas,
     String? ownerEnvioTipo,
     double? ownerEnvioGratisMinimo,
+    bool? ownerEnvioGratisTodos,
+    List<String>? ownerEnvioGratisEstados,
     List<String>? ownerTransportistas,
     bool? hasWarranty,
     Map<String, dynamic>? customFields,
@@ -435,6 +458,7 @@ class PartModel {
           ownerMinOrderAmountRef ?? this.ownerMinOrderAmountRef,
       ownerMinOrderCurrency:
           ownerMinOrderCurrency ?? this.ownerMinOrderCurrency,
+      ownerMinOrderUnits: ownerMinOrderUnits ?? this.ownerMinOrderUnits,
       ownerCatalogFeaturedUntil:
           ownerCatalogFeaturedUntil ?? this.ownerCatalogFeaturedUntil,
       ownerCatalogVerifiedAt:
@@ -449,6 +473,10 @@ class PartModel {
       ownerEnvioTipo: ownerEnvioTipo ?? this.ownerEnvioTipo,
       ownerEnvioGratisMinimo:
           ownerEnvioGratisMinimo ?? this.ownerEnvioGratisMinimo,
+      ownerEnvioGratisTodos:
+          ownerEnvioGratisTodos ?? this.ownerEnvioGratisTodos,
+      ownerEnvioGratisEstados:
+          ownerEnvioGratisEstados ?? this.ownerEnvioGratisEstados,
       ownerTransportistas: ownerTransportistas ?? this.ownerTransportistas,
       hasWarranty: hasWarranty ?? this.hasWarranty,
       customFields: customFields ?? this.customFields,
@@ -492,6 +520,16 @@ class PartModel {
     final v = m['min_order_amount_ref'];
     if (v is num) return v.toDouble();
     return double.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  static int? _ownerMinOrderUnitsFromProfiles(dynamic profiles) {
+    final m = _profilesMap(profiles);
+    if (m == null || !m.containsKey('min_order_units')) return null;
+    final v = m['min_order_units'];
+    if (v == null) return null;
+    final n = v is num ? v.toInt() : int.tryParse(v.toString());
+    if (n == null || n < 1) return null;
+    return n;
   }
 
   static MinOrderCurrency _ownerMinOrderCurrencyFromProfiles(dynamic profiles) {

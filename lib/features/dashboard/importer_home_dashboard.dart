@@ -10,9 +10,13 @@ import 'package:motolink_pro_app/features/catalog/importer_promo_widgets.dart';
 import 'package:motolink_pro_app/features/catalog/importer_store_count_card.dart';
 import 'package:motolink_pro_app/features/dashboard/importer_recent_orders_card.dart';
 import 'package:motolink_pro_app/features/inventory/importer_onboarding_checklist.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/inventory/importer_onboarding_checklist_card.dart';
 import 'package:motolink_pro_app/features/inventory/importer_priority_actions.dart';
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
+import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
+import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
+import 'package:motolink_pro_app/features/profile/importer_commercial_settings.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 /// Resumen del negocio. La edición de productos vive en Inventario.
@@ -24,6 +28,7 @@ class ImporterHomeDashboard extends StatefulWidget {
     this.mobileLayout = false,
     this.onSearch,
     this.onRefreshSummary,
+    this.onProfileRefresh,
   });
 
   final ProfileModel profile;
@@ -31,6 +36,7 @@ class ImporterHomeDashboard extends StatefulWidget {
   final bool mobileLayout;
   final VoidCallback? onSearch;
   final VoidCallback? onRefreshSummary;
+  final VoidCallback? onProfileRefresh;
 
   @override
   State<ImporterHomeDashboard> createState() => _ImporterHomeDashboardState();
@@ -174,7 +180,15 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   children: [
                     for (var i = 0; i < cards.length; i++) ...[
                       if (i > 0) const SizedBox(width: 12),
-                      Expanded(child: cards[i]),
+                      Expanded(
+                        child: row && i == 0
+                            ? ImporterTourAnchor(
+                                target: ImporterTourTarget.homePriorities,
+                                priority: 2,
+                                child: cards[i],
+                              )
+                            : cards[i],
+                      ),
                     ],
                   ],
                 );
@@ -320,6 +334,30 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   onPressed: onSearch,
                   icon: const Icon(Icons.search),
                 ),
+              if (wide && !widget.mobileLayout)
+                TextButton.icon(
+                  onPressed: () => ImporterWebInduction.show(
+                    context: context,
+                    profileId: widget.profile.id,
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.textSecondary,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
+                  icon: LucideIcon(
+                    LucideGlyph.sparkles,
+                    size: 16,
+                    color: theme.brand,
+                  ),
+                  label: const Text(
+                    'Ver inducción',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               IconButton(
                 tooltip: 'Actualizar resumen',
                 onPressed: widget.onRefreshSummary ?? _reload,
@@ -330,6 +368,28 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                 ),
               ),
             ]),
+            if (wide && !widget.mobileLayout) ...[
+              const SizedBox(height: 12),
+              _ImporterMinAmountNotice(
+                profile: widget.profile,
+                onDefine: () => ImporterCommercialSettings.openDesktop(
+                  context,
+                  profile: widget.profile,
+                  onChanged: widget.onProfileRefresh,
+                ),
+              ),
+              if (EnvioPolitica.normalize(widget.profile.envioTipo) ==
+                  EnvioPolitica.noDefinido) ...[
+                const SizedBox(height: 12),
+                _ImporterShippingNotice(
+                  onDefine: () => ImporterCommercialSettings.openDesktop(
+                    context,
+                    profile: widget.profile,
+                    onChanged: widget.onProfileRefresh,
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 12),
             FutureBuilder<InventoryMetrics>(
               future: _metrics,
@@ -427,5 +487,161 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
         ),
       );
     });
+  }
+}
+
+class _ImporterShippingNotice extends StatelessWidget {
+  const _ImporterShippingNotice({required this.onDefine});
+
+  final VoidCallback onDefine;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: LucideIcon(
+                LucideGlyph.truck,
+                size: 18,
+                color: theme.brand,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Política de envío',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Aún no definiste si el flete va incluido o es un cobro adicional.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onDefine,
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.brand,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                    ),
+                    child: const Text(
+                      'Configurar envío',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImporterMinAmountNotice extends StatelessWidget {
+  const _ImporterMinAmountNotice({
+    required this.profile,
+    required this.onDefine,
+  });
+
+  final ProfileModel profile;
+  final VoidCallback onDefine;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
+    final custom = profile.hasMinOrderAmount;
+    final currency = MinOrderCurrency.parse(profile.minOrderCurrency);
+    final units = profile.minOrderUnits;
+    final hasUnits = units != null && units >= 1;
+    final status = custom
+        ? 'Tu monto mínimo es ${formatMinOrderAmount(profile.minOrderAmountRef, currency)}. '
+            'Los pedidos por debajo de ese monto no se confirman.'
+        : hasUnits
+            ? 'No definiste un monto mínimo. Tus pedidos exigen $units unidades.'
+            : 'Aún no definiste monto ni unidades mínimas. Los pedidos se confirman sin ese piso.';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: LucideIcon(
+                LucideGlyph.badgeDollarSign,
+                size: 18,
+                color: theme.brand,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Monto mínimo por pedido',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onDefine,
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.brand,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                    ),
+                    child: Text(
+                      custom ? 'Ajustar monto mínimo' : 'Definir condiciones',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

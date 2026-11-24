@@ -54,6 +54,7 @@ import 'package:motolink_pro_app/features/dashboard/importer_command_palette.dar
 import 'package:motolink_pro_app/features/dashboard/importer_shell_badges.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_welcome_dialog.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
 import 'main_shell_tab.dart';
@@ -129,7 +130,9 @@ class _MainShellState extends State<MainShell> {
       }),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_maybeShowEntrepreneurWelcome());
+      if (!mounted) return;
+      unawaited(_maybeShowEntrepreneurWelcome());
+      unawaited(_maybeShowImporterWebInduction());
     });
     PushNotificationService.instance.registerTapHandler(_onPushNotificationTap);
     unawaited(PushNotificationService.instance.registerForCurrentUser());
@@ -299,6 +302,16 @@ class _MainShellState extends State<MainShell> {
     if (!mounted || p == null) return;
     setState(() => _profile = p);
     unawaited(_maybeShowEntrepreneurWelcome());
+  }
+
+  Future<void> _maybeShowImporterWebInduction() async {
+    if (widget.homeRole != AppHomeRole.importador) return;
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) return;
+    ImporterWebInduction.rememberProfile(_profile.id);
+    await ImporterWebInduction.showIfNeeded(
+      context: context,
+      profileId: _profile.id,
+    );
   }
 
   Future<void> _maybeShowEntrepreneurWelcome() async {
@@ -1103,6 +1116,11 @@ class _MainShellState extends State<MainShell> {
           mobileLayout: importerMobileLayout,
           onSearch: importerMobileLayout ? _openImporterCommandPalette : null,
           onRefreshSummary: importerMobileLayout ? _syncImporterView : null,
+          onProfileRefresh: importerMobileLayout
+              ? null
+              : () {
+                  _refreshProfile();
+                },
         ),
       ),
       if (_visitedImporterTabs.contains(ImporterShellTabs.inventario))
@@ -1757,12 +1775,12 @@ class _ProfileTabState extends State<_ProfileTab>
       );
     }
     if (_isAliado || widget.homeRole == AppHomeRole.importador) {
-      MainShellTabController.registerAliadoProfileSubTab((index) {
-        if (!mounted) return;
-        final i = index.clamp(0, _profileTabs.length - 1);
-        if (_profileTabs.index != i) {
-          _profileTabs.animateTo(i);
-        }
+      MainShellTabController.registerAliadoProfileSubTab(_applyProfileSubTab);
+    }
+    if (_tourOwnsProfileTabs) {
+      ImporterWebInduction.listenable.addListener(_syncImporterTourProfileTab);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncImporterTourProfileTab();
       });
     }
     if (_isAliado) {
@@ -1770,8 +1788,40 @@ class _ProfileTabState extends State<_ProfileTab>
     }
   }
 
+  bool get _tourOwnsProfileTabs =>
+      widget.embedInDesktopShell && widget.homeRole == AppHomeRole.importador;
+
+  void _applyProfileSubTab(int index) {
+    if (!mounted) return;
+    final i = index.clamp(0, _profileTabs.length - 1);
+    if (_profileTabs.index == i && !_profileTabs.indexIsChanging) return;
+    if (ImporterWebInduction.isActive) {
+      _profileTabs.animateTo(i, duration: Duration.zero);
+    } else {
+      _profileTabs.animateTo(i);
+    }
+  }
+
+  /// El recorrido ya está en Alertas, pero el [TabController] puede seguir
+  /// en Datos si el aviso llegó antes de que esta pestaña existiera.
+  void _syncImporterTourProfileTab() {
+    if (!mounted || !_tourOwnsProfileTabs) return;
+    final want = ImporterWebInduction.profileSubTab;
+    if (want == null) return;
+    _applyProfileSubTab(want);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final again = ImporterWebInduction.profileSubTab;
+      if (again == null) return;
+      _applyProfileSubTab(again);
+    });
+  }
+
   @override
   void dispose() {
+    if (_tourOwnsProfileTabs) {
+      ImporterWebInduction.listenable.removeListener(_syncImporterTourProfileTab);
+    }
     if (_isAliado || widget.homeRole == AppHomeRole.importador) {
       MainShellTabController.registerAliadoProfileSubTab(null);
     }
@@ -1912,6 +1962,12 @@ class _ProfileTabState extends State<_ProfileTab>
 
   @override
   Widget build(BuildContext context) {
+    final wantedTab = _tourOwnsProfileTabs ? ImporterWebInduction.profileSubTab : null;
+    if (wantedTab != null && _profileTabs.index != wantedTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncImporterTourProfileTab();
+      });
+    }
     final showSupportEntry = widget.homeRole == AppHomeRole.aliado ||
         widget.homeRole == AppHomeRole.importador;
 
@@ -1920,8 +1976,7 @@ class _ProfileTabState extends State<_ProfileTab>
     final theme = B2BThemeExtension.of(context);
     final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
 
-    final datosBody = _scrollPad(
-      child: ProfileB2BForm(
+    final profileForm = ProfileB2BForm(
         summaryFirst: true,
         accountActionsInShell: true,
         omitKycDocuments: _isAliado,
@@ -1940,7 +1995,17 @@ class _ProfileTabState extends State<_ProfileTab>
             ? _buildSupportEntryCard()
             : null,
         afterReputation: showSupportEntry ? _buildSupportEntryCard() : null,
-      ),
+    );
+
+    final datosBody = _scrollPad(
+      child: widget.embedInDesktopShell &&
+              widget.homeRole == AppHomeRole.importador
+          ? ImporterTourAnchor(
+              target: ImporterTourTarget.profileData,
+              priority: 2,
+              child: profileForm,
+            )
+          : profileForm,
     );
 
     final kycBody = _scrollPad(
@@ -2000,6 +2065,9 @@ class _ProfileTabState extends State<_ProfileTab>
           embedded: true,
           panel: panel,
           roleLabel: ProfileRoleLabels.labelEs(widget.profile.role),
+          guideAlerts: widget.embedInDesktopShell &&
+              widget.homeRole == AppHomeRole.importador &&
+              panel == AccountSettingsPanel.alerts,
         ),
       );
     }

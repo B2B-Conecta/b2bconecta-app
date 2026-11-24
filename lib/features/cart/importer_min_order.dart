@@ -1,3 +1,5 @@
+import 'package:motolink_pro_app/features/catalog/product_catalog_pricing.dart';
+
 import 'cart_service.dart';
 import 'min_order_currency.dart';
 
@@ -62,6 +64,108 @@ List<ImporterMinOrderProgress> importerMinOrderProgressFor(
           : lines.first.part.ownerMinOrderCurrency,
     );
   }).toList();
+}
+
+/// Monto mínimo de un proveedor en el carrito web.
+///
+/// Solo existe si el proveedor lo guardó. Sin monto propio no hay piso.
+class SupplierUsdMinOrder {
+  const SupplierUsdMinOrder({
+    required this.current,
+    required this.minimum,
+    required this.currency,
+    required this.hasMinimum,
+  });
+
+  final double current;
+  final double minimum;
+  final MinOrderCurrency currency;
+  final bool hasMinimum;
+
+  bool get meets => !hasMinimum || current + 1e-9 >= minimum;
+
+  double get remaining => meets ? 0 : minimum - current;
+
+  double get fraction {
+    if (!hasMinimum || minimum <= 0) return 1;
+    final value = current / minimum;
+    if (value.isNaN || value.isInfinite) return 0;
+    return value.clamp(0.0, 1.0);
+  }
+
+  static SupplierUsdMinOrder of(Iterable<CartLine> lines) {
+    final list = lines.toList();
+    if (list.isEmpty || list.first.part.ownerMinOrderAmountRef <= 0) {
+      return const SupplierUsdMinOrder(
+        current: 0,
+        minimum: 0,
+        currency: MinOrderCurrency.usd,
+        hasMinimum: false,
+      );
+    }
+    final part = list.first.part;
+    final configured = part.ownerMinOrderAmountRef;
+    if (part.ownerMinOrderCurrency != MinOrderCurrency.usd) {
+      return SupplierUsdMinOrder(
+        current: cartLinesSubtotalRef(list),
+        minimum: configured,
+        currency: part.ownerMinOrderCurrency,
+        hasMinimum: true,
+      );
+    }
+    return SupplierUsdMinOrder(
+      current: _usdSubtotal(list),
+      minimum: configured,
+      currency: MinOrderCurrency.usd,
+      hasMinimum: true,
+    );
+  }
+
+  static bool meetsLines(Iterable<CartLine> lines) => of(lines).meets;
+
+  static double _usdSubtotal(List<CartLine> lines) {
+    var total = 0.0;
+    for (final line in lines) {
+      total += ProductCatalogPricing.aliadoUnitUsdPaymentLine(
+            refUnitUsd: line.precioUnitarioAliadoRef,
+            salePriceUsd: line.part.salePriceUsd,
+            discountRules: line.part.discountRules,
+            ownerPagoSoloDivisas: line.part.ownerPagoSoloDivisas,
+          ) *
+          line.quantity;
+    }
+    return total;
+  }
+}
+
+/// Unidades mínimas de un pedido a un proveedor.
+///
+/// Sin un entero guardado por el proveedor no hay piso. Se suman todas las
+/// unidades de su catálogo.
+abstract final class SupplierOrderMinUnits {
+  static int? definedMinimum(Iterable<CartLine> lines) {
+    for (final line in lines) {
+      final configured = line.part.ownerMinOrderUnits;
+      if (configured != null && configured >= 1) return configured;
+    }
+    return null;
+  }
+
+  static int selected(Iterable<CartLine> lines) =>
+      lines.fold(0, (sum, line) => sum + line.quantity);
+
+  static bool meets(Iterable<CartLine> lines) {
+    final minimum = definedMinimum(lines);
+    if (minimum == null) return true;
+    return selected(lines) >= minimum;
+  }
+
+  static int missing(Iterable<CartLine> lines) {
+    final minimum = definedMinimum(lines);
+    if (minimum == null) return 0;
+    final gap = minimum - selected(lines);
+    return gap > 0 ? gap : 0;
+  }
 }
 
 /// Extrae el mensaje de `min_order_amount:owner:min:subtotal:name`.

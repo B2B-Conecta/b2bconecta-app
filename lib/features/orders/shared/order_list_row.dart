@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'order_list_colors.dart';
 import 'order_list_entry.dart';
 
@@ -75,12 +76,16 @@ class OrderListRow extends StatefulWidget {
       required this.table,
       required this.selected,
       required this.onOpen,
-      this.retailerCard = false});
+      this.retailerCard = false,
+      this.guidePending = false});
   final OrderListEntry entry;
   final bool table;
   final bool selected;
   final VoidCallback onOpen;
   final bool retailerCard;
+
+  /// Solo el recorrido de escritorio del mayorista. El resto de filas no lo usa.
+  final bool guidePending;
 
   @override
   State<OrderListRow> createState() => _OrderListRowState();
@@ -181,7 +186,7 @@ class _OrderListRowState extends State<OrderListRow> {
           borderRadius: BorderRadius.circular(10)),
       child: Icon(Icons.arrow_forward_rounded, size: 17, color: colors.accent),
     );
-    return Semantics(
+    final row = Semantics(
       button: true,
       selected: widget.selected,
       label: 'Abrir pedido ${entry.reference}',
@@ -306,6 +311,12 @@ class _OrderListRowState extends State<OrderListRow> {
                   ),
                 ))),
       ),
+    );
+    if (!widget.guidePending) return row;
+    return ImporterTourAnchor(
+      target: ImporterTourTarget.pendingOrder,
+      priority: 2,
+      child: row,
     );
   }
 }

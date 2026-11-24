@@ -10,7 +10,9 @@ import 'account_locked_screen.dart';
 import 'package:motolink_pro_app/core/data/jwt_clock_skew.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
+import 'package:motolink_pro_app/app/config/terms_config.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/features/onboarding/entrepreneur_signup_draft.dart';
 import 'package:motolink_pro_app/core/widgets/brand_loading_screen.dart';
 
 /// Tras login: carga `profiles` y muestra onboarding o [MainShell].
@@ -34,6 +36,18 @@ class _ProfileGateState extends State<ProfileGate> {
   }
 
   Future<ProfileModel?> _loadProfile() async {
+    try {
+      final draft = await EntrepreneurSignupDraft.consume();
+      if (draft != null) {
+        await SupabaseService.completeEntrepreneurRegistration(
+          phone: draft['phone']!,
+          rif: draft['rif']!,
+          cedula: draft['cedula']!,
+          direccion: draft['direccion']!,
+          termsVersion: TermsConfig.currentVersion,
+        );
+      }
+    } catch (_) {}
     try {
       await SupabaseService.syncMyEntrepreneurExpiry();
     } catch (_) {}

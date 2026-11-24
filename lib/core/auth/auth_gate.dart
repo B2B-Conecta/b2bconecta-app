@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/onboarding/public_legal_document_scree
 import 'recover_password_screen.dart';
 import 'auth_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
+import 'gmail_account.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/app/config/public_auth_route.dart';
 import 'package:motolink_pro_app/app/config/public_legal_route.dart';
@@ -477,6 +478,23 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _applyAuthState(data);
   }
 
+  Future<void> _finishGmailSignupGate(AuthState data) async {
+    final pending = await GmailSignupIntent.consume();
+    if (!mounted) return;
+    if (pending && !isGmailAddress(data.session?.user.email)) {
+      _initialLinkError =
+          'Esta cuenta no es de Gmail. El registro en escritorio solo acepta un correo @gmail.com.';
+      _offerResendSignup = false;
+      unawaited(_signOutAfterLinkError());
+      _applyAuthState(
+        const AuthState(AuthChangeEvent.signedOut, null),
+        skipGmailGate: true,
+      );
+      return;
+    }
+    _applyAuthState(data, skipGmailGate: true);
+  }
+
   Future<void> _applyAuthStateMaybeRecovery(AuthState data) async {
     if (!_awaitingPasswordRecovery &&
         await AuthRecoveryStorage.peekPendingPasswordRecovery()) {
@@ -485,7 +503,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _applyAuthState(data);
   }
 
-  void _applyAuthState(AuthState data) {
+  void _applyAuthState(AuthState data, {bool skipGmailGate = false}) {
+    final freshSession = data.session != null &&
+        (data.event == AuthChangeEvent.signedIn ||
+            data.event == AuthChangeEvent.initialSession);
+    if (!skipGmailGate && freshSession && !_awaitingPasswordRecovery) {
+      unawaited(_finishGmailSignupGate(data));
+      return;
+    }
+
     final shouldLogLogin = data.session != null &&
         !_awaitingPasswordRecovery &&
         (data.event == AuthChangeEvent.signedIn ||

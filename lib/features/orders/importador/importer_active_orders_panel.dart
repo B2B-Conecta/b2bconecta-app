@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/scroll_compact_layout.dart';
 import '../shared/order_priority_controls.dart';
@@ -31,6 +33,7 @@ import 'package:motolink_pro_app/features/orders/shared/order_signal_filters.dar
 import 'package:motolink_pro_app/features/orders/shared/order_workspace.dart';
 import 'package:motolink_pro_app/features/orders/shared/pedidos_scope_bar.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
@@ -60,11 +63,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
   DateTime? _dateFrom;
   DateTime? _dateTo;
   List<AliadoCreditBalance> _credits = const [];
+  bool _tourOpenedDetail = false;
 
   @override
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    ImporterWebInduction.listenable.addListener(_onImporterTour);
     MainShellTabController.registerImporterPedidosReload(() => _load());
     MainShellTabController.registerPedidosNotificationDeepLink(
       _onNotificationPedidosDeepLink,
@@ -75,8 +80,43 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     _load();
   }
 
+  void _onImporterTour() {
+    if (!mounted) return;
+    if (!ImporterWebInduction.isActive) _tourOpenedDetail = false;
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) return;
+    setState(() {
+      if (ImporterWebInduction.highlightsPendingRow) {
+        _tourOpenedDetail = false;
+        _expandedRequestId = null;
+      }
+    });
+  }
+
+  /// En escritorio, el recorrido abre la primera ficha para señalar sus botones.
+  void _maybeOpenTourDetail(
+    List<List<TransactionRequestModel>> groups,
+    bool desktop,
+  ) {
+    if (!desktop || _tourOpenedDetail || _expandedRequestId != null) return;
+    if (!ImporterWebInduction.wantsOrderDetail || groups.isEmpty) return;
+    _tourOpenedDetail = true;
+    List<TransactionRequestModel>? pending;
+    for (final group in groups) {
+      if (group.any((row) => row.status == TransactionRequestStatus.pendiente)) {
+        pending = group;
+        break;
+      }
+    }
+    final key = _displayGroupKey(pending ?? groups.first);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _expandedRequestId != null) return;
+      setState(() => _expandedRequestId = key);
+    });
+  }
+
   @override
   void dispose() {
+    ImporterWebInduction.listenable.removeListener(_onImporterTour);
     MainShellTabController.registerImporterPedidosReload(null);
     MainShellTabController.registerPedidosNotificationDeepLink(null);
     MainShellTabController.registerImportadorValidadosNotificationDeepLink(
@@ -255,6 +295,13 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
         _loading = false;
       });
       _tryExpandFromPendingNotification();
+      final hasPending = rows.any(
+        (row) => row.status == TransactionRequestStatus.pendiente,
+      );
+      if (hasPending &&
+          MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu) {
+        unawaited(ImporterWebInduction.showFirstOrderIfNeeded(context));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -791,6 +838,10 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
     final filterBadge = _currentFiltersDraft().activePanelFilterCount;
     final activeFilterChips = _buildActiveFilterChipsRow();
     final detailOpen = _expandedRequestId != null;
+    _maybeOpenTourDetail(
+      groups,
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu,
+    );
 
     return ScrollCompactLayout(
         resetKey: _expandedRequestId,
@@ -827,7 +878,22 @@ class _ImporterActiveOrdersPanelState extends State<ImporterActiveOrdersPanel> {
                     controls: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        OrdersListHeading(count: groups.length),
+                        if (MediaQuery.sizeOf(context).width >=
+                            AppBreakpoints.mobileMenu)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OrdersListHeading(count: groups.length),
+                              ),
+                              ImporterSectionInductionButton(
+                                label: 'Inducción de pedidos',
+                                onPressed: () =>
+                                    ImporterWebInduction.showOrders(context),
+                              ),
+                            ],
+                          )
+                        else
+                          OrdersListHeading(count: groups.length),
                         OrderListFilterBar(
                           softStyle: true,
                           searchController: _searchCtrl,

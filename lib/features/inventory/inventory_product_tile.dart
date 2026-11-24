@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 
 /// Las acciones secundarias no le quitan ancho al nombre en móvil.
 class InventoryProductTile extends StatelessWidget {
@@ -15,13 +16,17 @@ class InventoryProductTile extends StatelessWidget {
       this.soloDivisas = false,
       this.selecting = false,
       this.selected = false,
-      this.onSelect});
+      this.onSelect,
+      this.guideAvailability = false});
 
   final PartModel part;
   final VoidCallback onEdit, onShare, onDelete;
   final ValueChanged<bool>? onVisibilityChanged;
   final bool soloDivisas, selecting, selected;
   final VoidCallback? onSelect;
+
+  /// Solo el primer producto del inventario de escritorio señala el interruptor.
+  final bool guideAvailability;
 
   Widget _image() => ClipRRect(
       borderRadius: BorderRadius.circular(10),
@@ -90,6 +95,13 @@ class InventoryProductTile extends StatelessWidget {
               : 'Publicar ${part.nombre}',
           child: Switch(value: part.isActive, onChanged: onVisibilityChanged)),
     ]);
+    final visibilityControl = guideAvailability
+        ? ImporterTourAnchor(
+            target: ImporterTourTarget.inventoryAvailability,
+            priority: 2,
+            child: visibility,
+          )
+        : visibility;
     final menu = selecting
         ? const SizedBox.shrink()
         : PopupMenuButton<String>(
@@ -157,7 +169,7 @@ class InventoryProductTile extends StatelessWidget {
                             Expanded(flex: 2, child: price),
                             const SizedBox(width: 12),
                             Expanded(flex: 2, child: stock),
-                            if (!selecting) visibility,
+                            if (!selecting) visibilityControl,
                           ],
                           menu,
                         ]),
@@ -188,7 +200,7 @@ class InventoryProductTile extends StatelessWidget {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 4))))
                                 : const SizedBox.shrink()),
-                        if (!wide && !selecting) visibility,
+                        if (!wide && !selecting) visibilityControl,
                       ]),
                   ])));
     });

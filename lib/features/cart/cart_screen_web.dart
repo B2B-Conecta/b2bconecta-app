@@ -19,13 +19,18 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
   final pagaBolivares = pago != _PagoMoneda.usd;
   final currencyBlocked = pagaBolivares &&
       cart.lines.any((line) => line.part.ownerPagoSoloDivisas);
+  final groups = cart.supplierGroups.entries.toList();
+  final unitsReady =
+      groups.every((group) => SupplierOrderMinUnits.meets(group.value));
+  final usdReady =
+      groups.every((group) => SupplierUsdMinOrder.meetsLines(group.value));
   final canConfirm = cart.canEdit &&
       !state._submitting &&
       !state._choosingDelivery &&
       !currencyBlocked &&
-      cart.meetsAllImporterMinOrders &&
+      usdReady &&
+      unitsReady &&
       (!pagaBolivares || totalBs != null);
-  final groups = cart.supplierGroups.entries.toList();
   final net = displayNet < 0 ? 0.0 : displayNet;
   final listRefGross = cart.totalRef();
   final usdSavings = !pagaBolivares ? (listRefGross - displayGross) : 0.0;
@@ -65,6 +70,8 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
                   pagaBolivares: pagaBolivares,
                   canConfirm: canConfirm,
                   currencyBlocked: currencyBlocked,
+                  unitsReady: unitsReady,
+                  usdReady: usdReady,
                   displayGross: displayGross,
                   net: net,
                   totalBs: totalBs,
@@ -273,6 +280,115 @@ class _DesktopStep extends StatelessWidget {
   }
 }
 
+double _desktopGroupUsd(List<CartLine> lines) {
+  var sum = 0.0;
+  for (final line in lines) {
+    sum += ProductCatalogPricing.aliadoUnitUsdPaymentLine(
+          refUnitUsd: line.precioUnitarioAliadoRef,
+          salePriceUsd: line.part.salePriceUsd,
+          discountRules: line.part.discountRules,
+          ownerPagoSoloDivisas: line.part.ownerPagoSoloDivisas,
+        ) *
+        line.quantity;
+  }
+  return sum;
+}
+
+class _DesktopShippingCoverage extends StatelessWidget {
+  const _DesktopShippingCoverage({
+    required this.part,
+    required this.estado,
+    required this.subtotalUsd,
+  });
+
+  final PartModel part;
+  final String? estado;
+  final double subtotalUsd;
+
+  @override
+  Widget build(BuildContext context) {
+    final ficha = EnvioPolitica.evaluarCobertura(
+      tipo: part.ownerEnvioTipo,
+      minimoGratis: part.ownerEnvioGratisMinimo,
+      gratisTodos: part.ownerEnvioGratisTodos,
+      gratisEstados: part.ownerEnvioGratisEstados,
+      estadoComprador: estado,
+      subtotalUsd: subtotalUsd,
+    );
+    switch (ficha.vista) {
+      case EnvioCoberturaVista.gratisAqui:
+      case EnvioCoberturaVista.costoAdicional:
+      case EnvioCoberturaVista.sinUbicacion:
+        break;
+      case EnvioCoberturaVista.sinPolitica:
+      case EnvioCoberturaVista.politica:
+        return const SizedBox.shrink();
+    }
+    final theme = B2BThemeExtension.of(context);
+    final extra = ficha.vista == EnvioCoberturaVista.costoAdicional;
+    final ok = ficha.vista == EnvioCoberturaVista.gratisAqui;
+    final bg = extra
+        ? theme.warningBg
+        : ok
+            ? theme.successBg
+            : theme.surfaceSubtle;
+    final fg = extra
+        ? theme.warningFg
+        : ok
+            ? theme.successFg
+            : theme.textPrimary;
+    final border = extra || ok ? fg.withOpacity(0.35) : theme.borderSubtle;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.surfaceCard,
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: fg.withOpacity(0.4)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Text(
+                  ficha.etiqueta,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                ficha.texto,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DesktopSupplierGroup extends StatelessWidget {
   const _DesktopSupplierGroup({required this.state, required this.entry});
 
@@ -284,8 +400,11 @@ class _DesktopSupplierGroup extends StatelessWidget {
     final theme = B2BThemeExtension.of(context);
     final cart = state._cart;
     final lines = entry.value;
-    final units = lines.fold<int>(0, (sum, line) => sum + line.quantity);
-    final progress = state._progressFor(lines);
+    final units = SupplierOrderMinUnits.selected(lines);
+    final unitsMinimum = SupplierOrderMinUnits.definedMinimum(lines);
+    final unitsMet = unitsMinimum == null || units >= unitsMinimum;
+    final missing = SupplierOrderMinUnits.missing(lines);
+    final amount = SupplierUsdMinOrder.of(lines);
     final ownerId = lines.first.part.ownerId?.trim() ?? '';
     final tasa = state._tasa;
     return Material(
@@ -317,11 +436,19 @@ class _DesktopSupplierGroup extends StatelessWidget {
                         color: theme.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      units == 1 ? '1 unidad' : '$units unidades',
-                      style: TextStyle(fontSize: 12, color: theme.textSecondary),
-                    ),
+                    if (unitsMinimum != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        unitsMet
+                            ? '$units / $unitsMinimum unidades mínimas'
+                            : 'Faltan $missing · $units / $unitsMinimum unidades',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: unitsMet ? theme.successFg : theme.textPrimary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -346,35 +473,87 @@ class _DesktopSupplierGroup extends StatelessWidget {
             ]),
           ),
           Divider(height: 1, color: theme.borderSubtle),
-          if (progress != null && progress.hasMinimum)
+          if (unitsMinimum != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    progress.meets
-                        ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
-                        : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: unitsMet ? theme.successBg : theme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: unitsMet
+                        ? theme.successFg.withOpacity(0.35)
+                        : theme.borderSubtle,
+                  ),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(
+                    unitsMet
+                        ? 'Este proveedor ya cumple su mínimo de $unitsMinimum unidades.'
+                        : 'A este proveedor le faltan $missing unidades para llegar a $unitsMinimum.',
                     style: TextStyle(
                       fontSize: 12,
+                      height: 1.35,
                       fontWeight: FontWeight.w600,
-                      color: progress.meets ? theme.successFg : theme.textPrimary,
+                      color: unitsMet ? theme.successFg : theme.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress.fraction,
-                      minHeight: 4,
-                      backgroundColor: theme.borderSubtle,
-                      color: progress.meets ? theme.successFg : B2BBrandHero.start,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
+          if (amount.hasMinimum)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: amount.meets ? theme.successBg : theme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: amount.meets
+                        ? theme.successFg.withOpacity(0.35)
+                        : theme.borderSubtle,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        amount.meets
+                            ? 'Monto mínimo ${formatMinOrderAmount(amount.minimum, amount.currency)} cubierto'
+                            : 'Llevas ${formatMinOrderAmount(amount.current, amount.currency)} de ${formatMinOrderAmount(amount.minimum, amount.currency)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              amount.meets ? theme.successFg : theme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: amount.fraction,
+                          minHeight: 4,
+                          backgroundColor: theme.borderSubtle,
+                          color: amount.meets
+                              ? theme.successFg
+                              : B2BBrandHero.start,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          _DesktopShippingCoverage(
+            part: lines.first.part,
+            estado: state.widget.profile.estado,
+            subtotalUsd: _desktopGroupUsd(lines),
+          ),
           if ((state._credits[ownerId]?.remaining ?? 0) > 0)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
@@ -737,6 +916,8 @@ class _DesktopCartSummary extends StatelessWidget {
     required this.pagaBolivares,
     required this.canConfirm,
     required this.currencyBlocked,
+    required this.unitsReady,
+    required this.usdReady,
     required this.displayGross,
     required this.net,
     required this.totalBs,
@@ -749,6 +930,8 @@ class _DesktopCartSummary extends StatelessWidget {
   final bool pagaBolivares;
   final bool canConfirm;
   final bool currencyBlocked;
+  final bool unitsReady;
+  final bool usdReady;
   final double displayGross;
   final double net;
   final double? totalBs;
@@ -853,10 +1036,17 @@ class _DesktopCartSummary extends StatelessWidget {
                 style: TextStyle(fontSize: 12, height: 1.35, color: theme.textPrimary),
               ),
             ],
-            if (!cart.meetsAllImporterMinOrders) ...[
+            if (!usdReady) ...[
               const SizedBox(height: 12),
               Text(
-                'Completa el mínimo de cada proveedor para continuar.',
+                'Completa el monto mínimo que definió cada proveedor.',
+                style: TextStyle(fontSize: 12, height: 1.4, color: theme.textPrimary),
+              ),
+            ],
+            if (!unitsReady) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Completa las unidades mínimas que definió cada proveedor.',
                 style: TextStyle(fontSize: 12, height: 1.4, color: theme.textPrimary),
               ),
             ],

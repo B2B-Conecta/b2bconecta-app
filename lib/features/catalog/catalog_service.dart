@@ -247,11 +247,11 @@ class CatalogService {
 
   static String _catalogProfileSelect(CatalogFilters filters) {
     const rep =
-        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d, min_order_amount_ref, min_order_currency, catalog_featured_until, catalog_verified_at';
+        'rating_avg_received_rolling100, rating_count_received_rolling100, catalog_paid_orders_30d, min_order_amount_ref, min_order_currency, min_order_units, catalog_featured_until, catalog_verified_at';
     final embed = _catalogNeedsProfileInner(filters)
         ? '$_ownerProfileEmbed!inner'
         : _ownerProfileEmbed;
-    return '$embed(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, envio_tipo, monto_minimo_envio_gratis, transportistas_habilitados, $rep)';
+    return '$embed(business_name, logo_storage_path, estado, ciudad, latitude, longitude, pago_solo_divisas, envio_tipo, monto_minimo_envio_gratis, envio_gratis_todos, envio_gratis_estados, transportistas_habilitados, $rep)';
   }
 
   static Future<List<PromoCampaignModel>>

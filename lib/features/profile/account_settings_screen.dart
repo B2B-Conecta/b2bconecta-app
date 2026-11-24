@@ -12,6 +12,7 @@ import 'package:motolink_pro_app/core/notifications/web_push_status.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/theme_mode_bubble.dart';
+import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/profile/aliado_notification_prefs.dart';
 import 'package:motolink_pro_app/features/profile/profile_role_labels.dart';
 
@@ -36,6 +37,7 @@ class AccountSettingsScreen extends StatefulWidget {
     this.embedded = false,
     this.panel = AccountSettingsPanel.full,
     this.roleLabel,
+    this.guideAlerts = false,
   });
 
   /// Sin AppBar: se embebe como pestaña de Perfil.
@@ -46,6 +48,9 @@ class AccountSettingsScreen extends StatefulWidget {
 
   /// Rol visible en la tarjeta de sesión. Evita el texto de tienda minorista.
   final String? roleLabel;
+
+  /// El recorrido de escritorio del mayorista señala activar avisos.
+  final bool guideAlerts;
 
   @override
   State<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
@@ -491,7 +496,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Avisos mientras usas el panel.',
+              widget.guideAlerts
+                  ? 'Tres avisos dentro del panel. Cada uno se enciende o se apaga por separado.'
+                  : 'Avisos mientras usas el panel.',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.4,
@@ -515,8 +522,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               )
             else ...[
               _notifSwitch(
-                title: 'Pedidos aprobados',
-                subtitle: 'Cuando se aprueba un pedido.',
+                title: widget.guideAlerts
+                    ? 'Pedidos de tiendas'
+                    : 'Pedidos aprobados',
+                subtitle: widget.guideAlerts
+                    ? 'Cuando una tienda te hace un pedido.'
+                    : 'Cuando se aprueba un pedido.',
                 value: prefs.orderApproved,
                 onChanged: (v) {
                   setState(() => prefs.orderApproved = v);
@@ -525,8 +536,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ),
               Divider(height: 1, color: theme.borderSubtle),
               _notifSwitch(
-                title: 'Recordatorios KYC',
-                subtitle: 'Documentos y plazos pendientes.',
+                title: widget.guideAlerts
+                    ? 'Documentos del expediente'
+                    : 'Recordatorios KYC',
+                subtitle: widget.guideAlerts
+                    ? 'Si falta un documento o se acerca un plazo.'
+                    : 'Documentos y plazos pendientes.',
                 value: prefs.kycReminders,
                 onChanged: (v) {
                   setState(() => prefs.kycReminders = v);
@@ -535,8 +550,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ),
               Divider(height: 1, color: theme.borderSubtle),
               _notifSwitch(
-                title: 'Mensajes de mayoristas',
-                subtitle: 'Mensajes nuevos en pedidos.',
+                title: widget.guideAlerts
+                    ? 'Mensajes de tiendas'
+                    : 'Mensajes de mayoristas',
+                subtitle: widget.guideAlerts
+                    ? 'Cuando una tienda escribe en el chat de un pedido.'
+                    : 'Mensajes nuevos en pedidos.',
                 value: prefs.wholesaleMessages,
                 onChanged: (v) {
                   setState(() => prefs.wholesaleMessages = v);
@@ -597,7 +616,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Fuera de la página',
+                        widget.guideAlerts
+                            ? 'Avisos del navegador'
+                            : 'Fuera de la página',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -902,6 +923,16 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         widget.embedded || width >= AppBreakpoints.mobileMenu;
 
     if (widget.panel == AccountSettingsPanel.alerts) {
+      final optionCards = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _notificationsCard(),
+          if (kIsWeb) ...[
+            const SizedBox(height: 16),
+            _browserPushCard(),
+          ],
+        ],
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -912,16 +943,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _notificationsCard(),
-                if (kIsWeb) ...[
-                  const SizedBox(height: 16),
-                  _browserPushCard(),
-                ],
-              ],
-            ),
+            child: widget.guideAlerts
+                ? ImporterTourAnchor(
+                    target: ImporterTourTarget.profileAlerts,
+                    priority: 2,
+                    child: optionCards,
+                  )
+                : optionCards,
           ),
         ],
       );

@@ -171,7 +171,7 @@ class _ImporterStoreProfileScreenState
       category: values.length == 1 ? values.single : null,
     ).copyWith(
         categoryAnyOf: values.length > 1 ? values : const [],
-        searchQuery: _desktopStore ? null : _mobileSearch.text.trim());
+        searchQuery: _mobileSearch.text.trim());
   }
 
   @override
@@ -196,7 +196,6 @@ class _ImporterStoreProfileScreenState
 
   void _queueMobileSearch() {
     _searchDebounce?.cancel();
-    if (_desktopStore) return;
     _loadGen++;
     setState(() {
       _parts.clear();
@@ -568,7 +567,16 @@ class _ImporterStoreProfileScreenState
           padding: EdgeInsets.fromLTRB(
               hPad, desktop ? 22 : 12, hPad, desktop ? 16 : 8),
           sliver: SliverToBoxAdapter(
-            child: desktop ? _webCategoryChips() : _categoryChips(),
+            child: desktop
+                ? Column(children: [
+                    Center(
+                        child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 600),
+                            child: _storeSearchField())),
+                    const SizedBox(height: 12),
+                    _webCategoryChips(),
+                  ])
+                : _categoryChips(),
           ),
         ),
         if (_error != null && _parts.isEmpty)
@@ -597,7 +605,7 @@ class _ImporterStoreProfileScreenState
             child: Center(
               key: const Key('importer-store-empty'),
               child: Text(
-                !desktop && _mobileSearch.text.trim().isNotEmpty
+                _mobileSearch.text.trim().isNotEmpty
                     ? 'No hay productos que coincidan con tu búsqueda.'
                     : _selectedCategory == null
                         ? 'Este mayorista aún no tiene productos en vitrina.'
@@ -894,41 +902,41 @@ class _ImporterStoreProfileScreenState
     await launchUrl(uri);
   }
 
+  Widget _storeSearchField() => TextField(
+        key: const Key('store-product-search'),
+        controller: _mobileSearch,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) {
+          _searchDebounce?.cancel();
+          _loadMore(reset: true);
+        },
+        decoration: InputDecoration(
+            hintText: 'Buscar en esta tienda…',
+            hintStyle: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            isDense: true,
+            prefixIcon: const Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: LucideIcon(LucideGlyph.search, size: 19)),
+            suffixIcon: _mobileSearch.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Limpiar búsqueda',
+                    onPressed: _mobileSearch.clear,
+                    icon: const Icon(Icons.close)),
+            filled: true,
+            fillColor: AppColors.card,
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: supplierOutlineColor(context))),
+            border:
+                OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+      );
   Widget _categoryChips() {
-    Widget searchField() => TextField(
-          key: const Key('store-product-search'),
-          controller: _mobileSearch,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) {
-            _searchDebounce?.cancel();
-            _loadMore(reset: true);
-          },
-          decoration: InputDecoration(
-              hintText: 'Buscar en esta tienda…',
-              hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              isDense: true,
-              prefixIcon: const Center(
-                  widthFactor: 1,
-                  heightFactor: 1,
-                  child: LucideIcon(LucideGlyph.search, size: 19)),
-              suffixIcon: _mobileSearch.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Limpiar búsqueda',
-                      onPressed: _mobileSearch.clear,
-                      icon: const Icon(Icons.close)),
-              filled: true,
-              fillColor: AppColors.card,
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: supplierOutlineColor(context))),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-        );
     final families = catalogCategoryFamilies(_categories);
     final selected = canonicalCatalogCategory(_selectedCategory);
     final family = selected == null ? null : categoryFamily(selected);
@@ -944,7 +952,7 @@ class _ImporterStoreProfileScreenState
           ),
         ),
         const SizedBox(height: 8),
-        searchField(),
+        _storeSearchField(),
         const SizedBox(height: 10),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,

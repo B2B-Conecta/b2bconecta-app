@@ -36,10 +36,14 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   bool _loading = true;
   String? _error;
   SupportTicketFilter _mobileFilter = SupportTicketFilter.all;
+  SupportTicketModel? _selectedTicket;
   int _loadVersion = 0;
 
   void _setMobileFilter(SupportTicketFilter filter) {
-    setState(() => _mobileFilter = filter);
+    setState(() {
+      _mobileFilter = filter;
+      _selectedTicket = null;
+    });
   }
 
   @override
@@ -62,6 +66,9 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
       if (!mounted || version != _loadVersion) return;
       setState(() {
         _rows = results[0] as List<SupportTicketModel>;
+        for (final ticket in _rows) {
+          if (ticket.id == _selectedTicket?.id) _selectedTicket = ticket;
+        }
         _openCount = results[1] as int;
         _loading = false;
       });
@@ -79,7 +86,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
       await _openMobileCreate();
       return;
     }
-    final created = await showModalBottomSheet<bool>(
+    final created = await showModalBottomSheet<SupportTicketModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.card,
@@ -93,8 +100,18 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
       ),
     );
 
-    if (mounted && created == true) {
+    if (mounted && created != null) {
+      _setMobileFilter(SupportTicketFilter.open);
+      await _openDesktopTicket(created);
+    }
+  }
+
+  Future<void> _openDesktopTicket(SupportTicketModel ticket) async {
+    if (MediaQuery.sizeOf(context).width >= 1000) {
+      setState(() => _selectedTicket = ticket);
       await _load();
+    } else {
+      await _openMobileTicket(ticket);
     }
   }
 
@@ -103,8 +120,14 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
     if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
       return _buildMobile();
     }
-    final active = _rows.where((ticket) => !ticket.isClosed).toList();
-    final closed = _rows.where((ticket) => ticket.isClosed).toList();
+    final active = _mobileFilter == SupportTicketFilter.closed
+        ? <SupportTicketModel>[]
+        : _rows.where((ticket) => !ticket.isClosed).toList();
+    final closed = _mobileFilter == SupportTicketFilter.open
+        ? <SupportTicketModel>[]
+        : _rows.where((ticket) => ticket.isClosed).toList();
+    final selected = _selectedTicket;
+    final wide = MediaQuery.sizeOf(context).width >= 1000;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -127,50 +150,88 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
         top: false,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                children: [
-                  _supportSummary(),
-                  const SizedBox(height: 24),
-                  if (_loading)
-                    const LinearProgressIndicator(
-                      semanticsLabel: 'Cargando reclamos',
-                    )
-                  else if (_error != null)
-                    _messagePanel(
-                      icon: Icons.error_outline,
-                      title: 'No pudimos cargar tus reclamos',
-                      description:
-                          'Intenta actualizar para volver a consultarlos.',
-                      action: TextButton(
-                        onPressed: _load,
-                        child: const Text('Reintentar'),
-                      ),
-                    )
-                  else if (_rows.isEmpty)
-                    _messagePanel(
-                      title: 'Aún no tienes reclamos',
-                      description:
-                          'Cuando abras un reclamo, podrás seguirlo desde aquí.',
-                    )
-                  else ...[
-                    if (active.isNotEmpty) ...[
-                      _sectionHeading('Reclamos activos'),
-                      for (final ticket in active) _ticketRow(ticket),
-                    ],
-                    if (closed.isNotEmpty) ...[
-                      if (active.isNotEmpty) const SizedBox(height: 14),
-                      _sectionHeading('Historial de reclamos'),
-                      for (final ticket in closed) _ticketRow(ticket),
-                    ],
-                  ],
-                ],
-              ),
-            ),
+            constraints: BoxConstraints(maxWidth: wide ? 1280 : 1000),
+            child: Row(children: [
+              Expanded(
+                  flex: 4,
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                      children: [
+                        _supportSummary(),
+                        const SizedBox(height: 16),
+                        Wrap(spacing: 8, children: [
+                          for (final (filter, label) in const [
+                            (SupportTicketFilter.all, 'Todos'),
+                            (SupportTicketFilter.open, 'Abiertos'),
+                            (SupportTicketFilter.closed, 'Cerrados'),
+                          ])
+                            ChoiceChip(
+                              label: Text(label),
+                              selected: _mobileFilter == filter,
+                              onSelected: (_) => _setMobileFilter(filter),
+                            ),
+                        ]),
+                        const SizedBox(height: 12),
+                        if (_loading)
+                          const LinearProgressIndicator(
+                            semanticsLabel: 'Cargando reclamos',
+                          )
+                        else if (_error != null)
+                          _messagePanel(
+                            icon: Icons.error_outline,
+                            title: 'No pudimos cargar tus reclamos',
+                            description:
+                                'Intenta actualizar para volver a consultarlos.',
+                            action: TextButton(
+                              onPressed: _load,
+                              child: const Text('Reintentar'),
+                            ),
+                          )
+                        else if (_rows.isEmpty)
+                          _messagePanel(
+                            title: 'Aún no tienes reclamos',
+                            description:
+                                'Cuando abras un reclamo, podrás seguirlo desde aquí.',
+                          )
+                        else if (active.isEmpty && closed.isEmpty)
+                          _messagePanel(
+                            title: 'No hay reclamos en este filtro',
+                            description: 'Selecciona otro filtro para verlos.',
+                          )
+                        else ...[
+                          if (active.isNotEmpty) ...[
+                            _sectionHeading('Reclamos activos'),
+                            for (final ticket in active) _ticketRow(ticket),
+                          ],
+                          if (closed.isNotEmpty) ...[
+                            if (active.isNotEmpty) const SizedBox(height: 14),
+                            _sectionHeading('Historial de reclamos'),
+                            for (final ticket in closed) _ticketRow(ticket),
+                          ],
+                        ],
+                      ],
+                    ),
+                  )),
+              if (wide) ...[
+                const VerticalDivider(width: 1),
+                Expanded(
+                    flex: 5,
+                    child: selected == null
+                        ? const Center(
+                            child: Text(
+                                'Selecciona un reclamo para ver la conversación.'))
+                        : SupportTicketDetailScreen(
+                            key: ValueKey(selected.id),
+                            ticket: selected,
+                            isAdminView: false,
+                            embedded: true,
+                            onTicketChanged: _load,
+                          )),
+              ],
+            ]),
           ),
         ),
       ),
@@ -342,22 +403,16 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: AppColors.card,
+        color: _selectedTicket?.id == ticket.id
+            ? B2BThemeExtension.of(context).brand.withOpacity(0.08)
+            : AppColors.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: AppColors.borderSubtle),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () async {
-            await Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => SupportTicketDetailScreen(
-                    ticket: ticket, isAdminView: false),
-              ),
-            );
-            if (mounted) await _load();
-          },
+          onTap: () => _openDesktopTicket(ticket),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
@@ -420,6 +475,7 @@ class _CreateSupportTicketSheetState extends State<_CreateSupportTicketSheet> {
   final _bodyCtrl = TextEditingController();
   String _category = SupportTicketCategory.plataforma;
   bool _saving = false;
+  String? _createdId;
 
   @override
   void dispose() {
@@ -431,18 +487,25 @@ class _CreateSupportTicketSheetState extends State<_CreateSupportTicketSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await SupabaseService.createSupportTicket(
-        subject: _subjectCtrl.text,
-        category: _category,
-        body: _bodyCtrl.text,
-        relatedTransactionRequestId: widget.relatedTransactionRequestId,
-      );
+      final id = _createdId ??
+          await SupabaseService.createSupportTicket(
+            subject: _subjectCtrl.text,
+            category: _category,
+            body: _bodyCtrl.text,
+            relatedTransactionRequestId: widget.relatedTransactionRequestId,
+          );
+      _createdId = id;
+      final ticket = await SupabaseService.fetchSupportTicketById(id);
+      if (ticket == null) throw StateError('Reclamo no disponible');
       if (!mounted) return;
-      Navigator.pop(context, true);
+      Navigator.pop(context, ticket);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
+        SnackBar(
+            content: Text(_createdId != null
+                ? 'Tu reclamo se registró. Reintenta abrir la conversación.'
+                : supportFailureMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

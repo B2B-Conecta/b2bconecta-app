@@ -13,7 +13,6 @@ class CartSuggestionsSection extends StatelessWidget {
     super.key,
     required this.suggestions,
     required this.loading,
-    required this.confirmingIds,
     required this.onAdd,
     this.bcvRate,
     this.autoPlay = true,
@@ -21,7 +20,6 @@ class CartSuggestionsSection extends StatelessWidget {
 
   final List<CartSuggestion> suggestions;
   final bool loading;
-  final Set<String> confirmingIds;
   final ValueChanged<CartSuggestion>? onAdd;
   final double? bcvRate;
 
@@ -71,7 +69,6 @@ class CartSuggestionsSection extends StatelessWidget {
                     width: cardWidth,
                     child: _CompactSuggestionCard(
                       suggestion: suggestion,
-                      confirming: confirmingIds.contains(suggestion.part.id),
                       bcvRate: bcvRate,
                       onAdd: onAdd == null ? null : () => onAdd!(suggestion),
                     ),
@@ -121,13 +118,11 @@ class _SuggestionsSectionHeader extends StatelessWidget {
 class _CompactSuggestionCard extends StatelessWidget {
   const _CompactSuggestionCard({
     required this.suggestion,
-    required this.confirming,
     required this.bcvRate,
     required this.onAdd,
   });
 
   final CartSuggestion suggestion;
-  final bool confirming;
   final double? bcvRate;
   final VoidCallback? onAdd;
 
@@ -244,8 +239,7 @@ class _CompactSuggestionCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _AddButton(
-              confirming: confirming,
-              enabled: onAdd != null && !confirming,
+              enabled: onAdd != null,
               onPressed: onAdd,
               productName: part.nombre,
             ),
@@ -258,44 +252,17 @@ class _CompactSuggestionCard extends StatelessWidget {
 
 class _AddButton extends StatelessWidget {
   const _AddButton({
-    required this.confirming,
     required this.enabled,
     required this.onPressed,
     required this.productName,
   });
 
-  final bool confirming;
   final bool enabled;
   final VoidCallback? onPressed;
   final String productName;
 
   @override
   Widget build(BuildContext context) {
-    if (confirming) {
-      return Container(
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFFE5F6EA),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            LucideIcon(LucideGlyph.check, size: 15, color: Color(0xFF1B7F3A)),
-            SizedBox(width: 4),
-            Text(
-              'Añadido',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1B7F3A),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
     return Semantics(
       button: true,
       label: 'Añadir al pedido $productName',

@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 import 'package:flutter/services.dart';
 import 'package:file_saver/file_saver.dart';
@@ -25,7 +27,7 @@ typedef SupplierPaymentSubmit = Future<void> Function(
     SupplierPaymentDeclaration,
     PickedDocumentBytes?);
 
-/// Mobile-only guided payment. The supplied lines always belong to one supplier.
+/// Guided payment. The supplied lines always belong to one supplier.
 class MobileSupplierPaymentScreen extends StatefulWidget {
   const MobileSupplierPaymentScreen(
       {super.key,
@@ -1119,6 +1121,8 @@ class _MobileSupplierPaymentScreenState
 
   @override
   Widget build(BuildContext context) {
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     final title = [
       'Pago y factura',
       'Método de pago',
@@ -1131,6 +1135,22 @@ class _MobileSupplierPaymentScreenState
       2 => _receipt(),
       _ => _state()
     };
+    final busy = _sending || _refreshing || _picking || (_loadFailed && _step < 3);
+    final VoidCallback? primaryAction = busy
+        ? null
+        : switch (_step) {
+            0 when _canEdit && _quote.methods.isNotEmpty => () => _go(1),
+            0 when _hasSubmission => () => _go(3),
+            1 when _method != null && _quote.payable != null => () {
+                if (_amount.text.isEmpty) {
+                  _amount.text = _quote.payable!.toStringAsFixed(2);
+                }
+                _go(2);
+              },
+            2 => _send,
+            3 => () => Navigator.pop(context),
+            _ => null,
+          };
     return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -1138,65 +1158,65 @@ class _MobileSupplierPaymentScreenState
         },
         child: Scaffold(
           backgroundColor: _theme.background,
-          appBar: AppBar(
-              backgroundColor: _blue,
-              foregroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              toolbarHeight:
-                  MediaQuery.textScalerOf(context).scale(18) > 23 ? 96 : 72,
-              shape: const RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.vertical(bottom: Radius.circular(24))),
-              leading: BackButton(onPressed: _sending ? null : _back),
-              title: B2bHeaderTitle(
-                title: Text(title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700)),
-              )),
+          appBar: desktop
+              ? desktopWorkflowAppBar(context, title, onBack: _back)
+              : AppBar(
+                  backgroundColor: _blue,
+                  foregroundColor: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  toolbarHeight:
+                      MediaQuery.textScalerOf(context).scale(18) > 23 ? 96 : 72,
+                  shape: const RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.vertical(bottom: Radius.circular(24))),
+                  leading: BackButton(onPressed: _sending ? null : _back),
+                  title: B2bHeaderTitle(
+                    title: Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700)),
+                  )),
           body: SafeArea(
               top: false,
-              child: Column(children: [
-                Expanded(
-                    child: RefreshIndicator(
-                        onRefresh: _refresh,
-                        child: SingleChildScrollView(
-                            controller: _scroll,
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                            child: AbsorbPointer(
-                                absorbing: _sending || _refreshing,
-                                child: Form(
-                                    key: _form,
-                                    child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          if (_error != null)
-                                            _notice(_error!, warning: true),
-                                          if (_loadFailed)
-                                            TextButton.icon(
-                                                onPressed: _refreshing
-                                                    ? null
-                                                    : _refresh,
-                                                icon: const Icon(Icons.refresh),
-                                                label: const Text(
-                                                    'Reintentar actualización')),
-                                          _supplier(),
-                                          ...body,
-                                          if (widget.onMessage != null)
-                                            TextButton.icon(
-                                                onPressed: widget.onMessage,
-                                                icon: const Icon(
-                                                    Icons.chat_bubble_outline,
-                                                    size: 20),
-                                                label: const Text(
-                                                    'Consultar al proveedor')),
-                                        ])))))),
-                Padding(
+              child: DesktopWorkflow(
+                body: RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: SingleChildScrollView(
+                        controller: _scroll,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        child: AbsorbPointer(
+                            absorbing: _sending || _refreshing,
+                            child: Form(
+                                key: _form,
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (_error != null)
+                                        _notice(_error!, warning: true),
+                                      if (_loadFailed)
+                                        TextButton.icon(
+                                            onPressed:
+                                                _refreshing ? null : _refresh,
+                                            icon: const Icon(Icons.refresh),
+                                            label: const Text(
+                                                'Reintentar actualización')),
+                                      _supplier(),
+                                      ...body,
+                                      if (widget.onMessage != null)
+                                        TextButton.icon(
+                                            onPressed: widget.onMessage,
+                                            icon: const Icon(
+                                                Icons.chat_bubble_outline,
+                                                size: 20),
+                                            label: const Text(
+                                                'Consultar al proveedor')),
+                                    ]))))),
+                actions: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
                     child: SizedBox(
                         width: double.infinity,
@@ -1209,31 +1229,7 @@ class _MobileSupplierPaymentScreenState
                                   borderRadius: BorderRadius.circular(14)),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 13)),
-                          onPressed: _sending ||
-                                  _refreshing ||
-                                  _picking ||
-                                  (_loadFailed && _step < 3)
-                              ? null
-                              : _step == 0
-                                  ? (_canEdit && _quote.methods.isNotEmpty
-                                      ? () => _go(1)
-                                      : _hasSubmission
-                                          ? () => _go(3)
-                                          : null)
-                                  : _step == 1
-                                      ? (_method != null &&
-                                              _quote.payable != null
-                                          ? () {
-                                              if (_amount.text.isEmpty) {
-                                                _amount.text = _quote.payable!
-                                                    .toStringAsFixed(2);
-                                              }
-                                              _go(2);
-                                            }
-                                          : null)
-                                      : _step == 2
-                                          ? _send
-                                          : () => Navigator.pop(context),
+                          onPressed: primaryAction,
                           child: Text(
                               _sending
                                   ? 'Enviando…'
@@ -1250,10 +1246,13 @@ class _MobileSupplierPaymentScreenState
                                                       : 'Enviar comprobante')
                                               : 'Volver al pedido',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
+                                  color: primaryAction == null
+                                      ? _theme.textMuted
+                                      : Colors.white,
                                   fontWeight: FontWeight.w700, fontSize: 15)),
                         ))),
-              ])),
+              )),
         ));
   }
 }

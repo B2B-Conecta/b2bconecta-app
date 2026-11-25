@@ -148,6 +148,43 @@ void main() {
     expect(opened, 1);
     expect(find.text('Legacy payment form'), findsNothing);
   });
+
+  testWidgets('desktop order opens the guided payment for its supplier',
+      (tester) async {
+    final line = paymentFixture();
+    await paymentPump(
+      tester,
+      Scaffold(body: Builder(builder: (context) {
+        return SingleChildScrollView(
+          child: AliadoOrderDetailView(
+            lines: [line],
+            summary: const SizedBox.shrink(),
+            sectionsBuilder: (_, chunk, __, ___) => AliadoOrderDetailSections(
+              payment: const Text('Formulario anterior'),
+              paymentStatus: 'Pendiente de pago',
+              onOpenPayment: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(builder: (_) {
+                  return MobileSupplierPaymentScreen(
+                    lines: chunk,
+                    onChanged: () {},
+                    refreshInterval: null,
+                  );
+                }),
+              ),
+            ),
+          ),
+        );
+      })),
+      width: 1440,
+    );
+    final action = find.text('Ver factura y opciones');
+    await tester.ensureVisible(action);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileSupplierPaymentScreen), findsOneWidget);
+    expect(find.text('Formulario anterior'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   test(
       'parses precise amounts without losing a decimal comma or accepting ambiguity',
       () {
@@ -189,6 +226,7 @@ void main() {
   });
   for (final config in [
     (390.0, 1.0, Brightness.light),
+    (1440.0, 1.0, Brightness.light),
     (320.0, 1.6, Brightness.dark)
   ]) {
     testWidgets(

@@ -65,17 +65,15 @@ void main() {
       await tester.pumpAndSettle();
       final continueButton =
           find.widgetWithText(FilledButton, 'Continuar con la entrega →');
-      expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
-      expect(find.text('260.00 REF'), findsWidgets);
+      expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
+      await tester.tap(find.text('Bolívares'), warnIfMissed: false);
+      await tester.pumpAndSettle();
       if (!onlyDivisas) {
         expect(find.text('No hay tasa BCV vigente para cobrar en bolívares.'),
             findsWidgets);
         expect(find.text('Tasa BCV: 1 REF ='), findsNothing);
       }
-      await tester.ensureVisible(find.text('USD'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('USD'));
-      await tester.pumpAndSettle();
+      expect(cart.supplierCurrencyPreferences, isEmpty);
       expect(find.text('240.00 USD'), findsWidgets);
       expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
       expect(tester.takeException(), isNull);
@@ -132,9 +130,8 @@ void main() {
       expect(cart.totalRef(), 260);
       expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('260.00 REF'), findsWidgets);
-      expect(find.text('REF / Bs'), findsOneWidget);
+      expect(find.text('Bolívares'), findsOneWidget);
       expect(find.text('USD'), findsOneWidget);
-      expect(find.text('Bolívares'), findsNothing);
       expect(find.text('REF'), findsNothing);
       expect(find.text('Bs 2.600,00'), findsWidgets);
       await tester.ensureVisible(find.text('USD'));
@@ -147,7 +144,7 @@ void main() {
           findsWidgets);
       expect(find.text('Tasa BCV: 1 REF ='), findsNothing);
       expect(find.text('Bs 2.600,00'), findsNothing);
-      await tester.tap(find.text('REF / Bs'));
+      await tester.tap(find.text('Bolívares'));
       await tester.pumpAndSettle();
       expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('Bs 2.600,00'), findsWidgets);

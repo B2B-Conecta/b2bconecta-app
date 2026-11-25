@@ -550,6 +550,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 1.6]) {
+    testWidgets('desktop home aligns purchase buttons at text scale $scale',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const standard = PartModel(
+          id: 'plain-card',
+          ownerId: 'supplier',
+          nombre: 'Bujía',
+          precio: 12,
+          stock: 40);
+      const offer = PartModel(
+          id: 'offer-card',
+          ownerId: 'supplier',
+          ownerBusinessName: 'Distribuidora de repuestos',
+          nombre: 'Pastillas de freno delanteras para motocicletas',
+          parentSku: 'BRAKE',
+          precio: 12,
+          salePriceUsd: 9,
+          stock: 40);
+      await tester.pumpWidget(MaterialApp(
+          builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!),
+          home: AliadoHomeDashboard(
+              profile: profile,
+              embedInDesktopShell: true,
+              loader: () async =>
+                  const AliadoHomeData(newArrivals: [standard, offer]))));
+      await tester.pumpAndSettle();
+      final standardButton = tester.getRect(find.byTooltip('Agregar Bujía'));
+      final offerButton =
+          tester.getRect(find.byTooltip('Ver opciones ${offer.nombre}'));
+      expect(standardButton.top, closeTo(offerButton.top, 0.5));
+      expect(standardButton.height, closeTo(offerButton.height, 0.5));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final section in ['buyAgain', 'newArrivals', 'bestSellers']) {
     for (final size in [(320.0, 1.0), (390.0, 1.0), (320.0, 1.6)]) {
       testWidgets(

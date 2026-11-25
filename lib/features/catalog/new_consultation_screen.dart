@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import '../../app/theme/app_theme.dart';
 import '../../core/widgets/lucide_icon.dart';
 import '../orders/shared/order_message_pick.dart';
@@ -183,6 +185,7 @@ class _NewConsultationScreenState extends State<NewConsultationScreen> {
   @override
   Widget build(BuildContext context) {
     final query = _search.text.trim().toLowerCase();
+    final title = _choosing ? 'Elegir proveedor' : 'Nueva consulta';
     final suppliers = widget.suppliers
         .where((s) => '${s.businessName} ${s.ubicacionLine}'
             .toLowerCase()
@@ -195,9 +198,10 @@ class _NewConsultationScreenState extends State<NewConsultationScreen> {
         },
         child: Scaffold(
             backgroundColor: AppColors.background,
-            appBar: consultationAppBar(
-                title: _choosing ? 'Elegir proveedor' : 'Nueva consulta',
-                onBack: _back),
+            appBar:
+                MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu
+                    ? desktopWorkflowAppBar(context, title, onBack: _back)
+                    : consultationAppBar(title: title, onBack: _back),
             body: SafeArea(
                 top: false,
                 child: Center(

@@ -6,35 +6,15 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
   final theme = B2BThemeExtension.of(context);
   final cart = state._cart;
   final tasa = state._tasa;
-  final pago = state._pagoMoneda;
-  final grossRef = cart.totalRef();
-  final appliedCredit = state._appliedCredit;
-  final totalRef = grossRef - appliedCredit;
-  final totalBs = tasa != null && tasa > 0 ? totalRef * tasa : null;
-  final displayGross = cart.lines.fold<double>(
-    0,
-    (sum, line) => sum + _cartUnitDollars(line, pago) * line.quantity,
-  );
-  final displayNet = displayGross - appliedCredit;
-  final pagaBolivares = pago != _PagoMoneda.usd;
-  final currencyBlocked = pagaBolivares &&
-      cart.lines.any((line) => line.part.ownerPagoSoloDivisas);
+  final totals = state._mobileTotals;
   final groups = cart.supplierGroups.entries.toList();
-  final unitsReady =
-      groups.every((group) => SupplierOrderMinUnits.meets(group.value));
-  final usdReady =
-      groups.every((group) => SupplierUsdMinOrder.meetsLines(group.value));
+  final unitsReady = state._meetsSupplierMinimumUnits;
+  final amountReady = state._meetsSupplierMinimumAmounts;
   final canConfirm = cart.canEdit &&
       !state._submitting &&
       !state._choosingDelivery &&
-      !currencyBlocked &&
-      usdReady &&
       unitsReady &&
-      (!pagaBolivares || totalBs != null);
-  final net = displayNet < 0 ? 0.0 : displayNet;
-  final listRefGross = cart.totalRef();
-  final usdSavings = !pagaBolivares ? (listRefGross - displayGross) : 0.0;
-
+      amountReady;
   return Scaffold(
     backgroundColor: theme.background,
     body: cart.restoring || (cart.isEmpty && !cart.canEdit)
@@ -50,7 +30,9 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
         : cart.isEmpty
             ? const _DesktopCartEmpty()
             : LayoutBuilder(builder: (context, constraints) {
-                final sideBySide = constraints.maxWidth >= 980;
+                final sideBySide = constraints.maxWidth >= 980 &&
+                    constraints.maxHeight >= 520 &&
+                    MediaQuery.textScalerOf(context).scale(14) <= 21;
                 final warning = cart.restoreMessage ?? cart.storageMessage;
                 final products = <Widget>[
                   if (warning != null)
@@ -67,58 +49,64 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
                 ];
                 final summary = _DesktopCartSummary(
                   state: state,
-                  pagaBolivares: pagaBolivares,
+                  totals: totals,
                   canConfirm: canConfirm,
-                  currencyBlocked: currencyBlocked,
                   unitsReady: unitsReady,
-                  usdReady: usdReady,
-                  displayGross: displayGross,
-                  net: net,
-                  totalBs: totalBs,
-                  usdSavings: usdSavings,
-                  listRefGross: listRefGross,
-                  appliedCredit: appliedCredit,
+                  amountReady: amountReady,
                 );
-                final suggestions = !state._loadingSuggestions &&
-                        state._suggestions.isEmpty
-                    ? null
-                    : _DesktopCartSuggestions(
-                        suggestions: state._suggestions,
-                        loading: state._loadingSuggestions,
-                        confirmingIds: state._confirmingSuggestionIds,
-                        bcvRate: pagaBolivares ? tasa : null,
-                        autoPlay: state.widget.suggestionAutoPlay,
-                        onAdd: state._submitting || !cart.canEdit
-                            ? null
-                            : state._addSuggestion,
-                      );
-                return ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    sideBySide ? 28 : 20,
-                    20,
-                    sideBySide ? 28 : 20,
-                    36 + MediaQuery.paddingOf(context).bottom,
-                  ),
-                  children: [
-                    _DesktopCartHeader(state: state, groups: groups.length),
-                    const SizedBox(height: 18),
-                    if (sideBySide)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: Column(children: products)),
-                          const SizedBox(width: 24),
-                          SizedBox(width: 340, child: summary),
-                        ],
-                      )
-                    else ...[
-                      ...products,
-                      summary,
-                    ],
+                final suggestions =
+                    !state._loadingSuggestions && state._suggestions.isEmpty
+                        ? null
+                        : _DesktopCartSuggestions(
+                            suggestions: state._suggestions,
+                            loading: state._loadingSuggestions,
+                            bcvRate: tasa,
+                            autoPlay: state.widget.suggestionAutoPlay,
+                            onAdd: state._submitting || !cart.canEdit
+                                ? null
+                                : state._addSuggestion,
+                          );
+                final header = _DesktopCartHeader(
+                    state: state, groups: groups.length);
+                final bottom = 36 + MediaQuery.paddingOf(context).bottom;
+                final following = <Widget>[
                     if (suggestions != null) ...[
                       const SizedBox(height: 28),
                       suggestions,
                     ],
+                ];
+                if (sideBySide) {
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
+                    child: Column(children: [
+                      header,
+                      const SizedBox(height: 18),
+                      Expanded(child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: ListView(
+                            padding: EdgeInsets.only(bottom: bottom),
+                            children: [...products, ...following],
+                          )),
+                          const SizedBox(width: 24),
+                          SizedBox(width: 340, child: SingleChildScrollView(
+                            primary: false,
+                            padding: EdgeInsets.only(bottom: bottom),
+                            child: summary,
+                          )),
+                        ],
+                      )),
+                    ]),
+                  );
+                }
+                return ListView(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, bottom),
+                  children: [
+                    header,
+                    const SizedBox(height: 18),
+                    ...products,
+                    summary,
+                    ...following,
                   ],
                 );
               }),
@@ -407,6 +395,12 @@ class _DesktopSupplierGroup extends StatelessWidget {
     final amount = SupplierUsdMinOrder.of(lines);
     final ownerId = lines.first.part.ownerId?.trim() ?? '';
     final tasa = state._tasa;
+    final mode = state._modeFor(lines);
+    final quote = MobileSupplierTotals(
+      lines: lines,
+      payUsd: mode == _PagoMoneda.usd,
+      availableCredit: state._creditFor(lines),
+    );
     return Material(
       color: theme.surfaceCard,
       shape: RoundedRectangleBorder(
@@ -562,12 +556,12 @@ class _DesktopSupplierGroup extends StatelessWidget {
                 balance: state._credits[ownerId],
                 availableLabel: _cartMoney(
                   state._credits[ownerId]?.remaining ?? 0,
-                  state._pagoMoneda,
+                  mode,
                   tasa,
                 ),
                 appliedLabel: _cartMoney(
                   state._creditFor(lines),
-                  state._pagoMoneda,
+                  mode,
                   tasa,
                 ),
                 optedOut: state._creditOptOut.contains(ownerId),
@@ -575,6 +569,44 @@ class _DesktopSupplierGroup extends StatelessWidget {
                     state._setDesktopCredit(ownerId, useCredit),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            key: ValueKey('supplier-currency-$ownerId'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Moneda de pago',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                _CartCurrencySelector(
+                  labels: const ['Bolívares', 'USD'],
+                  selected: mode.index,
+                  canPayBolivares: (tasa ?? 0) > 0 &&
+                      !lines.any((line) => line.part.ownerPagoSoloDivisas),
+                  onSelected: state._submitting ||
+                          state._choosingDelivery ||
+                          !cart.canEdit
+                      ? null
+                      : (index) => cart.setSupplierCurrencies(
+                          {ownerId: index == _PagoMoneda.usd.index}),
+                ),
+                if ((tasa ?? 0) <= 0 &&
+                    !lines.any((line) => line.part.ownerPagoSoloDivisas))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text('No hay tasa BCV vigente para cobrar en bolívares.',
+                        style: TextStyle(color: theme.textSecondary)),
+                  ),
+                if (quote.usdSavings > 0.009)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(quote.payUsd
+                        ? 'Ahorro aplicado: ${formatRefAmount(quote.usdSavings)} USD'
+                        : 'Ahorra ${formatRefAmount(quote.usdSavings)} USD si pagas en divisas'),
+                  ),
+              ],
+            ),
+          ),
           for (var i = 0; i < lines.length; i++) ...[
             if (i > 0)
               Padding(
@@ -583,7 +615,7 @@ class _DesktopSupplierGroup extends StatelessWidget {
               ),
             _DesktopCartLine(
               line: lines[i],
-              modo: state._pagoMoneda,
+              modo: mode,
               tasa: tasa,
               onRemove: state._submitting || !cart.canEdit
                   ? null
@@ -911,40 +943,22 @@ class _DesktopRemoveButtonState extends State<_DesktopRemoveButton> {
 }
 
 class _DesktopCartSummary extends StatelessWidget {
-  const _DesktopCartSummary({
-    required this.state,
-    required this.pagaBolivares,
-    required this.canConfirm,
-    required this.currencyBlocked,
-    required this.unitsReady,
-    required this.usdReady,
-    required this.displayGross,
-    required this.net,
-    required this.totalBs,
-    required this.usdSavings,
-    required this.listRefGross,
-    required this.appliedCredit,
-  });
+  const _DesktopCartSummary(
+      {required this.state,
+      required this.totals,
+      required this.canConfirm,
+      required this.unitsReady,
+      required this.amountReady});
 
   final _CartScreenState state;
-  final bool pagaBolivares;
-  final bool canConfirm;
-  final bool currencyBlocked;
-  final bool unitsReady;
-  final bool usdReady;
-  final double displayGross;
-  final double net;
-  final double? totalBs;
-  final double usdSavings;
-  final double listRefGross;
-  final double appliedCredit;
-
+  final MobileCheckoutTotals totals;
+  final bool canConfirm, unitsReady, amountReady;
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
     final cart = state._cart;
     final tasa = state._tasa;
-    final currency = pagaBolivares ? 'REF' : 'USD';
+    final rate = tasa ?? 0;
     return Material(
       color: theme.surfaceCard,
       elevation: 0,
@@ -966,83 +980,31 @@ class _DesktopCartSummary extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            _DesktopCurrencyToggle(
-              selected: state._pagoMoneda.index,
-              onSelected: state._submitting ? null : state._selectDesktopCurrency,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              pagaBolivares ? 'Pago en Bs al BCV' : 'Pago directo en USD',
-              style: TextStyle(fontSize: 12, color: theme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            _summaryLine(
-              theme,
-              !pagaBolivares && usdSavings > 0.009
-                  ? 'Precio sin descuento'
-                  : 'Productos (${cart.itemCount} uds)',
-              !pagaBolivares && usdSavings > 0.009
-                  ? '${formatRefAmount(listRefGross)} USD'
-                  : '${formatRefAmount(displayGross)} $currency',
-            ),
-            if (appliedCredit > 0) ...[
+            for (final entry in totals.suppliers.entries) ...[
+              _summaryLine(theme, cart.importadorDisplayName(entry.key),
+                  '${formatRefAmount(entry.value.net)} ${entry.value.payUsd ? 'USD' : 'REF'}'),
               const SizedBox(height: 10),
-              _summaryLine(
-                theme,
-                'Saldo a favor',
-                '−${formatRefAmount(appliedCredit)} $currency',
-              ),
             ],
-            if (!pagaBolivares && usdSavings > 0.009) ...[
-              const SizedBox(height: 10),
-              _summaryLine(
-                theme,
-                'Ahorro en divisas',
-                '−${formatRefAmount(usdSavings)} USD',
-                valueColor: theme.successFg,
-              ),
+            Divider(color: theme.borderSubtle),
+            if (totals.suppliers.values.any((quote) => quote.payUsd))
+              _summaryLine(theme, 'Subtotal USD',
+                  '${formatRefAmount(totals.netUsd)} USD',
+                  prominent: true),
+            if (totals.suppliers.values.any((quote) => !quote.payUsd)) ...[
+              _summaryLine(theme, 'Subtotal REF',
+                  '${formatRefAmount(totals.netRef)} REF'),
+              if (rate > 0) ...[
+                _summaryLine(theme, 'Equivalente en Bs',
+                    formatBsLabel(totals.netRef * rate),
+                    prominent: true),
+                _CartBcvRate(
+                    tasa: rate, effectiveDate: state._tasaEffectiveDate),
+              ],
             ],
-            const SizedBox(height: 12),
-            Divider(height: 1, color: theme.borderSubtle),
-            const SizedBox(height: 12),
-            _summaryLine(
-              theme,
-              'Subtotal',
-              '${formatRefAmount(net)} $currency',
-              prominent: !pagaBolivares,
-            ),
-            if (pagaBolivares && totalBs != null) ...[
-              const SizedBox(height: 12),
-              _summaryLine(
-                theme,
-                'Equivalente en Bs',
-                formatBsLabel(totalBs!),
-                prominent: true,
-              ),
-              const SizedBox(height: 8),
-              _CartBcvRate(tasa: tasa!, effectiveDate: state._tasaEffectiveDate),
-            ],
-            if (pagaBolivares && totalBs == null) ...[
-              const SizedBox(height: 12),
-              Text(
-                'No hay tasa BCV vigente para cobrar en bolívares.',
-                style: TextStyle(fontSize: 12, color: B2BBrandHero.start),
-              ),
-            ],
-            if (currencyBlocked) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Un proveedor solo acepta divisas. Elige USD para continuar.',
-                style: TextStyle(fontSize: 12, height: 1.35, color: theme.textPrimary),
-              ),
-            ],
-            if (!usdReady) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Completa el monto mínimo que definió cada proveedor.',
-                style: TextStyle(fontSize: 12, height: 1.4, color: theme.textPrimary),
-              ),
-            ],
+            if (!amountReady)
+              const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text('Completa el monto mínimo de cada proveedor.')),
             if (!unitsReady) ...[
               const SizedBox(height: 12),
               Text(
@@ -1070,7 +1032,12 @@ class _DesktopCartSummary extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             FilledButton(
-              onPressed: canConfirm ? state._checkout : null,
+              onPressed: state._cart.pendingCheckoutAttempt != null &&
+                      !state._submitting
+                  ? state._recoverPendingCheckout
+                  : canConfirm
+                      ? state._checkout
+                      : null,
               style: FilledButton.styleFrom(
                 backgroundColor: B2BBrandHero.start,
                 foregroundColor: B2BBrandHero.foreground,
@@ -1091,7 +1058,9 @@ class _DesktopCartSummary extends StatelessWidget {
                         color: B2BBrandHero.foreground,
                       ),
                     )
-                  : const Text('Continuar con la entrega →'),
+                  : Text(state._cart.pendingCheckoutAttempt != null
+                      ? 'Recuperar pedido'
+                      : 'Continuar con la entrega →'),
             ),
           ],
         ),
@@ -1116,12 +1085,14 @@ class _DesktopCartSummary extends StatelessWidget {
     );
     return Row(
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: prominent ? 14 : 13,
-            fontWeight: prominent ? FontWeight.w600 : FontWeight.w500,
-            color: theme.textSecondary,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: prominent ? 14 : 13,
+              fontWeight: prominent ? FontWeight.w600 : FontWeight.w500,
+              color: theme.textSecondary,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -1131,67 +1102,10 @@ class _DesktopCartSummary extends StatelessWidget {
   }
 }
 
-class _DesktopCurrencyToggle extends StatelessWidget {
-  const _DesktopCurrencyToggle({required this.selected, required this.onSelected});
-
-  final int selected;
-  final ValueChanged<int>? onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = B2BThemeExtension.of(context);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.inputFill,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: theme.borderSubtle),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(3),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < 2; i++)
-                Semantics(
-                  selected: i == selected,
-                  button: true,
-                  child: Material(
-                    color: i == selected ? B2BBrandHero.start : Colors.transparent,
-                    borderRadius: BorderRadius.circular(999),
-                    child: InkWell(
-                      onTap: onSelected == null ? null : () => onSelected!(i),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                        child: Text(
-                          const ['REF / Bs', 'USD'][i],
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: i == selected
-                                ? B2BBrandHero.foreground
-                                : theme.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DesktopCartSuggestions extends StatefulWidget {
   const _DesktopCartSuggestions({
     required this.suggestions,
     required this.loading,
-    required this.confirmingIds,
     required this.onAdd,
     required this.autoPlay,
     this.bcvRate,
@@ -1199,7 +1113,6 @@ class _DesktopCartSuggestions extends StatefulWidget {
 
   final List<CartSuggestion> suggestions;
   final bool loading;
-  final Set<String> confirmingIds;
   final ValueChanged<CartSuggestion>? onAdd;
   final bool autoPlay;
   final double? bcvRate;
@@ -1389,8 +1302,6 @@ class _DesktopCartSuggestionsState extends State<_DesktopCartSuggestions> {
                           width: _cardWidth,
                           child: _DesktopSuggestionCard(
                             suggestion: suggestion,
-                            confirming:
-                                widget.confirmingIds.contains(suggestion.part.id),
                             bcvRate: widget.bcvRate,
                             onAdd: widget.onAdd == null
                                 ? null
@@ -1412,13 +1323,11 @@ class _DesktopCartSuggestionsState extends State<_DesktopCartSuggestions> {
 class _DesktopSuggestionCard extends StatelessWidget {
   const _DesktopSuggestionCard({
     required this.suggestion,
-    required this.confirming,
     required this.bcvRate,
     required this.onAdd,
   });
 
   final CartSuggestion suggestion;
-  final bool confirming;
   final double? bcvRate;
   final VoidCallback? onAdd;
 
@@ -1511,8 +1420,7 @@ class _DesktopSuggestionCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _DesktopSuggestButton(
-              confirming: confirming,
-              enabled: onAdd != null && !confirming,
+              enabled: onAdd != null,
               onPressed: onAdd,
               productName: part.nombre,
             ),
@@ -1525,45 +1433,17 @@ class _DesktopSuggestionCard extends StatelessWidget {
 
 class _DesktopSuggestButton extends StatelessWidget {
   const _DesktopSuggestButton({
-    required this.confirming,
     required this.enabled,
     required this.onPressed,
     required this.productName,
   });
 
-  final bool confirming;
   final bool enabled;
   final VoidCallback? onPressed;
   final String productName;
 
   @override
   Widget build(BuildContext context) {
-    final theme = B2BThemeExtension.of(context);
-    if (confirming) {
-      return Container(
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: theme.successBg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            LucideIcon(LucideGlyph.check, size: 15, color: theme.successFg),
-            const SizedBox(width: 4),
-            Text(
-              'Añadido',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: theme.successFg,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
     return Semantics(
       button: true,
       label: 'Añadir al pedido $productName',

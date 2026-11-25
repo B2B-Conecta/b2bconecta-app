@@ -145,7 +145,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           key: ValueKey(checkoutGroupExpandKey(lines)),
           lines: lines,
           summary: summary,
-          summaryBuilder: compactDetail && onCancelarProveedor != null
+          summaryBuilder: onCancelarProveedor != null
               ? (summaryContext, selected) => OrderSummaryHeader(
                     lines: lines,
                     viewerRole: AppHomeRole.aliado,
@@ -155,7 +155,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
                     showToggle: false,
                     detailSummary: true,
                     actionsInHeader: true,
-                    compactDetail: true,
+                    compactDetail: compactDetail,
                     onCancel: selected.isNotEmpty &&
                             selected.every((line) =>
                                 line.aliadoPuedeCancelarHastaFacturaProveedor)

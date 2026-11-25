@@ -295,20 +295,30 @@ class _AliadoOrderDetailViewState extends State<AliadoOrderDetailView> {
                   Text(sections.paymentStatus,
                       style: TextStyle(
                           fontSize: 13, height: 1.4, color: colors.secondary)),
-                  Theme(
-                    data: Theme.of(context)
-                        .copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      key: PageStorageKey('payment-${request.id}'),
-                      initiallyExpanded: sections.paymentOpen,
-                      maintainState: true,
-                      tilePadding: EdgeInsets.zero,
-                      childrenPadding: const EdgeInsets.only(top: 8),
-                      title: const Text('Ver factura y opciones',
-                          style: TextStyle(fontSize: 13)),
-                      children: [sections.payment],
+                  if (sections.onOpenPayment case final openPayment?)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: openPayment,
+                        icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                        label: const Text('Ver factura y opciones'),
+                      ),
+                    )
+                  else
+                    Theme(
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        key: PageStorageKey('payment-${request.id}'),
+                        initiallyExpanded: sections.paymentOpen,
+                        maintainState: true,
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: const EdgeInsets.only(top: 8),
+                        title: const Text('Ver factura y opciones',
+                            style: TextStyle(fontSize: 13)),
+                        children: [sections.payment],
+                      ),
                     ),
-                  ),
                 ]),
           );
     final supplier = OrderDetailSection(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme/b2b_theme_extension.dart';
+import '../../../core/widgets/desktop_workflow.dart';
 import '../shared/mobile_order_action_widgets.dart';
 import '../shared/transaction_request_model.dart';
 
@@ -151,9 +152,8 @@ class _MobileCancelOrderScreenState extends State<MobileCancelOrderScreen> {
             onBack: _saving ? () {} : _back),
         body: SafeArea(
             top: false,
-            child: Column(children: [
-              Expanded(
-                  child: ListView(
+            child: DesktopWorkflow(
+              body: ListView(
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
                       children: [
@@ -255,8 +255,8 @@ class _MobileCancelOrderScreenState extends State<MobileCancelOrderScreen> {
                                             (line) => line.ownerId == supplier)
                                         .toList(),
                                     _reason.text.trim()))),
-                  ])),
-              Padding(
+                  ]),
+              actions: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -303,7 +303,7 @@ class _MobileCancelOrderScreenState extends State<MobileCancelOrderScreen> {
                               },
                               child: const Text('Explorar catálogo')),
                       ])),
-            ])),
+            )),
       ),
     );
   }

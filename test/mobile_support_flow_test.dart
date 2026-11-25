@@ -433,14 +433,30 @@ void main() {
     expect(find.text('Abiertos: 2 de 3'), findsOneWidget);
   });
 
-  testWidgets('desktop keeps its original list and bottom-sheet creation',
+  testWidgets('desktop filters the list and opens created tickets beside it',
       (tester) async {
     await pumpSupport(tester, width: 1440);
     expect(find.text('Reclamos activos'), findsOneWidget);
-    expect(find.byType(ChoiceChip), findsNothing);
+    expect(find.byType(ChoiceChip), findsNWidgets(3));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Cerrados'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reclamos activos'), findsNothing);
+    expect(find.text('Actualizar teléfono'), findsOneWidget);
     await tester.tap(supportFilledButton('Abrir reclamo'));
     await tester.pumpAndSettle();
     expect(find.byType(MobileCreateSupportTicketScreen), findsNothing);
     expect(find.byType(BottomSheet), findsOneWidget);
+    final inputs = find.descendant(
+        of: find.byType(BottomSheet), matching: find.byType(TextField));
+    await tester.enterText(inputs.at(0), 'Nuevo caso de escritorio');
+    await tester.enterText(inputs.at(1), supportBody);
+    await tester.tap(find.widgetWithText(FilledButton, 'Enviar'));
+    await tester.pumpAndSettle();
+    final detail = tester.widget<SupportTicketDetailScreen>(
+        find.byType(SupportTicketDetailScreen));
+    expect(detail.embedded, isTrue);
+    expect(detail.ticket.id, createdSupportId);
+    expect(find.text('Reclamos activos'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

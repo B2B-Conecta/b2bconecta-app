@@ -500,7 +500,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('desktop store keeps its original navigation, cards and filters',
+  testWidgets('desktop store keeps its cards and gains catalog search',
       (tester) async {
     await pumpDirectory(tester, store: true, width: 1100);
     await tester.pumpAndSettle();
@@ -508,7 +508,7 @@ void main() {
     expect(find.byType(SupplierMobileNavigation), findsNothing);
     expect(find.byType(SupplierFilterChip), findsNothing);
     expect(find.byType(AliadoProductCard), findsNothing);
-    expect(find.byKey(const Key('store-product-search')), findsNothing);
+    expect(find.byKey(const Key('store-product-search')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -181,70 +181,72 @@ void main() {
     }
   }
 
-  testWidgets(
-      'confirming cancellation from a mixed checkout writes only the chosen supplier',
-      (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 1000);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final lines = [
-      supplierLine('paid-A', 'A', invoice: true, paid: true),
-      supplierLine('B-one', 'B'),
-      supplierLine('B-two', 'B')
-    ];
-    final cancelled = <String>[];
-    await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-            body: Builder(
-                builder: (context) => SingleChildScrollView(
-                      child: AliadoExpandableOrderCard(
-                        request: lines.first,
-                        checkoutGroupLines: lines,
-                        expanded: true,
-                        onToggle: () {},
-                        statusLabel: 'Varios estados',
-                        workspaceDetail: true,
-                        compactDetail: true,
-                        onCancelarProveedor: (selected) => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => MobileCancelOrderScreen(
-                                      lines: selected,
-                                      loadLines: () async => lines,
-                                      cancelLine: (line, reason) async {
-                                        cancelled.add(line.id);
-                                        expect(reason,
-                                            'Me equivoqué de proveedor.');
-                                      },
-                                    ))),
-                        detailSectionsBuilder: (_, __, ___, ____) =>
-                            const AliadoOrderDetailSections(
-                                payment: SizedBox.shrink(),
-                                paymentStatus: 'Estado del pago'),
-                      ),
-                    )))));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Proveedor B'));
-    await tester.tap(find.text('Proveedor B'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byTooltip('Más opciones del pedido'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Más opciones del pedido'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancelar a Proveedor B'));
-    await tester.pumpAndSettle();
-    expect(find.text('Proveedor A'), findsNothing);
-    expect(find.text('Repuesto paid-A'), findsNothing);
-    await tester.ensureVisible(find.byKey(const ValueKey('cancel-reason')));
-    await tester.enterText(find.byKey(const ValueKey('cancel-reason')),
-        'Me equivoqué de proveedor.');
-    await tester.tap(find.text('Confirmar cancelación'));
-    await tester.pumpAndSettle();
-    expect(cancelled, ['B-one', 'B-two']);
-    expect(find.text('Cancelación registrada'), findsOneWidget);
-    expect(lines.first.pagoEstadoRevisionEfectivo, 'aprobado');
-  });
+  for (final width in [390.0, 1440.0]) {
+    testWidgets(
+        'confirming cancellation from a mixed checkout writes only the chosen supplier at $width',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 1000);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final lines = [
+        supplierLine('paid-A', 'A', invoice: true, paid: true),
+        supplierLine('B-one', 'B'),
+        supplierLine('B-two', 'B')
+      ];
+      final cancelled = <String>[];
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: Builder(
+                  builder: (context) => SingleChildScrollView(
+                        child: AliadoExpandableOrderCard(
+                          request: lines.first,
+                          checkoutGroupLines: lines,
+                          expanded: true,
+                          onToggle: () {},
+                          statusLabel: 'Varios estados',
+                          workspaceDetail: true,
+                          compactDetail: width < 768,
+                          onCancelarProveedor: (selected) => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => MobileCancelOrderScreen(
+                                        lines: selected,
+                                        loadLines: () async => lines,
+                                        cancelLine: (line, reason) async {
+                                          cancelled.add(line.id);
+                                          expect(reason,
+                                              'Me equivoqué de proveedor.');
+                                        },
+                                      ))),
+                          detailSectionsBuilder: (_, __, ___, ____) =>
+                              const AliadoOrderDetailSections(
+                                  payment: SizedBox.shrink(),
+                                  paymentStatus: 'Estado del pago'),
+                        ),
+                      )))));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Proveedor B'));
+      await tester.tap(find.text('Proveedor B'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byTooltip('Más opciones del pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Más opciones del pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar a Proveedor B'));
+      await tester.pumpAndSettle();
+      expect(find.text('Proveedor A'), findsNothing);
+      expect(find.text('Repuesto paid-A'), findsNothing);
+      await tester.ensureVisible(find.byKey(const ValueKey('cancel-reason')));
+      await tester.enterText(find.byKey(const ValueKey('cancel-reason')),
+          'Me equivoqué de proveedor.');
+      await tester.tap(find.text('Confirmar cancelación'));
+      await tester.pumpAndSettle();
+      expect(cancelled, ['B-one', 'B-two']);
+      expect(find.text('Cancelación registrada'), findsOneWidget);
+      expect(lines.first.pagoEstadoRevisionEfectivo, 'aprobado');
+    });
+  }
 
   for (final width in [320.0, 390.0]) {
     testWidgets(

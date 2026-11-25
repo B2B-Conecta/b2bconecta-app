@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -27,6 +28,8 @@ import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'cart_product_actions.dart';
+import 'cart_combined_minimum.dart';
+import 'cart_combined_minimum_dialog.dart';
 import 'cart_suggestions.dart';
 import 'cart_suggestions_section.dart';
 import 'importer_min_order.dart';
@@ -316,8 +319,35 @@ class _CartScreenState extends State<CartScreen> {
   bool get _meetsSupplierMinimumUnits =>
       _cart.supplierGroups.values.every(SupplierOrderMinUnits.meets);
 
+  bool get _meetsCombinedMinimums =>
+      CartCombinedMinimum.meetsLines(_cart.lines);
+
   bool get _meetsSupplierMinimums =>
-      _meetsSupplierMinimumAmounts && _meetsSupplierMinimumUnits;
+      _meetsSupplierMinimumAmounts &&
+      _meetsSupplierMinimumUnits &&
+      _meetsCombinedMinimums;
+
+  Widget _combinedMinimumProgress(List<CartLine> lines) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final group in CartCombinedMinimum.forLines(lines))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: CartCombinedMinimumProgress(
+                group: group,
+                onBrowse: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => CartCombinedMinimumDialog(
+                    group: group,
+                    profile: widget.profile,
+                    cart: _cart,
+                    bcvRate: _tasa,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
 
   Future<void> _checkout() async {
     if (_cart.pendingCheckoutAttempt != null &&
@@ -490,6 +520,11 @@ class _CartScreenState extends State<CartScreen> {
                         if (error.toString().contains('PGRST202')) {
                           throw const MobileCheckoutException(
                               'Esta forma de confirmar aún no está disponible. No se creó el pedido y conservamos tu selección.');
+                        }
+                        if (error is PostgrestException &&
+                            error.code == '23514' &&
+                            error.message.startsWith('El mínimo combinado')) {
+                          throw MobileCheckoutException(error.message);
                         }
                         final minOrderError = cartMinOrderErrorMessage(error);
                         if (minOrderError != null) {
@@ -733,6 +768,7 @@ class _CartScreenState extends State<CartScreen> {
               ]),
             ),
             Divider(height: 1, color: AppColors.divider),
+            _combinedMinimumProgress(lines),
             if (minimumUnits != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1132,7 +1168,9 @@ class _CartScreenState extends State<CartScreen> {
                     if (!_meetsSupplierMinimums) ...[
                       const SizedBox(height: 12),
                       Text(
-                          'Completa el mínimo de cada proveedor para continuar.',
+                          !_meetsCombinedMinimums
+                              ? 'Completa los mínimos combinables para continuar.'
+                              : 'Completa el mínimo de cada proveedor para continuar.',
                           style: TextStyle(
                               fontSize: 12,
                               height: 1.4,
@@ -1415,7 +1453,7 @@ class _CartLineCard extends StatelessWidget {
         ? '${formatRefAmount(unit * line.quantity)} USD'
         : '${formatRefAmount(unit * line.quantity)} REF';
     final stockHint = part.hasSupplierMinOrderQty
-        ? 'Mín. ${part.minOrderQtyEffective} • Disp. ${part.stockForSale}'
+        ? '${part.minOrderQtyLabelEs} • Disp. ${part.stockForSale}'
         : 'Disp. ${part.stockForSale}';
     final thumbnail = ClipRRect(
         borderRadius: BorderRadius.circular(10),

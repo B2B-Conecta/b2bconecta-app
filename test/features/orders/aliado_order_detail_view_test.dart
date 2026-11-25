@@ -9,7 +9,17 @@ import 'package:motolink_pro_app/features/profile/app_home_role.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_detail_overview.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_delivery_stepper.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_chat_launch.dart';
+import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
 import 'order_workspace_test.dart' show fixture;
+
+class _ChatRouteObserver extends NavigatorObserver {
+  Route<dynamic>? lastPushed;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    lastPushed = route;
+  }
+}
 
 TransactionRequestModel supplierLine(String id, String supplier,
         {bool invoice = false, bool paid = false}) =>
@@ -346,6 +356,65 @@ void main() {
     expect(requested!.map((line) => line.id), ['A-one']);
     expect(globalCalls, 0);
   });
+
+  for (final width in [390.0, 1440.0]) {
+    testWidgets('order header chat follows the selected supplier at $width',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 1000);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final observer = _ChatRouteObserver();
+      final lines = [
+        supplierLine('A-one', 'A'),
+        supplierLine('B-one', 'B'),
+        supplierLine('B-two', 'B'),
+      ];
+      await tester.pumpWidget(MaterialApp(
+        navigatorObservers: [observer],
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: AliadoExpandableOrderCard(
+              request: lines.first,
+              checkoutGroupLines: lines,
+              expanded: true,
+              onToggle: () {},
+              statusLabel: 'Pendiente',
+              workspaceDetail: true,
+              compactDetail: width < 768,
+              detailSectionsBuilder: (_, __, ___, ____) =>
+                  const AliadoOrderDetailSections(
+                payment: SizedBox.shrink(),
+                paymentStatus: 'Esperando factura',
+              ),
+            ),
+          ),
+        ),
+      ));
+      final chat = find.byType(OrderChatIconButton);
+      expect(tester.widget<OrderChatIconButton>(chat).relatedOrderIds, ['A-one']);
+      await tester.tap(find.text('Proveedor B'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<OrderChatIconButton>(chat).relatedOrderIds,
+          ['B-one', 'B-two']);
+
+      if (width < 768) {
+        await tester.tap(find.byTooltip('Mensajes del pedido'));
+        final route = observer.lastPushed! as MaterialPageRoute<void>;
+        final thread = route.builder(tester.element(chat))
+            as OrderMotolinkThreadSection;
+        expect(thread.transactionRequestId, 'B-one');
+        expect(thread.mergedThreadRequestIds, ['B-one', 'B-two']);
+        expect(thread.orderLines.map((line) => line.ownerId), ['B', 'B']);
+        observer.navigator!.removeRoute(route);
+      }
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Proveedor A'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<OrderChatIconButton>(chat).relatedOrderIds, ['A-one']);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('retailer detail places the chat icon in the summary header',
       (tester) async {

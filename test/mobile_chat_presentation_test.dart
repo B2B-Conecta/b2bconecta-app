@@ -1,4 +1,9 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/gestures.dart'
+    show PointerDeviceKind, kSecondaryMouseButton;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
@@ -114,6 +119,91 @@ void main() {
       expect(background.color, mobile ? mobileChatBlue : isNot(mobileChatBlue));
     }
   });
+
+  testWidgets('selects message text for copying with platform controls',
+      (tester) async {
+    String? copied;
+    final channel =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    channel.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String;
+      }
+      return null;
+    });
+    addTearDown(
+        () => channel.setMockMethodCallHandler(SystemChannels.platform, null));
+    const body = 'Código ABC123 disponible';
+
+    final mobile = defaultTargetPlatform == TargetPlatform.android;
+    await pump(
+      tester,
+      ChatMessageBubble(
+        mine: mobile,
+        at: DateTime(2026, 11, 20, 10),
+        author: 'Repuestos Delta',
+        mobileStyle: mobile,
+        child: const Text(body),
+      ),
+      width: mobile ? 390 : 1280,
+    );
+    final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: find.text(body), matching: find.byType(RichText)));
+    final start = body.indexOf('ABC123');
+    final end = mobile ? start + 'ABC123'.length : body.length;
+    final selection = paragraph
+        .getBoxesForSelection(
+            TextSelection(baseOffset: start, extentOffset: end))
+        .single
+        .toRect();
+    Offset positionAt(int index) {
+      final caret =
+          paragraph.getOffsetForCaret(TextPosition(offset: index), Rect.zero);
+      return paragraph.localToGlobal(Offset(caret.dx, selection.center.dy));
+    }
+
+    if (mobile) {
+      await tester.longPressAt(paragraph.localToGlobal(selection.center));
+      await tester.pumpAndSettle();
+      expect(paragraph.selections,
+          [TextSelection(baseOffset: start, extentOffset: end)]);
+      if (!kIsWeb) await tester.tap(find.text('Copy'));
+    } else {
+      final gesture = await tester.startGesture(positionAt(start),
+          kind: PointerDeviceKind.mouse);
+      await tester.pump();
+      await gesture.moveTo(positionAt(end));
+      await gesture.up();
+      await tester.pump();
+      if (kIsWeb) {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      } else {
+        final contextClick = await tester.startGesture(
+          paragraph.localToGlobal(selection.center),
+          kind: PointerDeviceKind.mouse,
+          buttons: kSecondaryMouseButton,
+        );
+        await contextClick.up();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Copy'));
+      }
+    }
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+          of: find.byType(ChatMessageBubble),
+          matching: find.byType(TextButton)),
+      findsNothing,
+    );
+    if (!(mobile && kIsWeb)) expect(copied, body.substring(start, end));
+    expect(tester.takeException(), isNull);
+  },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.windows,
+      }));
 
   testWidgets(
       'order context keeps mixed status truth, real navigation and fits enlarged text',

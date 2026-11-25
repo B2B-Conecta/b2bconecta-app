@@ -13,8 +13,7 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
   final canConfirm = cart.canEdit &&
       !state._submitting &&
       !state._choosingDelivery &&
-      unitsReady &&
-      amountReady;
+      state._meetsSupplierMinimums;
   return Scaffold(
     backgroundColor: theme.background,
     body: cart.restoring || (cart.isEmpty && !cart.canEdit)
@@ -607,6 +606,7 @@ class _DesktopSupplierGroup extends StatelessWidget {
               ],
             ),
           ),
+          state._combinedMinimumProgress(lines),
           for (var i = 0; i < lines.length; i++) ...[
             if (i > 0)
               Padding(
@@ -673,9 +673,10 @@ class _DesktopCartLine extends StatelessWidget {
       quantity: line.quantity,
     );
     final stockHint = part.hasSupplierMinOrderQty
-        ? 'Mín. ${part.minOrderQtyEffective} • Disp. ${part.stockForSale}'
+        ? '${part.minOrderQtyLabelEs} • Disp. ${part.stockForSale}'
         : 'Disp. ${part.stockForSale}';
-    final priceColor = usdDiscount != null ? theme.successFg : theme.textPrimary;
+    final priceColor =
+        usdDiscount != null ? theme.successFg : theme.textPrimary;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
       child: Row(
@@ -1005,11 +1006,17 @@ class _DesktopCartSummary extends StatelessWidget {
               const Padding(
                   padding: EdgeInsets.only(top: 12),
                   child: Text('Completa el monto mínimo de cada proveedor.')),
+            if (!state._meetsCombinedMinimums)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Completa los mínimos combinables para continuar.'),
+              ),
             if (!unitsReady) ...[
               const SizedBox(height: 12),
               Text(
                 'Completa las unidades mínimas que definió cada proveedor.',
-                style: TextStyle(fontSize: 12, height: 1.4, color: theme.textPrimary),
+                style: TextStyle(
+                    fontSize: 12, height: 1.4, color: theme.textPrimary),
               ),
             ],
             const SizedBox(height: 14),
@@ -1415,7 +1422,7 @@ class _DesktopSuggestionCard extends StatelessWidget {
               ),
             ),
             Text(
-              'Mín. ${part.minOrderQtyEffective} uds',
+              part.minOrderQtyLabelEs,
               style: TextStyle(fontSize: 11, color: theme.textMuted),
             ),
             const SizedBox(height: 8),

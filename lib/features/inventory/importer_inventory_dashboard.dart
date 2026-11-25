@@ -11,6 +11,7 @@ import 'package:motolink_pro_app/features/catalog/share_qr_sheet.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'importer_product_edit_screen.dart';
 import 'inventory_qr_screen.dart';
+import 'inventory_combined_minimums_screen.dart';
 import 'catalog_document_reader.dart';
 import 'excel_catalog_service.dart';
 import 'flexible_catalog_import_service.dart';
@@ -1507,7 +1508,7 @@ class _ImporterInventoryDashboardState
   Widget _toolsMenu({required bool compact}) => PopupMenuButton<String>(
         icon: compact ? const Icon(Icons.more_horiz) : null,
         tooltip: 'Herramientas de inventario',
-        onSelected: (action) {
+        onSelected: (action) async {
           switch (action) {
             case 'import':
               _startBulkImport();
@@ -1521,6 +1522,11 @@ class _ImporterInventoryDashboardState
                   },
                 ),
               ));
+            case 'combined-minimums':
+              await Navigator.of(context).push<void>(MaterialPageRoute(
+                builder: (_) => const InventoryCombinedMinimumsScreen(),
+              ));
+              if (mounted) _reload();
             case 'template':
               _downloadImportTemplate();
             case 'export':
@@ -1579,6 +1585,10 @@ class _ImporterInventoryDashboardState
             ),
             const PopupMenuDivider(),
             header('Varios'),
+            const PopupMenuItem(
+              value: 'combined-minimums',
+              child: Text('Mínimos combinables'),
+            ),
             const PopupMenuItem(
                 value: 'labels', child: Text('Imprimir etiquetas QR')),
             const PopupMenuItem(

@@ -228,7 +228,7 @@ class _CompactSuggestionCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Mín. ${part.minOrderQtyEffective} uds',
+                    part.minOrderQtyLabelEs,
                     style: TextStyle(
                       fontSize: 10.5,
                       color: AppColors.textSecondary,

@@ -54,7 +54,7 @@ void main() {
         attribute: 'Presentación',
         value: '1 Litro',
         stock: 2,
-      ),
+      ).copyWith(minOrderQty: 5),
       _part(
         id: '4l',
         sku: 'ACE-4',

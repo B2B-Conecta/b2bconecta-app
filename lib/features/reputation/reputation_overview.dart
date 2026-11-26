@@ -7,6 +7,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/app_date_format.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
+import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/catalog/importer_catalog_logo.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
@@ -421,7 +422,18 @@ class _ReputationOverviewState extends State<ReputationOverview> {
                       Divider(height: 1, color: AppColors.borderSubtle),
                     _reviewRow(review, data.questionnaire),
                   ],
-                  if (reviews.length > _visibleReviews)
+                  if (widget.standaloneRetailer && !widget.isImporter)
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                            builder: (_) => _MobileRatingList(
+                                  reviews: reviews,
+                                  questionnaire: data.questionnaire,
+                                )),
+                      ),
+                      child: const Text('Ver todas las valoraciones'),
+                    )
+                  else if (reviews.length > _visibleReviews)
                     TextButton(
                         onPressed: () => setState(() => _visibleReviews += 5),
                         child: const Text('Ver más valoraciones')),

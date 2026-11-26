@@ -19,6 +19,28 @@ import 'package:motolink_pro_app/core/utils/haversine.dart';
 class CatalogService {
   CatalogService._();
 
+  static Future<List<PartModel>> fetchCombinedMinimumProducts({
+    required String ownerId,
+    required String groupId,
+    required int offset,
+    required int limit,
+  }) =>
+      retryOnJwtIssuedAtFuture(() async {
+        final rows = await SupabaseAccess.client
+            .from('products')
+            .select('*, ${_catalogProfileSelect(CatalogFilters.empty)}')
+            .eq('owner_id', ownerId)
+            .eq('minimum_group_id', groupId)
+            .eq('is_active', true)
+            .eq('stock_covers_min_order', true)
+            .order('name')
+            .order('id')
+            .range(offset, offset + limit - 1);
+        final parts = rows.map(PartModel.fromJson).toList();
+        return applyPromoDiscountsToParts(
+            parts, await fetchActivePromoProductDiscounts());
+      });
+
   static Future<List<PartModel>> fetchHomeNewArrivals() async {
     final rows = await retryOnJwtIssuedAtFuture(() => SupabaseAccess.client
         .from('products')
@@ -337,7 +359,9 @@ class CatalogService {
     final rows = response as List<dynamic>;
     final parts = rows
         .map((row) => PartModel.fromJson(row as Map<String, dynamic>))
-        .where((part) => part.id.isNotEmpty)
+        .where((part) =>
+            part.id.isNotEmpty &&
+            part.combinedMinimum?.id == seed.combinedMinimum?.id)
         .toList();
     if (parts.length < 2) return seed.variantChoices;
     final options = sortVariantOptions(parts);

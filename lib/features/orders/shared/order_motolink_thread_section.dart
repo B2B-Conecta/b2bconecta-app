@@ -617,7 +617,11 @@ class _OrderMotolinkThreadSectionState
       children: [
         if (mobileAppBar != null && widget.conversationContext != null)
           widget.conversationContext!,
-        if (mobileAppBar != null &&
+        if ((mobileAppBar != null ||
+                (widget.expandMessages &&
+                    (widget.allowReplyAsAliado ||
+                        widget.orderLines
+                            .any((line) => line.aliadoId == uid)))) &&
             (widget.orderLines
                     .any((line) => line.postventaDevolucionAt != null) ||
                 _items.any((message) =>

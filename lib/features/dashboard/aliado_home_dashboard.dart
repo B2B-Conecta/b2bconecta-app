@@ -35,7 +35,6 @@ import '../catalog/product_detail_screen.dart';
 import '../catalog/promo_banner_layout.dart';
 import '../catalog/promo_campaign_model.dart';
 import '../catalog/recent_product_views.dart';
-import '../catalog/store_supplier_chat.dart';
 import '../catalog/new_consultation_screen.dart';
 import '../inventory/product_custom_fields.dart';
 import '../onboarding/entrepreneur_first_purchase_warning_banner.dart';

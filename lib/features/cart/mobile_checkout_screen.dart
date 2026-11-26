@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 import '../../app/theme/b2b_theme_extension.dart';
 import '../../core/data/supabase_service.dart';
@@ -1182,6 +1184,17 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final created = _orderId != null;
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final sideSummary = MediaQuery.sizeOf(context).width >= 1000 &&
+        MediaQuery.textScalerOf(context).scale(14) <= 21;
+    final title = created
+        ? (_recoveredOrder ? 'Pedido recuperado' : 'Pedido creado')
+        : [
+            'Dirección de entrega',
+            'Entrega por proveedor',
+            'Revisa tu pedido'
+          ][_step];
     return PopScope<Object?>(
         canPop: _allowPop && !_sending,
         onPopInvokedWithResult: (didPop, _) {
@@ -1189,57 +1202,58 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
         },
         child: Scaffold(
           backgroundColor: B2BThemeExtension.of(context).background,
-          appBar: AppBar(
-              backgroundColor: mobileChatBlue,
-              foregroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              toolbarHeight: 72,
-              shape: const RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.vertical(bottom: Radius.circular(24))),
-              leading: BackButton(onPressed: _sending ? null : _back),
-              title: B2bHeaderTitle(
-                title: Text(
-                    created
-                        ? (_recoveredOrder
-                            ? 'Pedido recuperado'
-                            : 'Pedido creado')
-                        : [
-                            'Dirección de entrega',
-                            'Entrega por proveedor',
-                            'Revisa tu pedido'
-                          ][_step],
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              )),
+          appBar: desktop
+              ? desktopWorkflowAppBar(context, title, onBack: _back)
+              : AppBar(
+                  backgroundColor: mobileChatBlue,
+                  foregroundColor: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  toolbarHeight: 72,
+                  shape: const RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.vertical(bottom: Radius.circular(24))),
+                  leading: BackButton(onPressed: _sending ? null : _back),
+                  title: B2bHeaderTitle(
+                    title: Text(title,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  )),
           body: SafeArea(
               top: false,
-              child: Column(children: [
-                if (!created) _steps(),
-                Expanded(
-                    child: AbsorbPointer(
-                        absorbing: _sending || _savingAddress,
-                        child: Form(
-                            key: _form,
-                            child: ListView(
-                                controller: _scroll,
-                                padding: const EdgeInsets.all(16),
-                                children: created
-                                    ? _success()
-                                    : _step == 0
-                                        ? _addressStep()
-                                        : _step == 1
-                                            ? _deliveryStep()
-                                            : _reviewStep())))),
-                Padding(
+              child: DesktopWorkflow(
+                header: created ? null : _steps(),
+                body: AbsorbPointer(
+                    absorbing: _sending || _savingAddress,
+                    child: Form(
+                        key: _form,
+                        child: ListView(
+                            controller: _scroll,
+                            padding: const EdgeInsets.all(16),
+                            children: created
+                                ? _success()
+                                : _step == 0
+                                    ? _addressStep()
+                                    : _step == 1
+                                        ? _deliveryStep()
+                                        : _reviewStep()))),
+                actions: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          if (sideSummary && !created) ...[
+                            Text('Resumen de tu compra',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            for (final entry in _totals.suppliers.entries)
+                              _row(_supplier(entry.key),
+                                  '${formatRefAmount(entry.value.net)} ${entry.value.payUsd ? 'USD' : 'REF'}'),
+                            const Divider(),
+                          ],
                           if (!created && _step == 1)
                             _row('Envíos (${_groups.length} proveedores)',
                                 _shippingLabel,
@@ -1302,7 +1316,7 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
                                 onPressed: () => _exit(),
                                 child: const Text('Seguir comprando')),
                         ])),
-              ])),
+              )),
         ));
   }
 }

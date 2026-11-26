@@ -513,29 +513,24 @@ class _OrderChatInboxSheetState extends State<OrderChatInboxSheet> {
           deliveryGrace: thread.inDeliveryGrace,
           expandMessages: true,
           onThreadChanged: _scheduleRefresh,
-          conversationContext: Wrap(
-            spacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                '${thread.reference} · ${thread.statusLabel}',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              if (!_isAdmin)
-                TextButton(
-                  onPressed: () {
-                    final navigator = Navigator.of(context);
-                    if (!embedded) navigator.pop();
-                    navigator.pop();
-                    MainShellTabController.setPendingOpenOrderChat(false);
-                    MainShellTabController.setPendingNotificationType(null);
-                    MainShellTabController.setPendingNotificationRelatedId(id);
-                    MainShellTabController.navigateToPedidosForNotification();
-                  },
-                  child: const Text('Ver pedido'),
+          conversationContext: widget.homeRole == AppHomeRole.aliado
+              ? MobileOrderChatCard(thread: thread, onOpenOrder: openOrder)
+              : Wrap(
+                  spacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      '${thread.reference} · ${thread.statusLabel}',
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                    if (!_isAdmin)
+                      TextButton(
+                        onPressed: openOrder,
+                        child: const Text('Ver pedido'),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
       ),
     );

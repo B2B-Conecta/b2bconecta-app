@@ -66,7 +66,7 @@ List<ImporterMinOrderProgress> importerMinOrderProgressFor(
   }).toList();
 }
 
-/// Monto mínimo de un proveedor en el carrito web.
+/// Monto mínimo de un proveedor en el carrito.
 ///
 /// Solo existe si el proveedor lo guardó. Sin monto propio no hay piso.
 class SupplierUsdMinOrder {

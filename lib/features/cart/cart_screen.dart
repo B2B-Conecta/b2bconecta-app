@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/features/catalog/catalog_service.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
@@ -10,7 +11,6 @@ import 'package:motolink_pro_app/features/profile/profile_location_exception.dar
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'cart_service.dart';
 import 'cart_quantity_field.dart';
-import 'delivery_destination_dialog.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/features/ads/meta_pixel.dart';
@@ -28,6 +28,8 @@ import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_return_rules.dart';
 import 'package:motolink_pro_app/features/orders/shared/orders_service.dart';
 import 'cart_product_actions.dart';
+import 'cart_combined_minimum.dart';
+import 'cart_combined_minimum_dialog.dart';
 import 'cart_suggestions.dart';
 import 'cart_suggestions_section.dart';
 import 'importer_min_order.dart';
@@ -95,9 +97,6 @@ class _CartScreenState extends State<CartScreen> {
   String? _suggestionCartKey;
   String? _suggestionInflightKey;
   int _suggestionTicket = 0;
-  final Set<String> _confirmingSuggestionIds = {};
-  final Map<String, CartSuggestion> _pinnedSuggestions = {};
-  final Map<String, Timer> _suggestionConfirmTimers = {};
   final GlobalKey _summaryKey = GlobalKey();
   double _summaryHeight = 420;
   bool get _mobileCheckout =>
@@ -114,12 +113,11 @@ class _CartScreenState extends State<CartScreen> {
         for (final owner in _cart.supplierGroups.keys)
           owner: _supplierPaysUsd(owner),
       };
-  _PagoMoneda _modeFor(List<CartLine> lines) =>
-      _mobileCheckout && lines.isNotEmpty
-          ? (_supplierPaysUsd(lines.first.part.ownerId ?? '')
-              ? _PagoMoneda.usd
-              : _PagoMoneda.bolivares)
-          : _pagoMoneda;
+  _PagoMoneda _modeFor(List<CartLine> lines) => lines.isNotEmpty
+      ? (_supplierPaysUsd(lines.first.part.ownerId ?? '')
+          ? _PagoMoneda.usd
+          : _PagoMoneda.bolivares)
+      : _pagoMoneda;
   MobileCheckoutTotals get _mobileTotals => MobileCheckoutTotals(
       lines: _cart.lines,
       payUsd: _pagoMoneda == _PagoMoneda.usd,
@@ -131,10 +129,6 @@ class _CartScreenState extends State<CartScreen> {
       carriers: const {},
       supplierCount: _cart.supplierGroups.length,
       rate: _tasa);
-
-  void _selectDesktopCurrency(int index) {
-    setState(() => _pagoMoneda = _PagoMoneda.values[index]);
-  }
 
   void _setDesktopCredit(String ownerId, bool useCredit) {
     setState(() {
@@ -208,19 +202,14 @@ class _CartScreenState extends State<CartScreen> {
       _suggestionPool = const [];
       if (!mounted) return;
       setState(() {
-        _suggestions = [
-          for (final entry in _pinnedSuggestions.entries)
-            if (_confirmingSuggestionIds.contains(entry.key)) entry.value,
-        ];
+        _suggestions = const [];
         _loadingSuggestions = false;
       });
       return;
     }
     final ticket = ++_suggestionTicket;
     _suggestionInflightKey = key;
-    final skeleton = _suggestions.isEmpty &&
-        _pinnedSuggestions.isEmpty &&
-        !_loadingSuggestions;
+    final skeleton = _suggestions.isEmpty && !_loadingSuggestions;
     if (skeleton && mounted) setState(() => _loadingSuggestions = true);
     try {
       final candidates = await _loadSuggestionCandidates(
@@ -243,21 +232,14 @@ class _CartScreenState extends State<CartScreen> {
       cartParts: [for (final line in _cart.lines) line.part],
       candidates: _suggestionPool,
     );
-    final visible = <CartSuggestion>[
-      for (final entry in _pinnedSuggestions.entries)
-        if (_confirmingSuggestionIds.contains(entry.key)) entry.value,
-      for (final suggestion in ranked)
-        if (!_confirmingSuggestionIds.contains(suggestion.part.id)) suggestion,
-    ];
     if (!mounted) return;
     setState(() {
-      _suggestions = visible;
+      _suggestions = ranked;
       _loadingSuggestions = false;
     });
   }
 
   void _addSuggestion(CartSuggestion suggestion) {
-    if (_confirmingSuggestionIds.contains(suggestion.part.id)) return;
     final blocked = CartProductActions.blockReason(
       part: suggestion.part,
       profile: widget.profile,
@@ -275,20 +257,15 @@ class _CartScreenState extends State<CartScreen> {
       cart: _cart,
     );
     if (added == 0) return;
-    _pinnedSuggestions[suggestion.part.id] = suggestion;
-    _confirmingSuggestionIds.add(suggestion.part.id);
-    _suggestionConfirmTimers[suggestion.part.id]?.cancel();
-    _suggestionConfirmTimers[suggestion.part.id] = Timer(
-      const Duration(milliseconds: 700),
-      () {
-        if (!mounted) return;
-        _confirmingSuggestionIds.remove(suggestion.part.id);
-        _pinnedSuggestions.remove(suggestion.part.id);
-        _suggestionConfirmTimers.remove(suggestion.part.id);
-        _publishSuggestions();
-      },
-    );
     _publishSuggestions();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: _cartNoticeMargin,
+        duration: const Duration(seconds: 2),
+        content: const AppNoticeMessage.success('Añadido a tu bolsa'),
+      ));
   }
 
   Future<void> _loadCredits() async {
@@ -331,28 +308,46 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   void dispose() {
-    for (final timer in _suggestionConfirmTimers.values) {
-      timer.cancel();
-    }
     _cart.removeListener(_onCart);
     super.dispose();
   }
 
-  /// En escritorio, un proveedor bajo su monto mínimo en USD no puede enviarse.
-  bool get _desktopShortOnUsdMinimum {
-    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
-      return false;
-    }
-    return !_cart.supplierGroups.values.every(SupplierUsdMinOrder.meetsLines);
-  }
+  bool get _meetsSupplierMinimumAmounts =>
+      _cart.meetsAllImporterMinOrders &&
+      _cart.supplierGroups.values.every(SupplierUsdMinOrder.meetsLines);
 
-  /// En escritorio, un proveedor bajo su mínimo de unidades no puede enviarse.
-  bool get _desktopShortOnUnits {
-    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
-      return false;
-    }
-    return !_cart.supplierGroups.values.every(SupplierOrderMinUnits.meets);
-  }
+  bool get _meetsSupplierMinimumUnits =>
+      _cart.supplierGroups.values.every(SupplierOrderMinUnits.meets);
+
+  bool get _meetsCombinedMinimums =>
+      CartCombinedMinimum.meetsLines(_cart.lines);
+
+  bool get _meetsSupplierMinimums =>
+      _meetsSupplierMinimumAmounts &&
+      _meetsSupplierMinimumUnits &&
+      _meetsCombinedMinimums;
+
+  Widget _combinedMinimumProgress(List<CartLine> lines) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final group in CartCombinedMinimum.forLines(lines))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: CartCombinedMinimumProgress(
+                group: group,
+                onBrowse: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => CartCombinedMinimumDialog(
+                    group: group,
+                    profile: widget.profile,
+                    cart: _cart,
+                    bcvRate: _tasa,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
 
   Future<void> _checkout() async {
     if (_cart.pendingCheckoutAttempt != null &&
@@ -365,109 +360,14 @@ class _CartScreenState extends State<CartScreen> {
         _cart.isEmpty ||
         _submitting ||
         _choosingDelivery ||
-        !_cart.meetsAllImporterMinOrders ||
-        _desktopShortOnUsdMinimum ||
-        _desktopShortOnUnits) {
+        !_meetsSupplierMinimums) {
       return;
     }
 
-    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
-      await _checkoutMobile();
-      return;
-    }
-
-    final accountRevision = _cart.accountRevision;
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _choosingDelivery = true);
-    final result = await showDialog<DeliveryDestinationResult?>(
-      context: context,
-      builder: (ctx) => DeliveryDestinationDialog(
-          profile: widget.profile,
-          paymentSummary: _pagoMoneda == _PagoMoneda.usd
-              ? 'Pago en divisas (USD).'
-              : 'Pago en bolívares a la tasa BCV. El REF es la base de cálculo.'),
-    );
-
-    if (!mounted) return;
-    setState(() => _choosingDelivery = false);
-    if (result == null ||
-        !_cart.canEdit ||
-        _cart.isEmpty ||
-        accountRevision != _cart.accountRevision ||
-        !_cart.meetsAllImporterMinOrders ||
-        _desktopShortOnUsdMinimum ||
-        _desktopShortOnUnits) return;
-
-    setState(() => _submitting = true);
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final nav = Navigator.of(context);
-    try {
-      final lines = _cart.lines
-          .map(
-            (l) => <String, dynamic>{
-              'product_id': l.part.id,
-              'cantidad': l.quantity,
-            },
-          )
-          .toList();
-
-      final appliedCredit = _appliedCredit;
-      final moneda = _pagoMoneda == _PagoMoneda.usd ? 'DIVISAS' : 'BOLIVARES';
-      final orderId = await SupabaseService.checkoutMultiImportadorCart(
-        lines: lines,
-        destinoEntregaUsaPerfil: result.useProfile,
-        destinoEntregaTexto: result.texto,
-        destinoEntregaMapsUrl: result.mapsUrl,
-        promoByImportador: _cart.promoAttributionPayloadForCheckout(),
-        applyCreditByImportador: _creditPayload(),
-        moneda: moneda,
-      );
-      final purchaseValue = _cart.lines.fold<double>(
-              0,
-              (sum, line) =>
-                  sum + _cartUnitDollars(line, _pagoMoneda) * line.quantity) -
-          appliedCredit;
-      trackPurchase(
-        orderId: orderId.trim().isNotEmpty
-            ? orderId.trim()
-            : 'checkout-${DateTime.now().millisecondsSinceEpoch}',
-        valueUsd: purchaseValue,
-      );
-
-      _cart.clear();
-      MainShellTabController.notifyPedidosReload();
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            appliedCredit > 0
-                ? 'Pedido registrado. Se aplicaron ${_cartMoney(appliedCredit, _pagoMoneda, _tasa)} de saldo a favor.'
-                : 'Pedido registrado. Los importadores recibirán un aviso para confirmar stock.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      nav.pop(true);
-    } on ProfileLocationException catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(cartMinOrderErrorMessage(e) ?? '$e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
+    await _openCheckout();
   }
 
-  Future<void> _checkoutMobile() async {
+  Future<void> _openCheckout() async {
     final revision = _cart.accountRevision;
     final snapshot = _cart.lines
         .map((line) => CartLine(
@@ -518,7 +418,7 @@ class _CartScreenState extends State<CartScreen> {
                         throw const MobileCheckoutException(
                             'Tu bolsa cambió. Vuelve a ella y revisa los productos antes de confirmar.');
                       }
-                      if (!_cart.meetsAllImporterMinOrders) {
+                      if (!_meetsSupplierMinimums) {
                         throw const MobileCheckoutException(
                             'Completa el mínimo de cada proveedor para continuar.');
                       }
@@ -621,6 +521,11 @@ class _CartScreenState extends State<CartScreen> {
                           throw const MobileCheckoutException(
                               'Esta forma de confirmar aún no está disponible. No se creó el pedido y conservamos tu selección.');
                         }
+                        if (error is PostgrestException &&
+                            error.code == '23514' &&
+                            error.message.startsWith('El mínimo combinado')) {
+                          throw MobileCheckoutException(error.message);
+                        }
                         final minOrderError = cartMinOrderErrorMessage(error);
                         if (minOrderError != null) {
                           throw MobileCheckoutException(minOrderError);
@@ -700,15 +605,19 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  EdgeInsets get _cartNoticeMargin {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final narrow = MediaQuery.sizeOf(context).width < 980;
+    // Con checkout sticky: subir el banner. Bolsa vacía: pegarlo abajo.
+    final bottomGap = _cart.isEmpty ? 12.0 : (narrow ? 88.0 : 24.0);
+    return EdgeInsets.fromLTRB(16, 0, 16, bottomGap + bottomInset);
+  }
+
   void _removeLine(CartLine line) {
     final accountRevision = _cart.accountRevision;
     final campaign = _cart.promoCampaignIdForImportador(line.part.ownerId);
     _cart.removeProduct(line.part.id);
     final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final narrow = MediaQuery.sizeOf(context).width < 980;
-    // Con checkout sticky: subir el banner. Bolsa vacía: pegarlo abajo.
-    final bottomGap = _cart.isEmpty ? 12.0 : (narrow ? 88.0 : 24.0);
     void undo() {
       if (!mounted || _submitting || accountRevision != _cart.accountRevision) {
         return;
@@ -724,7 +633,7 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     messenger.showSnackBar(appActionNotice(
-      margin: EdgeInsets.fromLTRB(16, 0, 16, bottomGap + bottomInset),
+      margin: _cartNoticeMargin,
       duration: const Duration(seconds: 5),
       content: const AppNoticeMessage(
         'Producto eliminado',
@@ -742,13 +651,6 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
     return false;
-  }
-
-  ImporterMinOrderProgress? _progressFor(List<CartLine> lines) {
-    final ownerId = lines.isEmpty ? null : lines.first.part.ownerId;
-    final matches =
-        _cart.importerMinOrderProgress().where((e) => e.importerId == ownerId);
-    return matches.isEmpty ? null : matches.first;
   }
 
   List<Widget> _mixedSummaryRows(MobileCheckoutTotals totals, double? rate) {
@@ -812,11 +714,14 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildSupplierGroup(
       MapEntry<String, List<CartLine>> entry, double? tasa) {
-    final progress = _progressFor(entry.value);
-    final ownerId = entry.value.first.part.ownerId?.trim() ?? '';
-    final mode = _modeFor(entry.value);
+    final lines = entry.value;
+    final amount = SupplierUsdMinOrder.of(lines);
+    final minimumUnits = SupplierOrderMinUnits.definedMinimum(lines);
+    final missingUnits = SupplierOrderMinUnits.missing(lines);
+    final ownerId = lines.first.part.ownerId?.trim() ?? '';
+    final mode = _modeFor(lines);
     final quote = MobileSupplierTotals(
-        lines: entry.value,
+        lines: lines,
         payUsd: mode == _PagoMoneda.usd,
         availableCredit: _creditOptOut.contains(ownerId)
             ? 0
@@ -863,30 +768,47 @@ class _CartScreenState extends State<CartScreen> {
               ]),
             ),
             Divider(height: 1, color: AppColors.divider),
-            if (progress != null && progress.hasMinimum)
+            _combinedMinimumProgress(lines),
+            if (minimumUnits != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(
+                  missingUnits == 0
+                      ? 'Mínimo de $minimumUnits unidades cubierto'
+                      : 'Faltan $missingUnits unidades para llegar al mínimo de $minimumUnits',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: missingUnits == 0
+                        ? AppColors.successGreen
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            if (amount.hasMinimum)
               Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                            progress.meets
-                                ? 'Pedido mínimo ${formatMinOrderAmount(progress.minRef, progress.currency)} cubierto'
-                                : 'Llevas ${formatMinOrderAmount(progress.currentRef, progress.currency)} de ${formatMinOrderAmount(progress.minRef, progress.currency)}',
+                            amount.meets
+                                ? 'Monto mínimo ${formatMinOrderAmount(amount.minimum, amount.currency)} cubierto'
+                                : 'Llevas ${formatMinOrderAmount(amount.current, amount.currency)} de ${formatMinOrderAmount(amount.minimum, amount.currency)}',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: progress.meets
+                                color: amount.meets
                                     ? AppColors.successGreen
                                     : AppColors.textPrimary)),
                         const SizedBox(height: 6),
                         ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
-                                value: progress.fraction,
+                                value: amount.fraction,
                                 minHeight: 4,
                                 backgroundColor: AppColors.divider,
-                                color: progress.meets
+                                color: amount.meets
                                     ? AppColors.successGreen
                                     : AppColors.brandBlue)),
                       ])),
@@ -1018,7 +940,7 @@ class _CartScreenState extends State<CartScreen> {
         !_submitting &&
         !_choosingDelivery &&
         (mobileCheckout || !currencyBlocked) &&
-        _cart.meetsAllImporterMinOrders &&
+        _meetsSupplierMinimums &&
         (mobileCheckout || !pagaBolivares || totalBs != null);
 
     return Scaffold(
@@ -1243,10 +1165,12 @@ class _CartScreenState extends State<CartScreen> {
                             'Un proveedor solo acepta divisas. Elige USD para continuar.'),
                       ],
                     ],
-                    if (!_cart.meetsAllImporterMinOrders) ...[
+                    if (!_meetsSupplierMinimums) ...[
                       const SizedBox(height: 12),
                       Text(
-                          'Completa el mínimo de cada proveedor para continuar.',
+                          !_meetsCombinedMinimums
+                              ? 'Completa los mínimos combinables para continuar.'
+                              : 'Completa el mínimo de cada proveedor para continuar.',
                           style: TextStyle(
                               fontSize: 12,
                               height: 1.4,
@@ -1396,7 +1320,6 @@ class _CartScreenState extends State<CartScreen> {
                       : CartSuggestionsSection(
                           suggestions: _suggestions,
                           loading: _loadingSuggestions,
-                          confirmingIds: _confirmingSuggestionIds,
                           bcvRate: pagaBolivares ? tasa : null,
                           autoPlay: widget.suggestionAutoPlay,
                           onAdd: _submitting || !_cart.canEdit
@@ -1530,7 +1453,7 @@ class _CartLineCard extends StatelessWidget {
         ? '${formatRefAmount(unit * line.quantity)} USD'
         : '${formatRefAmount(unit * line.quantity)} REF';
     final stockHint = part.hasSupplierMinOrderQty
-        ? 'Mín. ${part.minOrderQtyEffective} • Disp. ${part.stockForSale}'
+        ? '${part.minOrderQtyLabelEs} • Disp. ${part.stockForSale}'
         : 'Disp. ${part.stockForSale}';
     final thumbnail = ClipRRect(
         borderRadius: BorderRadius.circular(10),

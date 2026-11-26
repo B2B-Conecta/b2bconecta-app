@@ -45,7 +45,7 @@ class ProductStockSummary extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: color));
     final minimum = Text(
-        inline
+        inline && part.combinedMinimum == null
             ? 'Mín. ${part.minOrderQtyEffective} unidades'
             : part.minOrderQtyLabelEs,
         maxLines: 1,
@@ -61,7 +61,7 @@ class ProductStockSummary extends StatelessWidget {
             ? LucideGlyph.circleCheck
             : LucideGlyph.package;
     if (inline) {
-      return Align(
+      final detailStock = Align(
         alignment: Alignment.centerLeft,
         child: FittedBox(
           fit: BoxFit.scaleDown,
@@ -72,7 +72,7 @@ class ProductStockSummary extends StatelessWidget {
               LucideIcon(stockGlyph, size: 18, color: color),
               const SizedBox(width: 5),
               stock,
-              if (showMin) ...[
+              if (showMin && part.combinedMinimum == null) ...[
                 Container(
                   width: 1,
                   height: 14,
@@ -84,6 +84,18 @@ class ProductStockSummary extends StatelessWidget {
             ],
           ),
         ),
+      );
+      if (part.combinedMinimum == null) return detailStock;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          detailStock,
+          const SizedBox(height: 4),
+          Text(
+            '${part.minOrderQtyLabelEs} · ${part.combinedMinimum!.name}',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          ),
+        ],
       );
     }
     // Ficha: ambos textos completos; si no caben, se escala el bloque.
@@ -103,7 +115,7 @@ class ProductStockSummary extends StatelessWidget {
             height: 1.2,
             fontWeight: FontWeight.w600,
             color: short ? color : minimumColor ?? const Color(0xFF0A1F44)));
-    return Align(
+    final card = Align(
       alignment: Alignment.centerLeft,
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -114,7 +126,7 @@ class ProductStockSummary extends StatelessWidget {
             LucideIcon(stockGlyph, size: 14, color: color),
             const SizedBox(width: 4),
             cardStock,
-            if (showMin) ...[
+            if (showMin && part.combinedMinimum == null) ...[
               Container(
                 width: 1,
                 height: 12,
@@ -126,6 +138,22 @@ class ProductStockSummary extends StatelessWidget {
           ],
         ),
       ),
+    );
+    if (part.combinedMinimum == null) return card;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        card,
+        const SizedBox(height: 2),
+        Text(
+          part.minOrderQtyLabelEs,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: minimumColor ?? Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

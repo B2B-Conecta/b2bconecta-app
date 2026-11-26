@@ -167,7 +167,7 @@ void main() {
 
   testWidgets('añadir una sugerencia actualiza el subtotal sin salir del carrito',
       (tester) async {
-    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -216,27 +216,30 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    expect(find.text('Bs 500,00'), findsWidgets);
+    final add = find.text('Agregar').hitTestable();
+    await tester.dragUntilVisible(
+        add, find.byType(ListView).first, const Offset(0, -250));
     expect(find.text('Completa tu compra'), findsOneWidget);
     expect(find.text('También te puede interesar.'), findsOneWidget);
     expect(find.text('Válvula metálica'), findsOneWidget);
     expect(find.text('Mayorista líder'), findsOneWidget);
     expect(find.text('Agregar'), findsWidgets);
-    expect(find.text('Bs 500,00'), findsWidgets);
     expect(find.textContaining('Continuar con la entrega'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Agregar').last);
-    await tester.tap(find.text('Agregar').last);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(add);
+    await tester.pumpAndSettle();
 
-    expect(find.text('Añadido'), findsOneWidget);
-    expect(find.textContaining('Continuar con la entrega'), findsOneWidget);
     expect(cart.lines.map((line) => line.part.id), contains('valve'));
+    final notice = find.text('Añadido a tu bolsa');
+    expect(notice.hitTestable(), findsOneWidget);
+    expect(find.textContaining('Continuar con la entrega'), findsOneWidget);
     expect(find.text('Bs 700,00'), findsWidgets);
 
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('Añadido'), findsNothing);
-    expect(find.text('Válvula metálica'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(notice, findsNothing);
+    expect(find.text('Completa tu compra'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -290,6 +293,15 @@ void main() {
     expect(find.text('Completa tu compra'), findsOneWidget);
     expect(find.byTooltip('Siguiente'), findsNothing);
     expect(find.text('Aceite 20W50 0'), findsAtLeastNWidgets(1));
+    final add = find.text('Agregar').hitTestable().first;
+    await tester.dragUntilVisible(
+        add, find.byType(ListView).first, const Offset(0, -250));
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(cart.lines.map((line) => line.part.id), contains('oil-0'));
+    expect(find.text('Añadido a tu bolsa').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
   });
 }

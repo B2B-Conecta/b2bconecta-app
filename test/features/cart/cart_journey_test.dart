@@ -43,13 +43,7 @@ void main() {
               profile: ProfileModel(id: 'ally', role: 'aliado'),
               liveTasaBcv: 881.8769)));
       await tester.pumpAndSettle();
-      if (scenario.size.width >= 768) {
-        await tester.ensureVisible(find.text('REF / Bs'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('REF / Bs'));
-        await tester.pumpAndSettle();
-      } else {
-        expect(find.text('REF / Bs'), findsNothing);
+      if (scenario.size.width < 768) {
         await tester.scrollUntilVisible(find.text('Resumen de tu compra'), 120,
             scrollable: find
                 .descendant(
@@ -168,11 +162,10 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('repuesto'), findsWidgets);
       if (size.width < 768) {
-        expect(find.text('REF / Bs'), findsNothing);
         expect(find.textContaining('Elige la moneda en cada proveedor'),
             findsOneWidget);
       } else {
-        expect(find.text('REF / Bs'), findsOneWidget);
+        expect(find.text('Bolívares'), findsOneWidget);
         expect(find.text('USD'), findsOneWidget);
       }
       final productScroll = find
@@ -198,17 +191,10 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.textContaining('Continuar con la entrega'));
         await tester.pumpAndSettle();
-        if (size.width == 390) {
-          expect(find.byType(MobileCheckoutScreen), findsOneWidget);
-          expect(find.text('Dirección de entrega'), findsOneWidget);
-          expect(find.text('Confirmar pedido'), findsNothing);
-          await tester.tap(find.byType(BackButton).first);
-        } else {
-          expect(find.byType(AlertDialog), findsOneWidget);
-          expect(find.text('Confirmar pedido'), findsOneWidget);
-          expect(find.byType(MobileCheckoutScreen), findsNothing);
-          await tester.tap(find.text('Cancelar'));
-        }
+        expect(find.byType(MobileCheckoutScreen), findsOneWidget);
+        expect(find.text('Dirección de entrega'), findsOneWidget);
+        expect(find.text('Confirmar pedido'), findsNothing);
+        await tester.tap(find.byType(BackButton).first);
         await tester.pumpAndSettle();
         expect(cart.itemCount, 12);
       }
@@ -274,15 +260,7 @@ void main() {
           .descendant(
               of: find.byType(ListView), matching: find.byType(Scrollable))
           .first;
-      if (scenario.size.width >= 768) {
-        await tester.scrollUntilVisible(find.text('REF / Bs'), 150,
-            scrollable: productScroll);
-        await tester.ensureVisible(find.text('REF / Bs'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('REF / Bs'));
-        await tester.pumpAndSettle();
-      } else {
-        expect(find.text('REF / Bs'), findsNothing);
+      if (scenario.size.width < 768) {
         await tester.scrollUntilVisible(find.text('Resumen de tu compra'), 150,
             scrollable: productScroll);
         await tester.pumpAndSettle();

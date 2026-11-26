@@ -262,8 +262,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  List<Widget> _detailAppBarActions() => [
-        if (_profile?.isAliado == true) FavoriteHeartButton(productId: part.id),
+  List<Widget> _detailAppBarActions({bool showFavorite = true}) => [
+        if (showFavorite && _profile?.isAliado == true)
+          FavoriteHeartButton(productId: part.id),
         if (_canShareProduct)
           IconButton(
             tooltip: 'Compartir producto',
@@ -292,7 +293,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
         title: const Text('Detalle del repuesto'),
-        actions: _detailAppBarActions(),
+        actions: _detailAppBarActions(showFavorite: false),
       ),
       body: Align(
         alignment: Alignment.topCenter,

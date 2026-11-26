@@ -404,7 +404,8 @@ class _OrderBolivarLabelState extends State<_OrderBolivarLabel> {
       color: widget.theme.textSecondary,
     );
     if (frozen != null) return Text(formatBsLabel(frozen), style: style);
-    if (!_web || !_ref) {
+    if (!_ref) return const SizedBox.shrink();
+    if (!_web) {
       return Text('Bs —',
           style: style.copyWith(
               fontWeight: FontWeight.w500, color: widget.theme.textMuted));

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/layout/app_breakpoints.dart';
 import '../../../core/data/supabase_service.dart';
 import 'order_chat_launch.dart';
 
@@ -203,13 +202,12 @@ class OrderReturnButtons extends StatelessWidget {
 
   Future<void> _openReport(BuildContext context,
       {required bool viewOnly}) async {
-    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => OrderIssueReportScreen(
           lines: lines,
           viewOnly: viewOnly,
-          onSubmitted: mobile
+          onSubmitted: allowReplyAsAliado
               ? (reportContext, reportedIds) async {
                   final fresh = await SupabaseService
                       .fetchCheckoutGroupLinesForTransactionRequest(
@@ -244,6 +242,6 @@ class OrderReturnButtons extends StatelessWidget {
         ),
       ),
     );
-    if (saved == true || mobile) onChanged?.call();
+    if (saved == true) onChanged?.call();
   }
 }

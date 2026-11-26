@@ -3,6 +3,7 @@ import 'package:motolink_pro_app/features/inventory/product_custom_fields.dart';
 import 'package:motolink_pro_app/features/inventory/product_images.dart';
 import 'package:motolink_pro_app/features/payments/broker_pricing.dart';
 import 'product_catalog_pricing.dart';
+import 'combined_minimum.dart';
 import 'package:motolink_pro_app/features/inventory/product_min_order_qty.dart';
 import 'package:motolink_pro_app/features/inventory/product_volume_tiers.dart';
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
@@ -24,6 +25,7 @@ class PartModel {
     required this.stock,
     this.stockReserved = 0,
     this.minOrderQty = ProductMinOrderQty.platformFloor,
+    this.combinedMinimum,
     this.imagenUrl,
     this.imageUrls = const [],
     this.sku,
@@ -100,9 +102,9 @@ class PartModel {
     return free < 0 ? 0 : free;
   }
 
-  /// Unidades mínimas para crear un pedido (`products.min_order_qty`).
-  /// Sin valor del proveedor, la plataforma usa 5; si lo define, ese valor manda.
+  /// Mínimo individual guardado, también cuando se aplica un mínimo combinable.
   final int minOrderQty;
+  final CombinedMinimum? combinedMinimum;
 
   final String? imagenUrl;
 
@@ -234,18 +236,22 @@ class PartModel {
   List<ProductVolumeTier> get volumeTiers =>
       parseProductVolumeTiers(discountRules);
 
-  int get minOrderQtyEffective => ProductMinOrderQty.resolve(minOrderQty);
+  int get minOrderQtyEffective => combinedMinimum == null
+      ? ProductMinOrderQty.resolve(minOrderQty)
+      : ProductMinOrderQty.platformFloor;
 
   bool get stockCoversMinOrder => ProductMinOrderQty.stockCovers(
         stock: stock,
-        minOrderQty: minOrderQty,
+        minOrderQty: minOrderQtyEffective,
       );
 
   /// El proveedor definió un MOQ por encima del piso de 1 unidad.
   bool get hasSupplierMinOrderQty =>
+      combinedMinimum != null ||
       ProductMinOrderQty.isSupplierDefined(minOrderQty);
 
-  String get minOrderQtyLabelEs => 'Mín. $minOrderQtyEffective uds';
+  String get minOrderQtyLabelEs =>
+      combinedMinimum?.catalogLabel ?? 'Mín. $minOrderQtyEffective uds';
 
   bool get hasVariantFamily =>
       parentSku != null && parentSku!.trim().isNotEmpty;
@@ -359,6 +365,7 @@ class PartModel {
       stock: _asInt(json['stock']),
       stockReserved: _asInt(json['stock_reserved']),
       minOrderQty: ProductMinOrderQty.resolve(_asInt(json['min_order_qty'])),
+      combinedMinimum: CombinedMinimum.fromJson(json['combined_minimum']),
       imagenUrl: productCoverImageUrl(
         imageUrls,
         legacy: _nullableUrl(imagenRaw),
@@ -441,6 +448,7 @@ class PartModel {
       stock: stock ?? this.stock,
       stockReserved: stockReserved ?? this.stockReserved,
       minOrderQty: minOrderQty ?? this.minOrderQty,
+      combinedMinimum: combinedMinimum,
       imagenUrl: imagenUrl ?? this.imagenUrl,
       imageUrls: imageUrls ?? this.imageUrls,
       sku: sku ?? this.sku,

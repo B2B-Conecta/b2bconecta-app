@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/features/cart/cart_screen.dart';
 import 'package:motolink_pro_app/features/cart/cart_service.dart';
 import 'package:motolink_pro_app/features/cart/cart_quantity_field.dart';
+import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 import 'package:motolink_pro_app/features/cart/mobile_checkout_screen.dart';
+import 'package:motolink_pro_app/features/catalog/combined_minimum.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 import 'mobile_checkout_test.dart' as fixture;
@@ -63,6 +65,112 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(target);
     await tester.pumpAndSettle();
+  }
+
+  for (final width in [390.0, 1440.0]) {
+    testWidgets('combined minimum counts eligible references at $width',
+        (tester) async {
+      const group = CombinedMinimum(id: 'tires', name: 'Cauchos', units: 5);
+      void add(String id, String owner, int quantity,
+          {CombinedMinimum? rule, int minimum = 1}) {
+        cart.addOrIncrement(
+          PartModel(
+            id: id,
+            ownerId: owner,
+            nombre: id,
+            precio: 10,
+            stock: 30,
+            minOrderQty: minimum,
+            combinedMinimum: rule,
+          ),
+          delta: quantity,
+          precioUnitarioAliadoRef: 10,
+        );
+      }
+
+      add('Caucho 110', 'one', 2, rule: group, minimum: 5);
+      add('Caucho 90', 'one', 1, rule: group, minimum: 5);
+      add('Referencia excluida', 'one', 5, minimum: 5);
+      add('Referencia de otro proveedor', 'two', 5, rule: group);
+      await open(tester, width: width);
+
+      expect(find.text('3 de 5 uds · Faltan 2 unidades'), findsOneWidget);
+      expect(find.text('Ver referencias elegibles'), findsWidgets);
+      final next =
+          find.widgetWithText(FilledButton, 'Continuar con la entrega →');
+      await tester.scrollUntilVisible(next, 120,
+          scrollable: find.byType(Scrollable).first);
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+
+      add('Caucho 100', 'one', 2, rule: group, minimum: 5);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(next).onPressed, isNotNull);
+
+      cart.setQuantity('Caucho 100', 1);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets(
+        'supplier units and discounted USD minimums gate delivery at $width',
+        (tester) async {
+      cart.addOrIncrement(
+        const PartModel(
+          id: 'unit-product',
+          ownerId: 'unit-supplier',
+          nombre: 'Repuesto por unidades',
+          precio: 10,
+          stock: 50,
+          ownerMinOrderUnits: 10,
+        ),
+        delta: 8,
+        precioUnitarioAliadoRef: 10,
+      );
+      cart.addOrIncrement(
+        const PartModel(
+          id: 'usd-product',
+          ownerId: 'usd-supplier',
+          nombre: 'Repuesto con descuento',
+          precio: 12.50,
+          stock: 50,
+          ownerMinOrderAmountRef: 95,
+          ownerMinOrderCurrency: MinOrderCurrency.usd,
+          discountRules: {'usd_payment_discount_pct': 10},
+        ),
+        delta: 8,
+        precioUnitarioAliadoRef: 12.50,
+      );
+      await open(tester, width: width);
+
+      final scroll = find.byType(Scrollable).first;
+      final unitNotice = find
+          .textContaining(RegExp('faltan 2 unidades', caseSensitive: false));
+      final amountNotice = find.text('Llevas 90 USD de 95 USD');
+      final next =
+          find.widgetWithText(FilledButton, 'Continuar con la entrega →');
+      expect(unitNotice, findsOneWidget);
+      await tester.scrollUntilVisible(amountNotice, 120, scrollable: scroll);
+      expect(amountNotice, findsOneWidget);
+      await tester.scrollUntilVisible(next, 120, scrollable: scroll);
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+
+      cart.setQuantity('usd-product', 9);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+
+      cart.setQuantity('usd-product', 8);
+      cart.setQuantity('unit-product', 10);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+
+      cart.setQuantity('usd-product', 9);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(next).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
   }
 
   for (final scale in [1.0, 1.6]) {
@@ -126,6 +234,27 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+
+  testWidgets('desktop keeps both supplier currencies when entering checkout',
+      (tester) async {
+    seed();
+    await open(tester, width: 1440);
+    await choose(tester, 'one', 'USD');
+    await choose(tester, 'two', 'Bolívares');
+    expect(cart.supplierCurrencyPreferences, {'one': true, 'two': false});
+    expect(find.text('450.00 USD'), findsWidgets);
+    expect(find.text('Bs 5.000,00'), findsWidgets);
+    final next = find.text('Continuar con la entrega →');
+    await tester.ensureVisible(next);
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+    final checkout =
+        tester.widget<MobileCheckoutScreen>(find.byType(MobileCheckoutScreen));
+    expect(checkout.initialPayUsdBySupplier, {'one': true, 'two': false});
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
       'USD-only and missing BCV disable bolivares without blocking the other supplier',
       (tester) async {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/b2b_theme_extension.dart';
 import '../../../core/layout/app_breakpoints.dart';
 import '../../../core/utils/app_date_format.dart';
+import '../../../core/widgets/desktop_workflow.dart';
 import 'mobile_order_action_widgets.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -96,10 +97,11 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
   List<_SavedReport> _saved = const [];
 
   bool get _hasVideo => _evidence.any((item) => item.isVideo);
-  bool get _mobile =>
+  bool get _guided =>
+      widget.onSubmitted != null ||
       MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
   bool get _editable =>
-      !_saving && !_pickingEvidence && (!_mobile || !_attempted);
+      !_saving && !_pickingEvidence && (!_guided || !_attempted);
 
   void _revealNotice() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -112,7 +114,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
 
   void _showError(String message) {
     setState(() => _formError = message);
-    if (_mobile) _revealNotice();
+    if (_guided) _revealNotice();
   }
 
   Future<Map<String, dynamic>?> _fetchReport(String id) =>
@@ -193,7 +195,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
     required bool video,
     required bool camera,
   }) async {
-    if (_saving || _pickingEvidence || (_mobile && _attempted)) return;
+    if (_saving || _pickingEvidence || (_guided && _attempted)) return;
     if (video && _evidence.isNotEmpty) {
       _showError(_hasVideo
           ? 'Solo puede adjuntar un video.'
@@ -244,7 +246,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
   Future<void> _submit() async {
     if (_saving || _pickingEvidence || _submitted) return;
     final note = _noteCtrl.text.trim();
-    final chosen = _mobile && _attemptLines != null
+    final chosen = _guided && _attemptLines != null
         ? _attemptLines!
         : _eligible.where((line) => _selected.contains(line.id)).toList();
     if (chosen.isEmpty) {
@@ -259,7 +261,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
       _showError('Adjunte al menos una foto o un video.');
       return;
     }
-    if (_mobile) {
+    if (_guided) {
       await _submitMobile(chosen, note);
       return;
     }
@@ -451,8 +453,8 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
   Widget build(BuildContext context) {
     final eligible = _eligible;
     final showForm = !widget.viewOnly &&
-        (eligible.isNotEmpty || (_mobile && _attempted && !_submitted));
-    if (_mobile) return _buildMobile(showForm, eligible);
+        (eligible.isNotEmpty || (_guided && _attempted && !_submitted));
+    if (_guided) return _buildGuided(showForm, eligible);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -499,7 +501,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
     );
   }
 
-  Widget _buildMobile(bool showForm, List<TransactionRequestModel> eligible) {
+  Widget _buildGuided(bool showForm, List<TransactionRequestModel> eligible) {
     final theme = B2BThemeExtension.of(context);
     final deadlines = eligible
         .map((line) => OrderReturnRules.availableUntil(
@@ -528,12 +530,11 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
             onBack: back),
         body: SafeArea(
             top: false,
-            child: Column(children: [
-              Expanded(
-                  child: ListView(
-                      controller: _scroll,
-                      padding: const EdgeInsets.all(16),
-                      children: [
+            child: DesktopWorkflow(
+              body: ListView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(16),
+                  children: [
                     MobileOrderActionPanel(
                         child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,8 +598,8 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
                         const SizedBox(height: 10)
                       ],
                     ],
-                  ])),
-              Padding(
+                  ]),
+              actions: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                   child: SizedBox(
                     width: double.infinity,
@@ -628,7 +629,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
                                             : 'Volver al pedido',
                             textAlign: TextAlign.center)),
                   )),
-            ])),
+            )),
       ),
     );
   }
@@ -665,7 +666,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
           eligible: eligible.any((item) => item.id == line.id),
           selected: _selected.contains(line.id),
           qty: _qty[line.id] ?? 1,
-          compact: _mobile,
+          compact: _guided,
           enabled: _editable,
           onSelected: (value) {
             setState(() {
@@ -686,11 +687,11 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
         controller: _noteCtrl,
         minLines: 3,
         maxLines: 5,
-        maxLength: _mobile ? 4000 : null,
+        maxLength: _guided ? 4000 : null,
         enabled: _editable,
         textCapitalization: TextCapitalization.sentences,
         decoration: InputDecoration(
-          labelText: _mobile ? '¿Qué ocurrió?' : 'Qué inconveniente tuvo',
+          labelText: _guided ? '¿Qué ocurrió?' : 'Qué inconveniente tuvo',
           hintText: 'Escríbalo con claridad.',
           filled: true,
           fillColor: AppColors.fieldFill,
@@ -715,7 +716,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
           color: AppColors.textSecondary,
         ),
       ),
-      if (_mobile)
+      if (_guided)
         _mobileEvidence()
       else
         OrderMessageAttachButtons(
@@ -725,8 +726,8 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
           onVideoCamera: () => _addEvidence(video: true, camera: true),
           onVideoGallery: () => _addEvidence(video: true, camera: false),
         ),
-      if (!_mobile && _evidence.isNotEmpty) _evidenceStrip(),
-      if (!_mobile && selected.isNotEmpty) ...[
+      if (!_guided && _evidence.isNotEmpty) _evidenceStrip(),
+      if (!_guided && selected.isNotEmpty) ...[
         const SizedBox(height: 8),
         _Preview(
           lines: selected,
@@ -736,7 +737,7 @@ class _OrderIssueReportScreenState extends State<OrderIssueReportScreen> {
           evidence: _evidence,
         ),
       ],
-      if (!_mobile) ...[
+      if (!_guided) ...[
         const SizedBox(height: 12),
         FilledButton(
           onPressed: _saving ? null : _submit,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/widgets/aliado_header_search.dart';
 import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
@@ -249,7 +250,14 @@ class _SupplierDirectoryScreenState extends State<SupplierDirectoryScreen> {
         MediaQuery.viewInsetsOf(context).bottom == 0;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: mobile ? null : _directoryHeader(0),
+      appBar: mobile
+          ? null
+          : desktopWorkflowAppBar(context, 'Proveedores', actions: [
+              IconButton(
+                  onPressed: _filters,
+                  tooltip: 'Filtros de proveedores',
+                  icon: const LucideIcon(LucideGlyph.slidersHorizontal)),
+            ]),
       extendBody: showNavigation,
       bottomNavigationBar:
           showNavigation ? const SupplierMobileNavigation() : null,
@@ -284,7 +292,23 @@ class _SupplierDirectoryScreenState extends State<SupplierDirectoryScreen> {
                       navigationInset: showNavigation
                           ? MediaQuery.paddingOf(context).bottom
                           : 0)))
-          : _directoryBody(),
+          : Center(
+              child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1050),
+              child: Column(children: [
+                Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: TextField(
+                      controller: _search,
+                      focusNode: _searchFocus,
+                      onSubmitted: (_) => _load(),
+                      decoration: const InputDecoration(
+                          hintText: 'Busca por negocio, marca, SKU o repuesto…',
+                          prefixIcon: Icon(Icons.search)),
+                    )),
+                Expanded(child: _directoryBody()),
+              ]),
+            )),
     );
   }
 

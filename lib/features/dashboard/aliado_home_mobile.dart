@@ -267,53 +267,6 @@ class _HomePicker extends StatelessWidget {
       ));
 }
 
-class _HomeSupplierConversation extends StatefulWidget {
-  const _HomeSupplierConversation({required this.supplier});
-  final ImporterOption supplier;
-
-  @override
-  State<_HomeSupplierConversation> createState() =>
-      _HomeSupplierConversationState();
-}
-
-class _HomeSupplierConversationState extends State<_HomeSupplierConversation> {
-  late Future<String> _thread;
-
-  @override
-  void initState() {
-    super.initState();
-    _thread = _open();
-  }
-
-  Future<String> _open() =>
-      StoreSupplierChatService.openOrCreate(importadorId: widget.supplier.id);
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<String>(
-        future: _thread,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return StoreSupplierChatScreen(threadId: snapshot.data!);
-          }
-          return Scaffold(
-            appBar: AppBar(title: Text(widget.supplier.businessName)),
-            body: Center(
-                child: snapshot.hasError
-                    ? Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Text('No pudimos abrir la consulta.'),
-                        TextButton(
-                            onPressed: () {
-                              final next = _open();
-                              setState(() => _thread = next);
-                            },
-                            child: const Text('Reintentar')),
-                      ])
-                    : const CircularProgressIndicator()),
-          );
-        },
-      );
-}
-
 class _HomeRecentSection extends StatefulWidget {
   const _HomeRecentSection({required this.viewerId, required this.builder});
   final String viewerId;

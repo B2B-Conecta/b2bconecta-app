@@ -20,6 +20,9 @@ TextStyle _reputationHeading(BuildContext context, {double size = 18}) =>
 
 AppBar _reputationAppBar(BuildContext context, String title,
     {List<Widget>? actions}) {
+  if (MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu) {
+    return desktopWorkflowAppBar(context, title, actions: actions);
+  }
   return AppBar(
     backgroundColor: _reputationBlue,
     foregroundColor: Colors.white,
@@ -326,6 +329,7 @@ class _MobileRatingList extends StatefulWidget {
 
 class _MobileRatingListState extends State<_MobileRatingList> {
   int? _stars;
+  _Review? _selected;
   final _scroll = ScrollController(keepScrollOffset: false);
 
   @override
@@ -343,81 +347,112 @@ class _MobileRatingListState extends State<_MobileRatingList> {
     final average =
         widget.reviews.fold<int>(0, (total, review) => total + review.stars) /
             widget.reviews.length;
+    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final selected = _selected;
     return Scaffold(
       backgroundColor: theme.surfaceCard,
       appBar: _reputationAppBar(context, 'Valoraciones recibidas'),
       body: SafeArea(
           top: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                  child: Text(
-                      '${_ratingCountLabel(widget.reviews.length)} · Promedio ${_score(average)} / 5',
-                      style: _reputationHeading(context, size: 17))),
-              if (widget.reviews.length == 100)
+          child: Row(children: [
+            Expanded(
+                child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('Últimas 100 valoraciones',
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                    child: Text(
+                        '${_ratingCountLabel(widget.reviews.length)} · Promedio ${_score(average)} / 5',
+                        style: _reputationHeading(context, size: 17))),
+                if (widget.reviews.length == 100)
+                  Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('Últimas 100 valoraciones',
+                          style: TextStyle(color: theme.textSecondary))),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    for (final stars in <int?>[null, 5, 4, 3, 2, 1])
+                      Padding(
+                          padding: const EdgeInsets.only(right: 7),
+                          child: ChoiceChip(
+                            label: Text(stars == null
+                                ? 'Todas'
+                                : stars == 1
+                                    ? '1 estrella'
+                                    : '$stars estrellas'),
+                            selected: _stars == stars,
+                            showCheckmark: false,
+                            shape: const StadiumBorder(),
+                            side: BorderSide(
+                                color: _stars == stars
+                                    ? _reputationBlue
+                                    : theme.borderStrong),
+                            selectedColor: _reputationBlue,
+                            labelStyle: TextStyle(
+                                color: _stars == stars
+                                    ? Colors.white
+                                    : theme.textPrimary),
+                            onSelected: (_) {
+                              if (_scroll.hasClients) _scroll.jumpTo(0);
+                              setState(() {
+                                _stars = stars;
+                                if (stars != null &&
+                                    _selected?.stars != stars) {
+                                  _selected = null;
+                                }
+                              });
+                            },
+                          )),
+                  ]),
+                ),
+                Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                    child: Text('Más recientes',
                         style: TextStyle(color: theme.textSecondary))),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(children: [
-                  for (final stars in <int?>[null, 5, 4, 3, 2, 1])
-                    Padding(
-                        padding: const EdgeInsets.only(right: 7),
-                        child: ChoiceChip(
-                          label: Text(stars == null
-                              ? 'Todas'
-                              : stars == 1
-                                  ? '1 estrella'
-                                  : '$stars estrellas'),
-                          selected: _stars == stars,
-                          showCheckmark: false,
-                          shape: const StadiumBorder(),
-                          side: BorderSide(
-                              color: _stars == stars
-                                  ? _reputationBlue
-                                  : theme.borderStrong),
-                          selectedColor: _reputationBlue,
-                          labelStyle: TextStyle(
-                              color: _stars == stars
-                                  ? Colors.white
-                                  : theme.textPrimary),
-                          onSelected: (_) {
-                            if (_scroll.hasClients) _scroll.jumpTo(0);
-                            setState(() => _stars = stars);
-                          },
-                        )),
-                ]),
-              ),
-              Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-                  child: Text('Más recientes',
-                      style: TextStyle(color: theme.textSecondary))),
+                Expanded(
+                    child: results.isEmpty
+                        ? const Center(
+                            child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text(
+                                    'No hay valoraciones con esta puntuación.',
+                                    textAlign: TextAlign.center)))
+                        : ListView.separated(
+                            controller: _scroll,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: results.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(height: 1, color: theme.border),
+                            itemBuilder: (_, index) => _MobileReviewRow(
+                                review: results[index],
+                                questionnaire: widget.questionnaire,
+                                returnLabel: 'Volver a valoraciones',
+                                onTap: wide
+                                    ? () => setState(
+                                        () => _selected = results[index])
+                                    : null,
+                                selected: identical(selected, results[index])),
+                          )),
+              ],
+            )),
+            if (wide) ...[
+              const VerticalDivider(width: 1),
               Expanded(
-                  child: results.isEmpty
+                  child: selected == null
                       ? const Center(
-                          child: Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Text(
-                                  'No hay valoraciones con esta puntuación.',
-                                  textAlign: TextAlign.center)))
-                      : ListView.separated(
-                          controller: _scroll,
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: results.length,
-                          separatorBuilder: (_, __) =>
-                              Divider(height: 1, color: theme.border),
-                          itemBuilder: (_, index) => _MobileReviewRow(
-                              review: results[index],
-                              questionnaire: widget.questionnaire,
-                              returnLabel: 'Volver a valoraciones'),
+                          child: Text(
+                              'Selecciona una valoración para ver el detalle.'))
+                      : _MobileReviewDetail(
+                          key: ObjectKey(selected),
+                          review: selected,
+                          questionnaire: widget.questionnaire,
+                          returnLabel: 'Volver a valoraciones',
+                          embedded: true,
                         )),
             ],
-          )),
+          ])),
     );
   }
 }
@@ -427,47 +462,56 @@ class _MobileReviewRow extends StatelessWidget {
     required this.review,
     required this.questionnaire,
     this.returnLabel = 'Volver al resumen',
+    this.onTap,
+    this.selected = false,
   });
   final _Review review;
   final RatingQuestionnaireModel questionnaire;
   final String returnLabel;
+  final VoidCallback? onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
     final comment = review.comment.trim();
-    return InkWell(
-      onTap: () => Navigator.of(context).push<void>(MaterialPageRoute(
-          builder: (_) => _MobileReviewDetail(
-              review: review,
-              questionnaire: questionnaire,
-              returnLabel: returnLabel))),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(children: [
-          _AnonymousReviewerAvatar(
-              size: MediaQuery.textScalerOf(context).scale(14) > 19 ? 36 : 44),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(review.author,
-                    style: _reputationHeading(context, size: 15)),
-                const SizedBox(height: 3),
-                if (comment.isNotEmpty)
-                  Text(comment, maxLines: 2, overflow: TextOverflow.ellipsis),
-                if (review.date case final date?)
-                  Text(formatEsShortDate(date),
-                      style:
-                          TextStyle(fontSize: 12, color: theme.textSecondary)),
-              ])),
-          const SizedBox(width: 6),
-          _MobileStars(score: review.stars),
-          const SizedBox(width: 4),
-          LucideIcon(LucideGlyph.chevronRight,
-              size: 16, color: theme.textSecondary),
-        ]),
+    return Ink(
+      color: selected ? theme.brand.withOpacity(0.08) : null,
+      child: InkWell(
+        onTap: onTap ??
+            () => Navigator.of(context).push<void>(MaterialPageRoute(
+                builder: (_) => _MobileReviewDetail(
+                    review: review,
+                    questionnaire: questionnaire,
+                    returnLabel: returnLabel))),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(children: [
+            _AnonymousReviewerAvatar(
+                size:
+                    MediaQuery.textScalerOf(context).scale(14) > 19 ? 36 : 44),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(review.author,
+                      style: _reputationHeading(context, size: 15)),
+                  const SizedBox(height: 3),
+                  if (comment.isNotEmpty)
+                    Text(comment, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (review.date case final date?)
+                    Text(formatEsShortDate(date),
+                        style: TextStyle(
+                            fontSize: 12, color: theme.textSecondary)),
+                ])),
+            const SizedBox(width: 6),
+            _MobileStars(score: review.stars),
+            const SizedBox(width: 4),
+            LucideIcon(LucideGlyph.chevronRight,
+                size: 16, color: theme.textSecondary),
+          ]),
+        ),
       ),
     );
   }
@@ -520,12 +564,15 @@ class _MobileStars extends StatelessWidget {
 
 class _MobileReviewDetail extends StatelessWidget {
   const _MobileReviewDetail(
-      {required this.review,
+      {super.key,
+      required this.review,
       required this.questionnaire,
-      required this.returnLabel});
+      required this.returnLabel,
+      this.embedded = false});
   final _Review review;
   final RatingQuestionnaireModel questionnaire;
   final String returnLabel;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -541,87 +588,90 @@ class _MobileReviewDetail extends StatelessWidget {
         criteria.add((question: question, score: score));
       }
     }
-    return Scaffold(
-      backgroundColor: theme.surfaceCard,
-      appBar: _reputationAppBar(context, 'Detalle de la valoración'),
-      body: SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(children: [
-                const _AnonymousReviewerAvatar(size: 54),
-                const SizedBox(width: 11),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(review.author,
-                          style: _reputationHeading(context, size: 20)),
-                      if (review.date case final date?)
-                        Text(formatEsShortDate(date),
-                            style: TextStyle(color: theme.textSecondary)),
-                    ])),
-              ]),
+    final detail = SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (embedded) ...[
+              Text('Detalle de la valoración',
+                  style: _reputationHeading(context)),
               const SizedBox(height: 16),
-              _MobileRatingPanel(
-                  child: Column(children: [
-                Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Icon(Icons.star_rounded,
-                          size: 46, color: Color(0xFFF5A400)),
-                      Text('${review.stars} / 5',
-                          style: _reputationHeading(context, size: 38)),
-                    ]),
-                const SizedBox(height: 8),
-                Text(
-                    comment.isEmpty
-                        ? 'Sin comentario escrito'
-                        : 'Comentario del proveedor',
+            ],
+            Row(children: [
+              const _AnonymousReviewerAvatar(size: 54),
+              const SizedBox(width: 11),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(review.author,
+                        style: _reputationHeading(context, size: 20)),
+                    if (review.date case final date?)
+                      Text(formatEsShortDate(date),
+                          style: TextStyle(color: theme.textSecondary)),
+                  ])),
+            ]),
+            const SizedBox(height: 16),
+            _MobileRatingPanel(
+                child: Column(children: [
+              Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Icon(Icons.star_rounded,
+                        size: 46, color: Color(0xFFF5A400)),
+                    Text('${review.stars} / 5',
+                        style: _reputationHeading(context, size: 38)),
+                  ]),
+              const SizedBox(height: 8),
+              Text(
+                  comment.isEmpty
+                      ? 'Sin comentario escrito'
+                      : 'Comentario del proveedor',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: theme.textSecondary)),
+              if (comment.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(comment,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: theme.textSecondary)),
-                if (comment.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Text(comment,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 18,
-                          height: 1.3,
-                          fontWeight: FontWeight.w700)),
-                ],
-              ])),
-              if (criteria.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _MobileRatingPanel(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                      Text('Puntuación por criterio',
-                          style: _reputationHeading(context)),
-                      const SizedBox(height: 6),
-                      for (final (index, criterion) in criteria.indexed) ...[
-                        if (index > 0)
-                          Divider(height: 1, color: theme.borderStrong),
-                        Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(children: [
-                              LucideIcon(_criterionIcon(criterion.question.id),
-                                  size: 21, color: theme.brand),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                  child: Text(criterion.question.displayTitle)),
-                              const SizedBox(width: 8),
-                              _MobileStars(
-                                  score: criterion.score,
-                                  max: questionnaire.scaleMax),
-                            ])),
-                      ],
-                    ])),
+                    style: const TextStyle(
+                        fontSize: 18,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700)),
               ],
-              const SizedBox(height: 20),
+            ])),
+            if (criteria.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _MobileRatingPanel(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                    Text('Puntuación por criterio',
+                        style: _reputationHeading(context)),
+                    const SizedBox(height: 6),
+                    for (final (index, criterion) in criteria.indexed) ...[
+                      if (index > 0)
+                        Divider(height: 1, color: theme.borderStrong),
+                      Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(children: [
+                            LucideIcon(_criterionIcon(criterion.question.id),
+                                size: 21, color: theme.brand),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(criterion.question.displayTitle)),
+                            const SizedBox(width: 8),
+                            _MobileStars(
+                                score: criterion.score,
+                                max: questionnaire.scaleMax),
+                          ])),
+                    ],
+                  ])),
+            ],
+            const SizedBox(height: 20),
+            if (!embedded)
               FilledButton(
                 onPressed: () => Navigator.pop(context),
                 style: FilledButton.styleFrom(
@@ -633,8 +683,13 @@ class _MobileReviewDetail extends StatelessWidget {
                 ),
                 child: Text(returnLabel, textAlign: TextAlign.center),
               ),
-            ],
-          )),
+          ],
+        ));
+    if (embedded) return detail;
+    return Scaffold(
+      backgroundColor: theme.surfaceCard,
+      appBar: _reputationAppBar(context, 'Detalle de la valoración'),
+      body: detail,
     );
   }
 }

@@ -285,6 +285,7 @@ class ChatMessageBubble extends StatelessWidget {
   final bool isAction;
   final bool highlightAction;
   final bool showDate;
+
   /// Hora de 12 horas (`10:32 AM`). El panel estrecho sigue en 24 h.
   final bool use12HourClock;
   final bool mobileStyle;
@@ -369,7 +370,7 @@ class ChatMessageBubble extends StatelessWidget {
                       fontSize: mobileStyle ? 15 : 13.5,
                       height: 1.35,
                     ),
-                    child: child,
+                    child: SelectionArea(child: child),
                   ),
                   if (time != null)
                     Padding(

@@ -225,12 +225,14 @@ class PromoCreativeImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.mobileUrl,
     this.onLoadFailed,
+    this.onImageRatio,
   });
 
   final String url;
   final BoxFit fit;
   final String? mobileUrl;
   final ValueChanged<String>? onLoadFailed;
+  final ValueChanged<double>? onImageRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +257,18 @@ class PromoCreativeImage extends StatelessWidget {
           filterQuality: FilterQuality.medium,
           cacheWidth: cacheWidth,
           gaplessPlayback: true,
+          frameBuilder: onImageRatio == null
+              ? null
+              : (_, child, frame, __) {
+                  final pixels = child is Semantics ? child.child : child;
+                  if (frame == 0 && pixels is RawImage && pixels.image != null) {
+                    final image = pixels.image!;
+                    final ratio = image.width / image.height;
+                    WidgetsBinding.instance
+                        .addPostFrameCallback((_) => onImageRatio!(ratio));
+                  }
+                  return child;
+                },
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
             return _PromoBannerPlaceholder(progress: progress);

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
+import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
 import '../../../app/theme/b2b_theme_extension.dart';
 import '../../../core/utils/ves_amount_format.dart';
@@ -28,24 +30,28 @@ String mobileOrderReference(List<TransactionRequestModel> lines) {
 
 PreferredSizeWidget mobileOrderActionBar(BuildContext context, String title,
         {VoidCallback? onBack}) =>
-    AppBar(
-      backgroundColor: mobileOrderActionBlue,
-      foregroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      toolbarHeight: MediaQuery.textScalerOf(context).scale(18) > 23 ? 96 : 72,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(24))),
-      leading: BackButton(onPressed: onBack),
-      title: B2bHeaderTitle(
-        title: Text(title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700)),
-      ),
-    );
+    MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu
+        ? desktopWorkflowAppBar(context, title, onBack: onBack)
+        : AppBar(
+            backgroundColor: mobileOrderActionBlue,
+            foregroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            toolbarHeight:
+                MediaQuery.textScalerOf(context).scale(18) > 23 ? 96 : 72,
+            shape: const RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.vertical(bottom: Radius.circular(24))),
+            leading: BackButton(onPressed: onBack),
+            title: B2bHeaderTitle(
+              title: Text(title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700)),
+            ),
+          );
 
 class MobileOrderActionPanel extends StatelessWidget {
   const MobileOrderActionPanel({super.key, required this.child});

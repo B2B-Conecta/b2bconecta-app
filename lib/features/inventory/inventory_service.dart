@@ -6,6 +6,8 @@ import 'package:motolink_pro_app/features/inventory/catalog_import_validator.dar
 import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_mapping.dart';
 import 'package:motolink_pro_app/features/inventory/catalog_import/catalog_import_result.dart';
 import 'package:motolink_pro_app/features/catalog/part_model.dart';
+import 'package:motolink_pro_app/features/catalog/combined_minimum.dart';
+import 'package:motolink_pro_app/features/catalog/catalog_taxonomy.dart';
 import 'package:motolink_pro_app/features/inventory/inventory_search.dart';
 import 'package:motolink_pro_app/features/inventory/product_delete_result.dart';
 import 'package:motolink_pro_app/features/inventory/product_image_bulk_result.dart';
@@ -15,6 +17,64 @@ import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart
 
 class InventoryService {
   InventoryService._();
+
+  static Future<List<CombinedMinimum>> fetchCombinedMinimums() async {
+    final rows = await SupabaseAccess.client
+        .from('product_minimum_groups')
+        .select('id, name, minimum_units')
+        .order('name');
+    return rows.map(CombinedMinimum.fromJson).nonNulls.toList();
+  }
+
+  static Future<bool> hasCombinedMinimumInCategory(String category) async {
+    final ownerId = SupabaseAccess.currentUserId;
+    if (ownerId == null) return false;
+    try {
+      final matches = await SupabaseAccess.client
+          .from('products')
+          .select('id')
+          .eq('owner_id', ownerId)
+          .not('minimum_group_id', 'is', null)
+          .ilike('category', '${categoryFamily(category)}%')
+          .limit(1);
+      return matches.isNotEmpty;
+    } catch (_) {
+      // Suggesting a rule is optional after the product has been saved.
+      return false;
+    }
+  }
+
+  static Future<List<PartModel>> fetchCombinedMinimumInventory() async {
+    final ownerId = SupabaseAccess.currentUserId;
+    if (ownerId == null) return const [];
+    const pageSize = 300;
+    final products = <PartModel>[];
+    while (true) {
+      final rows = await SupabaseAccess.client
+          .from('products')
+          .select('id, name, sku, category, is_active, combined_minimum')
+          .eq('owner_id', ownerId)
+          .order('name')
+          .order('id')
+          .range(products.length, products.length + pageSize - 1);
+      products.addAll(rows.map(PartModel.fromJson));
+      if (rows.length < pageSize) return products;
+    }
+  }
+
+  static Future<void> saveCombinedMinimum({
+    String? id,
+    required String? name,
+    required int? units,
+    required Set<String> productIds,
+  }) async {
+    await SupabaseAccess.client.rpc('save_product_minimum_group', params: {
+      'p_group_id': id,
+      'p_name': name,
+      'p_minimum_units': units,
+      'p_product_ids': productIds.toList(),
+    });
+  }
 
   static Future<int> importadorBulkSetUsdPaymentDiscount({
     required double pct,

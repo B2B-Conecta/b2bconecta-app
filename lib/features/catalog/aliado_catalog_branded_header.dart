@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
@@ -148,28 +149,30 @@ class CatalogCollapsingSearchField extends StatelessWidget {
           ),
           suffixIcon: Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: IconButton(
-              tooltip: 'Filtros del catálogo',
-              onPressed: onOpenFilters,
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(44),
-                padding: EdgeInsets.zero,
-                foregroundColor: AliadoBrandedHeader.filterBlue,
-              ),
-              icon: Badge(
-                isLabelVisible: filterBadge > 0,
-                label: Text('$filterBadge'),
-                backgroundColor: AppColors.brandAccent,
-                child: const SizedBox.square(
-                  dimension: 32,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AliadoBrandedHeader.filterBlue,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: LucideIcon(LucideGlyph.slidersHorizontal,
-                          size: 17, color: Colors.white),
+            child: RetailerTourTarget(
+              child: IconButton(
+                tooltip: 'Filtros del catálogo',
+                onPressed: onOpenFilters,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(44),
+                  padding: EdgeInsets.zero,
+                  foregroundColor: AliadoBrandedHeader.filterBlue,
+                ),
+                icon: Badge(
+                  isLabelVisible: filterBadge > 0,
+                  label: Text('$filterBadge'),
+                  backgroundColor: AppColors.brandAccent,
+                  child: const SizedBox.square(
+                    dimension: 32,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AliadoBrandedHeader.filterBlue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: LucideIcon(LucideGlyph.slidersHorizontal,
+                            size: 17, color: Colors.white),
+                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,4 @@
-import 'dart:async' show Timer, unawaited;
+import 'dart:async' show scheduleMicrotask, Timer, unawaited;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
@@ -54,6 +54,7 @@ import 'package:motolink_pro_app/features/dashboard/importer_command_palette.dar
 import 'package:motolink_pro_app/features/dashboard/importer_shell_badges.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_welcome_dialog.dart';
+import 'package:motolink_pro_app/features/onboarding/retailer_induction.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
@@ -209,6 +210,9 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    if (widget.homeRole == AppHomeRole.aliado) {
+      scheduleMicrotask(endRetailerTour);
+    }
     _presenceTimer?.cancel();
     PushNotificationService.instance.unregisterTapHandler();
     _notifications.removeListener(_onNotificationsChanged);
@@ -2130,10 +2134,8 @@ class _ProfileTabState extends State<_ProfileTab>
                   height: 42,
                   child: TabBar(
                     controller: _profileTabs,
-                    isScrollable: mobile || _tabCount > 3,
-                    tabAlignment: (mobile || _tabCount > 3)
-                        ? TabAlignment.start
-                        : TabAlignment.fill,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.center,
                     labelColor: theme.surfaceCard,
                     unselectedLabelColor: theme.textPrimary,
                     indicatorSize: TabBarIndicatorSize.tab,

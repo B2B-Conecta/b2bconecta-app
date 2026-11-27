@@ -600,6 +600,10 @@ extension on _AliadoHomeDashboardState {
                   else if (EntrepreneurRailStatusCard.homeBanner(widget.profile)
                       case final entrepreneurBanner?)
                     _block(entrepreneurBanner, top: 12),
+                  _block(const Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: RetailerTourButton(),
+                  ), top: 12),
                   if (snapshot.connectionState != ConnectionState.done &&
                       data == null)
                     const SliverFillRemaining(
@@ -803,12 +807,14 @@ extension on _AliadoHomeDashboardState {
     VoidCallback? onSearch,
     VoidCallback? onFilters,
   }) =>
-      AliadoHeaderSearch(
-        controller: _search,
-        hint: 'Buscar repuestos, bujías, cauchos…',
-        autofocus: autofocus,
-        onSearch: onSearch ?? _searchCatalog,
-        onFilters: onFilters ?? () => _searchCatalogWithFilters(true),
+      RetailerTourTarget(
+        child: AliadoHeaderSearch(
+          controller: _search,
+          hint: 'Buscar repuestos, bujías, cauchos…',
+          autofocus: autofocus,
+          onSearch: onSearch ?? _searchCatalog,
+          onFilters: onFilters ?? () => _searchCatalogWithFilters(true),
+        ),
       );
 
   Widget _block(Widget child, {double top = 18, bool fullWidth = false}) {
@@ -821,6 +827,7 @@ extension on _AliadoHomeDashboardState {
 
   List<Widget> _mobileSections(AliadoHomeData data,
       {required bool showTracking}) {
+    final categories = _webAllCategories(data);
     final brands = <String, MapEntry<String, String>>{};
     for (final product in [
       ...data.newArrivals,
@@ -864,7 +871,7 @@ extension on _AliadoHomeDashboardState {
             top: 0,
             fullWidth: campaigns.length > 1),
       ],
-      if (data.categories.isNotEmpty)
+      if (categories.isNotEmpty)
         _block(
           top: campaigns.length > 1 ? 4 : 18,
           Column(
@@ -872,28 +879,47 @@ extension on _AliadoHomeDashboardState {
             children: [
               _homeHeading(
                 'Categorías',
-                action: data.categories.length > 4 ||
-                        data.categories
-                            .any((group) => group.children.isNotEmpty)
-                    ? 'Ver todas'
-                    : null,
+                action: 'Ver todas',
                 showActionAngle: true,
-                onAction: () => _categories(data),
+                onAction: () => _categories(
+                  data,
+                  groups: categories,
+                  includeBlankAccessories: data.categoryLabels.isNotEmpty,
+                ),
               ),
               LayoutBuilder(builder: (context, bounds) {
-                final count =
+                const gap = 8.0;
+                final preferredCount =
                     MediaQuery.textScalerOf(context).scale(13) > 19 ? 2 : 4;
-                final width = (bounds.maxWidth - (count - 1) * 8) / count;
-                return Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (final group in data.categories.take(4))
-                    SizedBox(
-                        width: width,
-                        child: _CategoryShortcut(
-                          label: group.label,
-                          illustrated: true,
-                          onTap: () => _openCategory(group),
-                        )),
-                ]);
+                final visibleCount = categories.length > preferredCount
+                    ? preferredCount - 0.2
+                    : preferredCount.toDouble();
+                final width = (bounds.maxWidth + gap) / visibleCount - gap;
+                return SingleChildScrollView(
+                  key: const PageStorageKey('mobile-home-categories'),
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final (index, group) in categories.indexed) ...[
+                        if (index > 0) const SizedBox(width: gap),
+                        SizedBox(
+                          width: width,
+                          child: _CategoryShortcut(
+                            label: group.label,
+                            illustrated: true,
+                            onTap: () => _openCategory(
+                              group,
+                              includeBlankCategory:
+                                  data.categoryLabels.isNotEmpty &&
+                                      group.label == 'Accesorios',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
               }),
             ],
           ),

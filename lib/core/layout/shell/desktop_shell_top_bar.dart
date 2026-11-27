@@ -21,7 +21,7 @@ class DesktopShellTopBar extends StatelessWidget {
   });
 
   final int unreadNotifications;
-  final VoidCallback onNotificationTap;
+  final void Function(BuildContext anchorContext) onNotificationTap;
   final VoidCallback? onMessagesTap;
   final int unreadMessages;
   final List<Widget> trailingActions;
@@ -79,14 +79,16 @@ class DesktopShellTopBar extends StatelessWidget {
                   onPressed: onMessagesTap!,
                   unreadCount: unreadMessages,
                 ),
-              HeaderIconButton(
-                tooltip: 'Notificaciones',
-                onPressed: onNotificationTap,
-                count: unreadNotifications,
-                badgeColor: Colors.red,
-                icon: unreadNotifications > 0
-                    ? Icons.notifications
-                    : Icons.notifications_none_outlined,
+              Builder(
+                builder: (anchorContext) => HeaderIconButton(
+                  tooltip: 'Notificaciones',
+                  onPressed: () => onNotificationTap(anchorContext),
+                  count: unreadNotifications,
+                  badgeColor: Colors.red,
+                  icon: unreadNotifications > 0
+                      ? Icons.notifications
+                      : Icons.notifications_none_outlined,
+                ),
               ),
               const SizedBox(width: 4),
               const ThemeModeBubble(),

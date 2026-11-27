@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
@@ -217,8 +218,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // Umbral propio de ficha: en web ancha no debe verse como móvil apilado.
     final isDesktop =
         MediaQuery.sizeOf(context).width >= AppBreakpoints.productDetailDesktop;
-    if (isDesktop) return _buildDesktopLayout(context);
-    return _buildMobileLayout(context);
+    final screen = isDesktop
+        ? _buildDesktopLayout(context)
+        : _buildMobileLayout(context);
+    if (widget.guestPreview) return screen;
+    return RetailerTourScreen(
+      stop: RetailerTourStop.product,
+      child: screen,
+    );
   }
 
   Widget _buildMobileLayout(BuildContext context) {

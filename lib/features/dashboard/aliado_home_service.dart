@@ -44,7 +44,7 @@ class AliadoHomeData {
   /// Textos distintos de `products.category`. Inicio web los reclasifica.
   final List<String> categoryLabels;
 
-  /// Productos activos con stock. Solo lo llena Inicio web.
+  /// Productos activos con stock para clasificar y contar las categorías.
   final List<WebCatalogStockItem> stockIndex;
 
   AliadoHomeData withWebStock(List<WebCatalogStockItem> stockIndex) {

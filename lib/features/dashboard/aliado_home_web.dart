@@ -67,7 +67,14 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         sliver: SliverToBoxAdapter(
-          child: _webHeroBanner(data),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _webHeroBanner(data),
+              const SizedBox(height: 12),
+              const RetailerTourButton(),
+            ],
+          ),
         ),
       ),
       if (warning != null)
@@ -1747,24 +1754,26 @@ class _WebHomeHero extends StatelessWidget {
                   Positioned(
                     left: width * 0.046,
                     bottom: height * 0.11,
-                    child: FilledButton(
-                      onPressed: onCatalog,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: B2BBrandHero.foreground,
-                        foregroundColor: B2BBrandHero.accentInk,
-                        elevation: 0,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: width * 0.026,
-                          vertical: height * 0.04,
+                    child: RetailerTourTarget(
+                      child: FilledButton(
+                        onPressed: onCatalog,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: B2BBrandHero.foreground,
+                          foregroundColor: B2BBrandHero.accentInk,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: width * 0.026,
+                            vertical: height * 0.04,
+                          ),
+                          shape: const StadiumBorder(),
+                          textStyle: TextStyle(
+                            fontSize: (width * 0.018).clamp(13.0, 17.0),
+                            fontWeight: FontWeight.w700,
+                            height: 1,
+                          ),
                         ),
-                        shape: const StadiumBorder(),
-                        textStyle: TextStyle(
-                          fontSize: (width * 0.018).clamp(13.0, 17.0),
-                          fontWeight: FontWeight.w700,
-                          height: 1,
-                        ),
+                        child: const Text('Explora el catálogo'),
                       ),
-                      child: const Text('Explora el catálogo'),
                     ),
                   ),
                 ],

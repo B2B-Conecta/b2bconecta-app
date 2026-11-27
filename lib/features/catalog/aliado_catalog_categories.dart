@@ -23,7 +23,7 @@ class AliadoCatalogCategoryGroup {
   /// Hay productos publicados de esta familia o subcategoría.
   final bool hasInventory;
 
-  /// Productos activos con stock que caen en este nodo. Solo lo llena la web.
+  /// Productos activos con stock que caen en este nodo.
   final List<String> productIds;
 }
 

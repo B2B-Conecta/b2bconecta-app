@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'package:flutter/material.dart';
 
 import 'aliado_catalog_categories.dart';
@@ -85,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen>
   Set<String> _selectedImporterIds = {};
   String _selectedCategoryLabel = kAliadoCatalogAllCategoriesLabel;
   List<AliadoCatalogCategoryGroup> _categoryGroups = const [];
-  List<AliadoCatalogCategoryGroup> _desktopCategoryTree = const [];
+  List<AliadoCatalogCategoryGroup> _catalogCategoryTree = const [];
 
   late final TextEditingController _searchController;
   late final TextEditingController _minPriceController;
@@ -104,6 +105,8 @@ class _HomeScreenState extends State<HomeScreen>
   int? _minOwnerRatingCount;
   bool _onlyWithCommercialDiscount = false;
   bool _onlyEnvioIncluido = false;
+  bool _categoryCountsAvailable = false;
+  Future<void>? _categoryLoad;
   bool _desktopFiltersVisible = true;
   double? _allySortLat;
   double? _allySortLng;
@@ -232,31 +235,32 @@ class _HomeScreenState extends State<HomeScreen>
       maxP = t;
     }
     final userQ = _searchController.text.trim();
-    final desktopIds = widget.embedInDesktopShell
-        ? webProductIdsForSelection(_desktopCategoryTree, _selectedCategoryLabel)
-        : const <String>[];
-    final categoryValues = desktopIds.isNotEmpty
+    final treeIds =
+        webProductIdsForSelection(_catalogCategoryTree, _selectedCategoryLabel);
+    final productIds = treeIds.isNotEmpty
+        ? treeIds
+        : (!_categoryCountsAvailable &&
+                _activeFilters.category == _selectedCategoryLabel
+            ? _activeFilters.productIds
+            : const <String>[]);
+    final categoryValues = productIds.isNotEmpty
         ? const <String>[]
-        : widget.embedInDesktopShell
-            ? catalogValuesForSelection(
-                _desktopCategoryTree.isEmpty
-                    ? _categoryGroups
-                    : _desktopCategoryTree,
-                _selectedCategoryLabel,
-              )
-            : _categoryValuesFor(_selectedCategoryLabel);
+        : _categoryValuesFor(_selectedCategoryLabel);
     final oe = _ownerEstadoFilterController.text.trim();
     final oc = _ownerCiudadFilterController.text.trim();
     final useNearest = _catalogSortMode == CatalogSortMode.nearest;
     return CatalogFilters(
       searchQuery: userQ.isEmpty ? null : userQ,
-      category: desktopIds.isNotEmpty
+      category: productIds.isNotEmpty
           ? _selectedCategoryLabel
           : (categoryValues.length == 1 ? categoryValues.first : null),
-      categoryAnyOf: desktopIds.isNotEmpty
+      categoryAnyOf: productIds.isNotEmpty
           ? const []
           : (categoryValues.length > 1 ? categoryValues : const []),
-      productIds: desktopIds,
+      productIds: productIds,
+      includeBlankCategory: productIds.isEmpty &&
+          _activeFilters.category == _selectedCategoryLabel &&
+          _activeFilters.includeBlankCategory,
       ownerIds: _selectedImporterIds.toList(),
       ownerEstado: oe.isEmpty ? null : oe,
       ownerCiudad: oc.isEmpty ? null : oc,
@@ -676,6 +680,7 @@ class _HomeScreenState extends State<HomeScreen>
       minOwnerRatingAvg: _minOwnerRatingAvg,
       minOwnerRatingCount: _minOwnerRatingCount,
       onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
+      onlyEnvioIncluido: _onlyEnvioIncluido,
     );
   }
 
@@ -720,6 +725,7 @@ class _HomeScreenState extends State<HomeScreen>
       _minOwnerRatingAvg = draft.minOwnerRatingAvg;
       _minOwnerRatingCount = draft.minOwnerRatingCount;
       _onlyWithCommercialDiscount = draft.onlyWithCommercialDiscount;
+      _onlyEnvioIncluido = draft.onlyEnvioIncluido;
     });
 
     if (draft.sortMode == CatalogSortMode.nearest) {
@@ -742,38 +748,37 @@ class _HomeScreenState extends State<HomeScreen>
     _applyFiltersFromUi();
   }
 
-  Future<void> _loadCatalogCategories() async {
+  Future<void> _loadCatalogCategories() => _categoryLoad ??=
+      _fetchCatalogCategories().whenComplete(() => _categoryLoad = null);
+
+  Future<void> _fetchCatalogCategories() async {
+    final stockRequest = SupabaseService.fetchWebCatalogStockIndex()
+        .then<List<WebCatalogStockItem>?>((stock) => stock, onError: (_) => null);
     try {
       final rows = await SupabaseService.fetchAliadoCatalogCategories();
-      if (!mounted) return;
-      final groups = catalogCategoryFamilies(rows);
-      var desktop = webStoreCategoryFamilies(rows, includeEmpty: true);
-      if (widget.embedInDesktopShell) {
-        try {
-          final stock = await SupabaseService.fetchWebCatalogStockIndex();
-          if (stock.isNotEmpty) {
-            desktop = webStoreCategoryFamiliesFromStock(
-              stock,
-              includeEmpty: true,
-            );
-          }
-        } catch (_) {}
-      }
+      final stock = await stockRequest;
       if (!mounted) return;
       setState(() {
-        _categoryGroups = groups;
-        _desktopCategoryTree = desktop;
+        _categoryGroups = catalogCategoryFamilies(rows);
+        _categoryCountsAvailable = stock != null;
+        _catalogCategoryTree = stock == null ||
+                (widget.embedInDesktopShell && stock.isEmpty)
+            ? webStoreCategoryFamilies(rows, includeEmpty: true)
+            : webStoreCategoryFamiliesFromStock(stock, includeEmpty: true);
       });
     } catch (_) {}
   }
 
   List<String> _categoryValuesFor(String label) {
-    if (_categoryGroups.isEmpty &&
+    if (_catalogCategoryTree.isEmpty &&
         _activeFilters.category == label &&
         _activeFilters.categoryAnyOf.isNotEmpty) {
       return _activeFilters.categoryAnyOf;
     }
-    return catalogValuesForSelection(_categoryGroups, label);
+    return catalogValuesForSelection(
+      _catalogCategoryTree.isEmpty ? _categoryGroups : _catalogCategoryTree,
+      label,
+    );
   }
 
   /// Proveedores con al menos un producto publicado. El resto no aparece
@@ -796,7 +801,10 @@ class _HomeScreenState extends State<HomeScreen>
       context,
       initial: _currentFiltersDraft(),
       importers: importers,
-      categoryGroups: _categoryGroups,
+      categoryGroups: _catalogCategoryTree.isEmpty
+          ? _categoryGroups
+          : _catalogCategoryTree,
+      showCategoryCounts: _categoryCountsAvailable,
       onOpenImporterStore: (id) {
         CatalogRouteLock.push(
           context,
@@ -903,17 +911,19 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
         if (showFilterButton)
-          IconButton(
-            tooltip: 'Filtros',
-            onPressed: onOpenFilters,
-            icon: Badge(
-              isLabelVisible: filterBadge > 0,
-              label: Text('$filterBadge'),
-              backgroundColor: AppColors.brand,
-              child: Icon(
-                Icons.tune,
-                color:
-                    filterBadge > 0 ? AppColors.brand : AppColors.textSecondary,
+          RetailerTourTarget(
+            child: IconButton(
+              tooltip: 'Filtros',
+              onPressed: onOpenFilters,
+              icon: Badge(
+                isLabelVisible: filterBadge > 0,
+                label: Text('$filterBadge'),
+                backgroundColor: AppColors.brand,
+                child: Icon(
+                  Icons.tune,
+                  color:
+                      filterBadge > 0 ? AppColors.brand : AppColors.textSecondary,
+                ),
               ),
             ),
           ),
@@ -1085,7 +1095,7 @@ class _HomeScreenState extends State<HomeScreen>
       _catalogCrossAxisCount = columns;
       final sidebar = AliadoCatalogWebSidebar(
         categories: _desktopCategoryLabels(),
-        categoryTree: _desktopCategoryTree,
+        categoryTree: _catalogCategoryTree,
         selectedCategory: _selectedCategoryLabel,
         onCategory: _setDesktopCategory,
         usdPromo: _onlyWithCommercialDiscount,
@@ -1284,6 +1294,37 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screen = _buildScreen(context);
+    if (widget.homeRole != AppHomeRole.aliado) return screen;
+    return RetailerTourScreen(
+      stop: RetailerTourStop.catalog,
+      onNext: _openTourProduct,
+      child: screen,
+    );
+  }
+
+  void _openTourProduct() {
+    final part = _loadedParts.firstOrNull;
+    if (part == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cuando haya resultados, podrás continuar. Si aplicaste filtros, '
+            'prueba quitarlos o cambiar la búsqueda.',
+          ),
+        ),
+      );
+      return;
+    }
+    CatalogRouteLock.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailScreen(part: part),
+      ),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     // IndexedStack reutiliza el State: hay que depender del Theme para redibujar.
     AppColors.brightness = Theme.of(context).brightness;
     final appBar = widget.embedInDesktopShell
@@ -1468,23 +1509,25 @@ class _HomeScreenState extends State<HomeScreen>
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  OutlinedButton.icon(
-                                    onPressed: openFilters,
-                                    icon: Badge(
-                                      isLabelVisible: filterBadge > 0,
-                                      label: Text('$filterBadge'),
-                                      child: const Icon(Icons.tune, size: 20),
-                                    ),
-                                    label: const Text('Filtros'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppColors.brandAccent,
-                                      backgroundColor: AppColors.fieldFill,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 14,
+                                  RetailerTourTarget(
+                                    child: OutlinedButton.icon(
+                                      onPressed: openFilters,
+                                      icon: Badge(
+                                        isLabelVisible: filterBadge > 0,
+                                        label: Text('$filterBadge'),
+                                        child: const Icon(Icons.tune, size: 20),
                                       ),
-                                      side: BorderSide(
-                                          color: AppColors.borderSubtle),
+                                      label: const Text('Filtros'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.brandAccent,
+                                        backgroundColor: AppColors.fieldFill,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 14,
+                                        ),
+                                        side: BorderSide(
+                                            color: AppColors.borderSubtle),
+                                      ),
                                     ),
                                   ),
                                 ],

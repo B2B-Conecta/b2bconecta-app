@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/layout/app_breakpoints.dart';
 import '../../../app/theme/b2b_theme_extension.dart';
 import '../../../core/widgets/desktop_workflow.dart';
 import '../shared/mobile_order_action_widgets.dart';
@@ -140,20 +142,56 @@ class _MobileCancelOrderScreenState extends State<MobileCancelOrderScreen> {
         .whereType<DateTime>()
         .toList()
       ..sort();
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _back();
-      },
-      child: Scaffold(
-        backgroundColor: theme.background,
-        appBar: mobileOrderActionBar(
-            context, _confirmed ? 'Pedido cancelado' : 'Cancelar pedido',
-            onBack: _saving ? () {} : _back),
-        body: SafeArea(
-            top: false,
-            child: DesktopWorkflow(
-              body: ListView(
+    final desktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+    final actions = Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (!_confirmed) ...[
+                          OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(44, 44),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
+                              onPressed: _saving ? null : _back,
+                              child: Text(_attempted
+                                  ? 'Volver al pedido'
+                                  : 'Conservar pedido')),
+                          const SizedBox(height: 8),
+                        ],
+                        FilledButton(
+                            style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    _confirmed ? mobileOrderActionBlue : danger,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
+                                minimumSize: const Size(44, 48)),
+                            onPressed: _saving
+                                ? null
+                                : _confirmed
+                                    ? _back
+                                    : _cancel,
+                            child: Text(
+                                _saving
+                                    ? 'Cancelando…'
+                                    : _confirmed
+                                        ? 'Volver a pedidos'
+                                        : _attempted
+                                            ? 'Reintentar cancelación'
+                                            : 'Confirmar cancelación',
+                                textAlign: TextAlign.center)),
+                        if (_confirmed && widget.onExplore != null)
+                          TextButton(
+                              onPressed: () {
+                                _back();
+                                widget.onExplore!();
+                              },
+                              child: const Text('Explorar catálogo')),
+                      ]));
+    final content = ListView(
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
                       children: [
@@ -255,55 +293,38 @@ class _MobileCancelOrderScreenState extends State<MobileCancelOrderScreen> {
                                             (line) => line.ownerId == supplier)
                                         .toList(),
                                     _reason.text.trim()))),
-                  ]),
-              actions: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (!_confirmed) ...[
-                          OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size(44, 44),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14))),
-                              onPressed: _saving ? null : _back,
-                              child: Text(_attempted
-                                  ? 'Volver al pedido'
-                                  : 'Conservar pedido')),
-                          const SizedBox(height: 8),
-                        ],
-                        FilledButton(
-                            style: FilledButton.styleFrom(
-                                backgroundColor:
-                                    _confirmed ? mobileOrderActionBlue : danger,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
-                                minimumSize: const Size(44, 48)),
-                            onPressed: _saving
-                                ? null
-                                : _confirmed
-                                    ? _back
-                                    : _cancel,
-                            child: Text(
-                                _saving
-                                    ? 'Cancelando…'
-                                    : _confirmed
-                                        ? 'Volver a pedidos'
-                                        : _attempted
-                                            ? 'Reintentar cancelación'
-                                            : 'Confirmar cancelación',
-                                textAlign: TextAlign.center)),
-                        if (_confirmed && widget.onExplore != null)
-                          TextButton(
-                              onPressed: () {
-                                _back();
-                                widget.onExplore!();
-                              },
-                              child: const Text('Explorar catálogo')),
-                      ])),
-            )),
+                    if (desktop) ...[
+                      const SizedBox(height: 12),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 332),
+                          child: actions,
+                        ),
+                      ),
+                    ],
+                  ]);
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        backgroundColor: theme.background,
+        appBar: mobileOrderActionBar(
+            context, _confirmed ? 'Pedido cancelado' : 'Cancelar pedido',
+            onBack: _saving ? () {} : _back),
+        body: SafeArea(
+          top: false,
+          child: desktop
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 802),
+                    child: content,
+                  ),
+                )
+              : DesktopWorkflow(body: content, actions: actions),
+        ),
       ),
     );
   }

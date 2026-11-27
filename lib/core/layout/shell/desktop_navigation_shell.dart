@@ -328,8 +328,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                         else
                           DesktopShellTopBar(
                             unreadNotifications: widget.unreadNotifications,
-                            onNotificationTap: () =>
-                                widget.onNotificationTap(context),
+                            onNotificationTap: widget.onNotificationTap,
                             onMessagesTap: widget.onMessagesTap,
                             unreadMessages: widget.unreadMessages,
                             trailingActions: widget.trailingActions,

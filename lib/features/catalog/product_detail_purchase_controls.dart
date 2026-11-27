@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
@@ -317,7 +318,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
         : unavailable;
     final showOpenCart = line != null;
 
-    final action = FilledButton.icon(
+    final action = RetailerTourTarget(child: FilledButton.icon(
         key: const Key('product-purchase-action'),
         onPressed: showOpenCart
             ? _openCart
@@ -343,7 +344,7 @@ class _PurchaseControlsState extends State<ProductDetailPurchaseControls> {
           child: Text(showOpenCart ? 'Ver carrito' : addLabel,
               key: ValueKey(showOpenCart ? 'open-cart' : addLabel),
               textAlign: TextAlign.center),
-        ));
+        )));
 
     final status = Semantics(
         liveRegion: true,

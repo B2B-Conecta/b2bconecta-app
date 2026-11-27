@@ -268,7 +268,7 @@ class _DesktopStep extends StatelessWidget {
   }
 }
 
-double _desktopGroupUsd(List<CartLine> lines) {
+double _cartGroupUsd(List<CartLine> lines) {
   var sum = 0.0;
   for (final line in lines) {
     sum += ProductCatalogPricing.aliadoUnitUsdPaymentLine(
@@ -282,8 +282,8 @@ double _desktopGroupUsd(List<CartLine> lines) {
   return sum;
 }
 
-class _DesktopShippingCoverage extends StatelessWidget {
-  const _DesktopShippingCoverage({
+class _CartShippingCoverage extends StatelessWidget {
+  const _CartShippingCoverage({
     required this.part,
     required this.estado,
     required this.subtotalUsd,
@@ -467,86 +467,97 @@ class _DesktopSupplierGroup extends StatelessWidget {
             ]),
           ),
           Divider(height: 1, color: theme.borderSubtle),
-          if (unitsMinimum != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: unitsMet ? theme.successBg : theme.surfaceSubtle,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: unitsMet
-                        ? theme.successFg.withOpacity(0.35)
-                        : theme.borderSubtle,
-                  ),
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Text(
-                    unitsMet
-                        ? 'Este proveedor ya cumple su mínimo de $unitsMinimum unidades.'
-                        : 'A este proveedor le faltan $missing unidades para llegar a $unitsMinimum.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                      color: unitsMet ? theme.successFg : theme.textPrimary,
+          RetailerTourTarget(
+            topic: RetailerCartTopic.minimums,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (unitsMinimum != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: unitsMet ? theme.successBg : theme.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: unitsMet
+                              ? theme.successFg.withOpacity(0.35)
+                              : theme.borderSubtle,
+                        ),
+                      ),
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Text(
+                          unitsMet
+                              ? 'Este proveedor ya cumple su mínimo de $unitsMinimum unidades.'
+                              : 'A este proveedor le faltan $missing unidades para llegar a $unitsMinimum.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: unitsMet ? theme.successFg : theme.textPrimary,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
-          if (amount.hasMinimum)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: amount.meets ? theme.successBg : theme.surfaceSubtle,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: amount.meets
-                        ? theme.successFg.withOpacity(0.35)
-                        : theme.borderSubtle,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        amount.meets
-                            ? 'Monto mínimo ${formatMinOrderAmount(amount.minimum, amount.currency)} cubierto'
-                            : 'Llevas ${formatMinOrderAmount(amount.current, amount.currency)} de ${formatMinOrderAmount(amount.minimum, amount.currency)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              amount.meets ? theme.successFg : theme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: amount.fraction,
-                          minHeight: 4,
-                          backgroundColor: theme.borderSubtle,
+                if (amount.hasMinimum)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: amount.meets ? theme.successBg : theme.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
                           color: amount.meets
-                              ? theme.successFg
-                              : B2BBrandHero.start,
+                              ? theme.successFg.withOpacity(0.35)
+                              : theme.borderSubtle,
                         ),
                       ),
-                    ],
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              amount.meets
+                                  ? 'Monto mínimo ${formatMinOrderAmount(amount.minimum, amount.currency)} cubierto'
+                                  : 'Llevas ${formatMinOrderAmount(amount.current, amount.currency)} de ${formatMinOrderAmount(amount.minimum, amount.currency)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color:
+                                    amount.meets ? theme.successFg : theme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: amount.fraction,
+                                minHeight: 4,
+                                backgroundColor: theme.borderSubtle,
+                                color: amount.meets
+                                    ? theme.successFg
+                                    : B2BBrandHero.start,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+              ],
             ),
-          _DesktopShippingCoverage(
-            part: lines.first.part,
-            estado: state.widget.profile.estado,
-            subtotalUsd: _desktopGroupUsd(lines),
+          ),
+          RetailerTourTarget(
+            topic: RetailerCartTopic.shipping,
+            child: _CartShippingCoverage(
+              part: lines.first.part,
+              estado: state.widget.profile.estado,
+              subtotalUsd: _cartGroupUsd(lines),
+            ),
           ),
           if ((state._credits[ownerId]?.remaining ?? 0) > 0)
             Padding(
@@ -607,7 +618,10 @@ class _DesktopSupplierGroup extends StatelessWidget {
               ],
             ),
           ),
-          state._combinedMinimumProgress(lines),
+          RetailerTourTarget(
+            topic: RetailerCartTopic.minimums,
+            child: state._combinedMinimumProgress(lines),
+          ),
           for (var i = 0; i < lines.length; i++) ...[
             if (i > 0)
               Padding(
@@ -1039,36 +1053,39 @@ class _DesktopCartSummary extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            FilledButton(
-              onPressed: state._cart.pendingCheckoutAttempt != null &&
-                      !state._submitting
-                  ? state._recoverPendingCheckout
-                  : canConfirm
-                      ? state._checkout
-                      : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: B2BBrandHero.start,
-                foregroundColor: B2BBrandHero.foreground,
-                disabledBackgroundColor: B2BBrandHero.start.withOpacity(0.35),
-                disabledForegroundColor: B2BBrandHero.foreground,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            RetailerTourTarget(
+              topic: RetailerCartTopic.delivery,
+              child: FilledButton(
+                onPressed: state._cart.pendingCheckoutAttempt != null &&
+                        !state._submitting
+                    ? state._recoverPendingCheckout
+                    : canConfirm
+                        ? state._checkout
+                        : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: B2BBrandHero.start,
+                  foregroundColor: B2BBrandHero.foreground,
+                  disabledBackgroundColor: B2BBrandHero.start.withOpacity(0.35),
+                  disabledForegroundColor: B2BBrandHero.foreground,
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
-                textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                child: state._submitting
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: B2BBrandHero.foreground,
+                        ),
+                      )
+                    : Text(state._cart.pendingCheckoutAttempt != null
+                        ? 'Recuperar pedido'
+                        : 'Continuar con la entrega →'),
               ),
-              child: state._submitting
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: B2BBrandHero.foreground,
-                      ),
-                    )
-                  : Text(state._cart.pendingCheckoutAttempt != null
-                      ? 'Recuperar pedido'
-                      : 'Continuar con la entrega →'),
             ),
           ],
         ),

@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
@@ -768,50 +769,66 @@ class _CartScreenState extends State<CartScreen> {
               ]),
             ),
             Divider(height: 1, color: AppColors.divider),
-            _combinedMinimumProgress(lines),
-            if (minimumUnits != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Text(
-                  missingUnits == 0
-                      ? 'Mínimo de $minimumUnits unidades cubierto'
-                      : 'Faltan $missingUnits unidades para llegar al mínimo de $minimumUnits',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: missingUnits == 0
-                        ? AppColors.successGreen
-                        : AppColors.textPrimary,
-                  ),
-                ),
+            RetailerTourTarget(
+              topic: RetailerCartTopic.shipping,
+              child: _CartShippingCoverage(
+                part: lines.first.part,
+                estado: widget.profile.estado,
+                subtotalUsd: _cartGroupUsd(lines),
               ),
-            if (amount.hasMinimum)
-              Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                            amount.meets
-                                ? 'Monto mínimo ${formatMinOrderAmount(amount.minimum, amount.currency)} cubierto'
-                                : 'Llevas ${formatMinOrderAmount(amount.current, amount.currency)} de ${formatMinOrderAmount(amount.minimum, amount.currency)}',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: amount.meets
-                                    ? AppColors.successGreen
-                                    : AppColors.textPrimary)),
-                        const SizedBox(height: 6),
-                        ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                                value: amount.fraction,
-                                minHeight: 4,
-                                backgroundColor: AppColors.divider,
-                                color: amount.meets
-                                    ? AppColors.successGreen
-                                    : AppColors.brandBlue)),
-                      ])),
+            ),
+            RetailerTourTarget(
+              topic: RetailerCartTopic.minimums,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _combinedMinimumProgress(lines),
+                  if (minimumUnits != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Text(
+                        missingUnits == 0
+                            ? 'Mínimo de $minimumUnits unidades cubierto'
+                            : 'Faltan $missingUnits unidades para llegar al mínimo de $minimumUnits',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: missingUnits == 0
+                              ? AppColors.successGreen
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  if (amount.hasMinimum)
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                  amount.meets
+                                      ? 'Monto mínimo ${formatMinOrderAmount(amount.minimum, amount.currency)} cubierto'
+                                      : 'Llevas ${formatMinOrderAmount(amount.current, amount.currency)} de ${formatMinOrderAmount(amount.minimum, amount.currency)}',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: amount.meets
+                                          ? AppColors.successGreen
+                                          : AppColors.textPrimary)),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                      value: amount.fraction,
+                                      minHeight: 4,
+                                      backgroundColor: AppColors.divider,
+                                      color: amount.meets
+                                          ? AppColors.successGreen
+                                          : AppColors.brandBlue)),
+                            ])),
+                ],
+              ),
+            ),
             if ((_credits[ownerId]?.remaining ?? 0) > 0)
               Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
@@ -914,6 +931,13 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return RetailerTourScreen(
+      stop: RetailerTourStop.cart,
+      child: _buildScreen(context),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     if (MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu) {
       return _buildDesktopCartScreen(this);
     }
@@ -1206,95 +1230,101 @@ class _CartScreenState extends State<CartScreen> {
                                               color: AppColors.textSecondary))),
                                 ]),
                             const SizedBox(height: 16),
-                            FilledButton(
-                              onPressed: canConfirm ? _checkout : null,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF004BDD),
-                                disabledBackgroundColor:
-                                    const Color(0xFF004BDD).withOpacity(0.35),
-                                minimumSize: const Size(double.infinity, 50),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
-                                textStyle: const TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w700),
-                              ),
-                              child: _submitting
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white))
-                                  : const Text('Continuar con la entrega →',
-                                      textAlign: TextAlign.center),
-                            ),
-                          ],
-                        ]),
-                  );
-                  final checkoutBar = Material(
-                    color: AppColors.card,
-                    elevation: 10,
-                    shadowColor: AppColors.black.withOpacity(0.12),
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const LucideIcon(LucideGlyph.truck,
-                                    size: 18, color: Color(0xFF004BDD)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'El envío se revisa en el siguiente paso.',
-                                    softWrap: true,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      height: 1.35,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
+                            RetailerTourTarget(
+                              topic: RetailerCartTopic.delivery,
                               child: FilledButton(
                                 onPressed: canConfirm ? _checkout : null,
                                 style: FilledButton.styleFrom(
                                   backgroundColor: const Color(0xFF004BDD),
                                   disabledBackgroundColor:
                                       const Color(0xFF004BDD).withOpacity(0.35),
+                                  minimumSize: const Size(double.infinity, 50),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 14),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
+                                      borderRadius: BorderRadius.circular(14)),
                                   textStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                      fontSize: 15, fontWeight: FontWeight.w700),
                                 ),
                                 child: _submitting
                                     ? const SizedBox(
                                         height: 20,
                                         width: 20,
                                         child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white))
-                                    : const FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child:
-                                            Text('Continuar con la entrega →'),
-                                      ),
+                                            strokeWidth: 2, color: Colors.white))
+                                    : const Text('Continuar con la entrega →',
+                                        textAlign: TextAlign.center),
                               ),
                             ),
+                            ],
+                          ]),
+                    );
+                    final checkoutBar = Material(
+                      color: AppColors.card,
+                      elevation: 10,
+                      shadowColor: AppColors.black.withOpacity(0.12),
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const LucideIcon(LucideGlyph.truck,
+                                      size: 18, color: Color(0xFF004BDD)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'El envío se revisa en el siguiente paso.',
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.35,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: RetailerTourTarget(
+                                  topic: RetailerCartTopic.delivery,
+                                  child: FilledButton(
+                                    onPressed: canConfirm ? _checkout : null,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF004BDD),
+                                      disabledBackgroundColor:
+                                          const Color(0xFF004BDD).withOpacity(0.35),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    child: _submitting
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white))
+                                        : const FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child:
+                                                Text('Continuar con la entrega →'),
+                                          ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

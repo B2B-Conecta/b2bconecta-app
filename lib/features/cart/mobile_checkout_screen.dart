@@ -1202,6 +1202,47 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
           _notice('Puedes consultar los avances y las facturas en Pedidos.'),
         ];
 
+  Widget _successActions({required double gap}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton(
+            onPressed: () => _exit(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: mobileChatBlue,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 50),
+            ),
+            child: const Text('Ver pedido'),
+          ),
+          if (gap > 0) SizedBox(height: gap),
+          OutlinedButton(
+            onPressed: () => _exit(),
+            child: const Text('Seguir comprando'),
+          ),
+        ],
+      );
+
+  Widget _desktopSuccess() => Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 802),
+          child: ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.all(16),
+            children: [
+              ..._success(),
+              const SizedBox(height: 20),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  child: _successActions(gap: 8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final created = _orderId != null;
@@ -1245,98 +1286,95 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
                   )),
           body: SafeArea(
               top: false,
-              child: DesktopWorkflow(
-                header: created ? null : _steps(),
-                body: AbsorbPointer(
-                    absorbing: _sending || _savingAddress,
-                    child: Form(
-                        key: _form,
-                        child: ListView(
-                            controller: _scroll,
-                            padding: const EdgeInsets.all(16),
-                            children: created
-                                ? _success()
-                                : _step == 0
-                                    ? _addressStep()
-                                    : _step == 1
-                                        ? _deliveryStep()
-                                        : _reviewStep()))),
-                actions: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (sideSummary && !created) ...[
-                            Text('Resumen de tu compra',
-                                style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 12),
-                            for (final entry in _totals.suppliers.entries)
-                              _row(_supplier(entry.key),
-                                  '${formatRefAmount(entry.value.net)} ${entry.value.payUsd ? 'USD' : 'REF'}'),
-                            const Divider(),
-                          ],
-                          if (!created && _step == 1)
-                            _row('Envíos (${_groups.length} proveedores)',
-                                _shippingLabel,
-                                bold: true),
-                          if (!created && _step == 2) ...[
-                            _row(
-                                _totals.mixedCurrencies
-                                    ? 'Productos por moneda'
-                                    : _totals.shippingPending
-                                        ? 'Subtotal productos'
-                                        : 'Total estimado',
-                                _payableLabel,
-                                bold: true),
-                            if (_totals.shippingPending)
-                              const Padding(
-                                  padding: EdgeInsets.only(bottom: 6),
-                                  child: Text('Envíos por confirmar',
-                                      style: TextStyle(fontSize: 12))),
-                          ],
-                          if (_error != null)
-                            Semantics(
-                                liveRegion: true,
-                                child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Text(_error!,
-                                        style: TextStyle(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .error,
-                                            fontSize: 13)))),
-                          FilledButton(
-                              onPressed: created
-                                  ? () => _exit(true)
-                                  : _sending ||
-                                          _loading ||
-                                          _savingAddress ||
-                                          (_step == 1 && !_deliveryValid) ||
-                                          (_step == 2 && !_currencyValid)
-                                      ? null
-                                      : _next,
-                              style: FilledButton.styleFrom(
-                                  backgroundColor: mobileChatBlue,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size(0, 50)),
-                              child: _sending
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white))
-                                  : Text(created
-                                      ? 'Ver pedido'
-                                      : [
+              child: desktop && created
+                  ? _desktopSuccess()
+                  : DesktopWorkflow(
+                    header: created ? null : _steps(),
+                    body: AbsorbPointer(
+                        absorbing: _sending || _savingAddress,
+                        child: Form(
+                            key: _form,
+                            child: ListView(
+                                controller: _scroll,
+                                padding: const EdgeInsets.all(16),
+                                children: created
+                                    ? _success()
+                                    : _step == 0
+                                        ? _addressStep()
+                                        : _step == 1
+                                            ? _deliveryStep()
+                                            : _reviewStep()))),
+                    actions: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (sideSummary && !created) ...[
+                                Text('Resumen de tu compra',
+                                    style: Theme.of(context).textTheme.titleMedium),
+                                const SizedBox(height: 12),
+                                for (final entry in _totals.suppliers.entries)
+                                  _row(_supplier(entry.key),
+                                      '${formatRefAmount(entry.value.net)} ${entry.value.payUsd ? 'USD' : 'REF'}'),
+                                const Divider(),
+                              ],
+                              if (!created && _step == 1)
+                                _row('Envíos (${_groups.length} proveedores)',
+                                    _shippingLabel,
+                                    bold: true),
+                              if (!created && _step == 2) ...[
+                                _row(
+                                    _totals.mixedCurrencies
+                                        ? 'Productos por moneda'
+                                        : _totals.shippingPending
+                                            ? 'Subtotal productos'
+                                            : 'Total estimado',
+                                    _payableLabel,
+                                    bold: true),
+                                if (_totals.shippingPending)
+                                  const Padding(
+                                      padding: EdgeInsets.only(bottom: 6),
+                                      child: Text('Envíos por confirmar',
+                                          style: TextStyle(fontSize: 12))),
+                              ],
+                              if (_error != null)
+                                Semantics(
+                                    liveRegion: true,
+                                    child: Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: Text(_error!,
+                                            style: TextStyle(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .error,
+                                                fontSize: 13)))),
+                              if (created)
+                                _successActions(gap: 0)
+                              else
+                                FilledButton(
+                                  onPressed: _sending ||
+                                              _loading ||
+                                              _savingAddress ||
+                                              (_step == 1 && !_deliveryValid) ||
+                                              (_step == 2 && !_currencyValid)
+                                          ? null
+                                          : _next,
+                                  style: FilledButton.styleFrom(
+                                      backgroundColor: mobileChatBlue,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(0, 50)),
+                                  child: _sending
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2, color: Colors.white))
+                                      : Text([
                                           'Continuar con la entrega →',
                                           'Revisar pedido →',
                                           'Confirmar pedido'
                                         ][_step])),
-                          if (created)
-                            OutlinedButton(
-                                onPressed: () => _exit(),
-                                child: const Text('Seguir comprando')),
-                        ])),
+                            ])),
               )),
         ));
   }

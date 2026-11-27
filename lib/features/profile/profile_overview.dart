@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/features/commissions/importer_commission_settle
 import 'package:motolink_pro_app/features/kyc/authorization_status_section.dart';
 import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
+import 'package:motolink_pro_app/features/onboarding/retailer_induction.dart';
 
 import 'account_settings_screen.dart';
 import 'importer_commercial_settings.dart';
@@ -307,6 +308,15 @@ class ProfileOverview extends StatelessWidget {
               ),
             ],
             if (profile.isAliado) ...[
+              _entry(
+                context,
+                LucideGlyph.sparkles,
+                'Guía de compra',
+                'Del catálogo a tu primer pedido',
+                () => showRetailerInduction(context),
+                lucide: true,
+              ),
+
               _entry(
                 context,
                 Icons.star_rounded,

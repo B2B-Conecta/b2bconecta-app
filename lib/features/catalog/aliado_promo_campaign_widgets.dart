@@ -10,6 +10,8 @@ import 'part_model.dart';
 import 'promo_campaign_model.dart';
 import 'promo_banner_layout.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'product_catalog_pricing.dart';
 
 const _promoMonthShort = [
@@ -955,7 +957,7 @@ Future<void> showAliadoActivePromotionsSheet({
   );
 }
 
-/// Sheet para elegir entre varios productos de una valla (imagen + precio promo).
+/// Selector de productos de una valla en escritorio y móvil.
 Future<PartModel?> showAliadoPromoProductsSheet({
   required BuildContext context,
   required PromoCampaignModel campaign,
@@ -963,115 +965,115 @@ Future<PartModel?> showAliadoPromoProductsSheet({
 }) {
   if (parts.isEmpty) return Future<PartModel?>.value(null);
 
-  return showModalBottomSheet<PartModel>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-    ),
-    builder: (ctx) {
-      final maxH = MediaQuery.sizeOf(ctx).height * 0.62;
-      final discountLabel = campaign.productDiscountPercents.isEmpty
-          ? ProductCatalogPricing.campaignDiscountChipEs(
-              campaign.discountPercent,
-            )
-          : null;
+  final desktop = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
+  Widget buildContent(BuildContext ctx) {
+    final theme = B2BThemeExtension.of(ctx);
+    final maxH = MediaQuery.sizeOf(ctx).height * 0.62;
+    final discountLabel = campaign.productDiscountPercents.isEmpty
+        ? ProductCatalogPricing.campaignDiscountChipEs(
+            campaign.discountPercent,
+          )
+        : null;
 
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+    return SafeArea(
+      child: Padding(
+        padding: desktop
+            ? const EdgeInsets.all(24)
+            : const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!desktop)
               Center(
                 child: Container(
                   width: 40,
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: theme.borderSubtle,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Productos de la promoción',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17,
-                          ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Productos de la promoción',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          campaign.promoLabel,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        campaign.promoLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 6),
-                        PromoActivePeriodChip(
-                          startsAt: campaign.startsAt,
-                          endsAt: campaign.endsAt,
+                      ),
+                      const SizedBox(height: 6),
+                      PromoActivePeriodChip(
+                        startsAt: campaign.startsAt,
+                        endsAt: campaign.endsAt,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        promoPeriodFootnote(campaign),
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.3,
+                          color: theme.textSecondary,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          promoPeriodFootnote(campaign),
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.3,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar promoción',
+                  onPressed: () => Navigator.pop(ctx),
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            if (discountLabel != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF6E5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFE8A317).withOpacity(0.45),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              if (discountLabel != null) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF6E5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: const Color(0xFFE8A317).withOpacity(0.45),
-                      ),
-                    ),
-                    child: Text(
-                      discountLabel,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF8A5A00),
-                      ),
+                  child: Text(
+                    discountLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF8A5A00),
                     ),
                   ),
                 ),
-              ],
-              const SizedBox(height: 12),
-              ConstrainedBox(
+              ),
+            ],
+            const SizedBox(height: 12),
+            Flexible(
+              child: ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: maxH),
                 child: ListView.separated(
                   shrinkWrap: true,
@@ -1086,11 +1088,36 @@ Future<PartModel?> showAliadoPromoProductsSheet({
                   },
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    },
+      ),
+    );
+  }
+
+  final theme = B2BThemeExtension.of(context);
+  if (desktop) {
+    return showDialog<PartModel>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: theme.dialogSurface,
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: buildContent(ctx),
+        ),
+      ),
+    );
+  }
+
+  return showModalBottomSheet<PartModel>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: theme.dialogSurface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+    ),
+    builder: buildContent,
   );
 }
 

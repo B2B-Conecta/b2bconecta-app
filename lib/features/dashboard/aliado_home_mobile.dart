@@ -492,10 +492,12 @@ class _HomePromotionCarouselState extends State<_HomePromotionCarousel> {
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         child: Semantics(
-          button: true,
+          button: campaign.isTappable,
           label: campaign.displayTitle ?? campaign.internalTitle,
           child: InkWell(
-            onTap: () => widget.onCampaign(campaign),
+            onTap: campaign.isTappable
+                ? () => widget.onCampaign(campaign)
+                : null,
             child: Image.network(
               campaign.imageUrlForWidth(400),
               width: double.infinity,
@@ -1045,10 +1047,17 @@ extension on _AliadoHomeDashboardState {
   }
 
   void _openHomeCampaign(PromoCampaignModel campaign) {
-    if (campaign.actionType == PromoCampaignModel.actionExternalUrl) {
+    if (campaign.opensExternalUrl) {
       launchPromoCampaignExternalUrl(context, campaign);
-    } else {
+    } else if (campaign.filtersImporter ||
+        (widget.embedInDesktopShell && campaign.isTappable)) {
       _promotion(campaign);
+    } else if (campaign.opensProduct || campaign.opensStore) {
+      unawaited(openAliadoPromoCampaignDestination(
+        context: context,
+        campaign: campaign,
+        viewer: widget.profile,
+      ));
     }
   }
 

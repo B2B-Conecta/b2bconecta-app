@@ -20,6 +20,7 @@ import '../cart/cart_product_actions.dart';
 import '../cart/catalog_cart_bar.dart';
 import '../catalog/aliado_catalog_categories.dart';
 import '../catalog/aliado_promo_campaign_widgets.dart';
+import '../catalog/aliado_promo_campaign_navigation.dart';
 import '../catalog/favorite_heart_button.dart';
 import '../catalog/product_stock_summary.dart';
 import '../catalog/catalog_category_icon.dart';

@@ -5,6 +5,7 @@ import 'package:motolink_pro_app/features/payments/pago_metodo.dart';
 import 'carrier_flete_pago_modo.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:flutter/services.dart';
 
@@ -13,11 +14,12 @@ Future<bool?> showImporterCarrierForm(
   BuildContext context, {
   ImporterCarrierModel? existing,
 }) {
-  final isWide = MediaQuery.sizeOf(context).width >= 720;
+  final isWide = MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
   if (isWide) {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
+        clipBehavior: Clip.antiAlias,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
@@ -34,7 +36,7 @@ Future<bool?> showImporterCarrierForm(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: AppColors.background,
+    backgroundColor: B2BThemeExtension.of(context).dialogSurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -419,14 +421,16 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = B2BThemeExtension.of(context);
     final isDialog = widget.scrollController == null;
     final title =
         widget.existing == null ? 'Nuevo transportista' : 'Editar transportista';
 
     return Material(
-      color: isDialog ? Colors.white : AppColors.background,
+      color: theme.dialogSurface,
       borderRadius: isDialog ? BorderRadius.circular(12) : null,
       child: Column(
+        mainAxisSize: isDialog ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
@@ -453,7 +457,8 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
             child: _pasos(),
           ),
-          Expanded(
+          Flexible(
+            fit: isDialog ? FlexFit.loose : FlexFit.tight,
             child: SingleChildScrollView(
               controller: widget.scrollController,
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -465,7 +470,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
               20,
               8,
               20,
-              MediaQuery.viewInsetsOf(context).bottom + 16,
+              (isDialog ? 0 : MediaQuery.viewInsetsOf(context).bottom) + 16,
             ),
             child: Row(
               children: [
@@ -478,19 +483,20 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
                 FilledButton(
                   onPressed: _saving ? null : (_step == 0 ? _siguiente : _save),
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.brand,
+                    backgroundColor: theme.brand,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 22,
                       vertical: 14,
                     ),
                   ),
                   child: _saving
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         )
                       : Text(
@@ -509,7 +515,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
   Widget _pasos() {
     return Row(
       children: [
-        _pasoMarca(1, 'Datos', _step == 0),
+        _pasoMarca(1, 'Cobertura', _step == 0),
         Expanded(
           child: Container(
             height: 2,
@@ -517,7 +523,7 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
             color: _step == 1 ? AppColors.brand : AppColors.borderSubtle,
           ),
         ),
-        _pasoMarca(2, 'Pago', _step == 1),
+        _pasoMarca(2, 'Pago del flete', _step == 1),
       ],
     );
   }
@@ -563,21 +569,22 @@ class _ImporterCarrierFormState extends State<_ImporterCarrierForm> {
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _company,
-          textCapitalization: TextCapitalization.words,
-          decoration: _fieldDecoration(
-            label: 'Empresa *',
-            icon: Icons.business_outlined,
+        _twoCol(
+          left: TextField(
+            controller: _company,
+            textCapitalization: TextCapitalization.words,
+            decoration: _fieldDecoration(
+              label: 'Empresa *',
+              icon: Icons.business_outlined,
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _phone,
-          keyboardType: TextInputType.phone,
-          decoration: _fieldDecoration(
-            label: 'Teléfono *',
-            icon: Icons.phone_outlined,
+          right: TextField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            decoration: _fieldDecoration(
+              label: 'Teléfono *',
+              icon: Icons.phone_outlined,
+            ),
           ),
         ),
         const SizedBox(height: 16),

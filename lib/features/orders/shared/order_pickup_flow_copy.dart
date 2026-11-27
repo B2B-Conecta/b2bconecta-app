@@ -119,7 +119,7 @@ abstract final class OrderPickupFlowCopy {
 
   // —— Ubicaciones alternas (config) ——
 
-  static const ubicacionesTitulo = 'Ubicaciones de recolección';
+  static const ubicacionesTitulo = 'Puntos de retiro';
   static const ubicacionesIntro =
       'Guarde direcciones adicionales para usarlas al confirmar dónde retiran los pedidos.';
   static const ubicacionesVacias =

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
-import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/layout/segmented_filter_bar.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
@@ -57,6 +55,8 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
   final _minimo = TextEditingController();
   bool _loading = true;
   bool _saving = false;
+  bool _coverageExpanded = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -71,6 +71,10 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
     try {
       final profile = await ProfileService.fetchMyProfile();
       if (!mounted) return;
@@ -89,7 +93,10 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
     }
   }
 
@@ -104,7 +111,7 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
     }
   }
 
-  Future<void> _saveDesktop() async {
+  Future<void> _save() async {
     if (_saving) return;
     double? minimo;
     if (_gratis && _tipo != EnvioPolitica.noDefinido) {
@@ -136,33 +143,6 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
     }
   }
 
-  Future<void> _save() async {
-    if (_saving) return;
-    double? minimo;
-    if (_gratis && _tipo != EnvioPolitica.noDefinido) {
-      minimo = parseVesOrEnDecimal(_minimo.text);
-      if (minimo == null || minimo <= 0) {
-        _snack('Indique un monto mayor a 0 para el envío gratis.');
-        return;
-      }
-    }
-    setState(() => _saving = true);
-    try {
-      await LogisticsService.importadorSetEnvioPolitica(
-        tipo: _tipo,
-        montoMinimo: minimo,
-        transportistas: const [],
-      );
-      if (!mounted) return;
-      _snack('Política de envío guardada.');
-    } catch (_) {
-      if (!mounted) return;
-      _snack('No se pudo guardar la política de envío.');
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
   void _snack(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
@@ -171,132 +151,6 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
 
   @override
   Widget build(BuildContext context) {
-    final desktop =
-        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
-    if (desktop) return _buildDesktop(context);
-    return _buildNarrow();
-  }
-
-  Widget _buildNarrow() {
-    return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderSubtle),
-        ),
-        child: _loading
-            ? const SizedBox(
-                height: 88,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Política de envío',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Así lo ve la tienda en el catálogo. El monto final del flete '
-                    'lo define usted en cada pedido.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.35,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SegmentedFilterBar(
-                    labels: _labels,
-                    selectedIndex: _selectedIndex,
-                    onSelected: (index) {
-                      setState(() {
-                        _tipo = index == 0
-                            ? EnvioPolitica.incluido
-                            : EnvioPolitica.aparte;
-                      });
-                    },
-                  ),
-                  Text(
-                    EnvioPolitica.ayudaProveedor(_tipo),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (_tipo != EnvioPolitica.noDefinido)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: () => setState(() {
-                          _tipo = EnvioPolitica.noDefinido;
-                          _gratis = false;
-                        }),
-                        child: const Text('Dejar sin definir'),
-                      ),
-                    ),
-                  if (_tipo != EnvioPolitica.noDefinido) ...[
-                    const SizedBox(height: 4),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _gratis,
-                      onChanged: (value) => setState(() => _gratis = value),
-                      title: const Text(
-                        'Envío gratis a partir de un monto',
-                        style:
-                            TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                      ),
-                      subtitle: Text(
-                        'Opcional. Se informa al confirmar el pedido.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    if (_gratis)
-                      TextField(
-                        controller: _minimo,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Monto mínimo (USD)',
-                          hintText: '150.00',
-                          isDense: true,
-                        ),
-                      ),
-                  ],
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _saving ? null : _save,
-                    child: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Guardar política'),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildDesktop(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
     final onBrand = Theme.of(context).colorScheme.onPrimary;
     final undefined = _tipo == EnvioPolitica.noDefinido;
@@ -318,256 +172,281 @@ class _ImporterEnvioPoliticaPanelState extends State<ImporterEnvioPoliticaPanel>
                   child: CircularProgressIndicator(color: theme.brand),
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+            : _loadFailed
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      LucideIcon(
-                        LucideGlyph.truck,
-                        size: 18,
-                        color: theme.brand,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Política de envío',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: theme.textPrimary,
-                          ),
-                        ),
-                      ),
-                      _PolicyBadge(undefined: undefined),
+                      const Text('No pudimos cargar la política de envío.'),
+                      TextButton(onPressed: _load, child: const Text('Reintentar')),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Así lo ve la tienda. El monto del flete lo confirmas en cada pedido.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.4,
-                      color: theme.textSecondary,
-                    ),
-                  ),
-                  if (undefined) ...[
-                    const SizedBox(height: 12),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: theme.surfaceSubtle,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.borderSubtle),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                        child: Text(
-                          'Aún no tienes una política de envío. Elige si el flete va incluido o es un cobro adicional y guárdala aquí.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w600,
-                            color: theme.textPrimary,
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          LucideIcon(
+                            LucideGlyph.truck,
+                            size: 18,
+                            color: theme.brand,
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Política de envío',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          _PolicyBadge(undefined: undefined),
+                        ],
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  SegmentedFilterBar(
-                    labels: _labels,
-                    selectedIndex: _selectedIndex,
-                    onSelected: (index) {
-                      setState(() {
-                        _tipo = index == 0
-                            ? EnvioPolitica.incluido
-                            : EnvioPolitica.aparte;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    EnvioPolitica.ayudaProveedor(_tipo),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                      color: theme.textPrimary,
-                    ),
-                  ),
-                  if (!undefined)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: () => setState(() {
-                          _tipo = EnvioPolitica.noDefinido;
-                          _gratis = false;
-                          _todos = false;
-                          _estados.clear();
-                        }),
-                        style: TextButton.styleFrom(
-                          foregroundColor: theme.textSecondary,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 0),
-                        ),
-                        child: const Text('Dejar sin definir'),
-                      ),
-                    ),
-                  if (!undefined) ...[
-                    const SizedBox(height: 4),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _gratis,
-                      activeColor: theme.brand,
-                      onChanged: (value) => setState(() {
-                        _gratis = value;
-                        if (!value) {
-                          _todos = false;
-                          _estados.clear();
-                        }
-                      }),
-                      title: Text(
-                        'Envío gratis a partir de un monto',
+                      const SizedBox(height: 6),
+                      Text(
+                        'Así lo ve la tienda. El monto del flete lo confirmas en cada pedido.',
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: theme.textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Solo en los estados que marques. Los demás no tienen envío gratis y la tienda ve un costo adicional de flete.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.35,
+                          fontSize: 12.5,
+                          height: 1.4,
                           color: theme.textSecondary,
                         ),
                       ),
-                    ),
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment.topCenter,
-                      child: !_gratis
-                          ? const SizedBox(width: double.infinity)
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: _minimo,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.allow(
-                                      RegExp(r'[0-9.,]'),
-                                    ),
-                                  ],
-                                  style: TextStyle(color: theme.textPrimary),
-                                  decoration: InputDecoration(
-                                    labelText: 'Monto mínimo (USD)',
-                                    hintText: '150.00',
-                                    isDense: true,
-                                    filled: true,
-                                    fillColor: theme.inputFill,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Dónde aplica el envío gratis',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: theme.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
+                      if (undefined) ...[
+                        const SizedBox(height: 12),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.surfaceSubtle,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.borderSubtle),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            child: Text(
+                              'Aún no tienes una política de envío. Elige si el flete va incluido o es un cobro adicional y guárdala aquí.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.35,
+                                fontWeight: FontWeight.w600,
+                                color: theme.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      SegmentedFilterBar(
+                        labels: _labels,
+                        distributeWhenNarrow: true,
+                        selectedIndex: _selectedIndex,
+                        onSelected: (index) {
+                          setState(() {
+                            _tipo = index == 0
+                                ? EnvioPolitica.incluido
+                                : EnvioPolitica.aparte;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        EnvioPolitica.ayudaProveedor(_tipo),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      if (!undefined)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: () => setState(() {
+                              _tipo = EnvioPolitica.noDefinido;
+                              _gratis = false;
+                              _todos = false;
+                              _estados.clear();
+                            }),
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.textSecondary,
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 0),
+                            ),
+                            child: const Text('Dejar sin definir'),
+                          ),
+                        ),
+                      if (!undefined) ...[
+                        const SizedBox(height: 4),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _gratis,
+                          activeColor: theme.brand,
+                          onChanged: (value) => setState(() {
+                            _gratis = value;
+                            if (!value) {
+                              _todos = false;
+                              _estados.clear();
+                            }
+                          }),
+                          title: Text(
+                            'Envío gratis a partir de un monto',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: theme.textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Solo en los estados que marques. Los demás no tienen envío gratis y la tienda ve un costo adicional de flete.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: theme.textSecondary,
+                            ),
+                          ),
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: !_gratis
+                              ? const SizedBox(width: double.infinity)
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    _StatePill(
-                                      label: 'Todos los estados',
-                                      selected: _todos,
-                                      onTap: () => setState(() {
-                                        _todos = !_todos;
-                                        if (_todos) _estados.clear();
-                                      }),
-                                    ),
-                                    for (final estado in _estadosVenezuela)
-                                      _StatePill(
-                                        label: estado,
-                                        selected:
-                                            !_todos && _estados.contains(estado),
-                                        onTap: () => setState(() {
-                                          _todos = false;
-                                          if (!_estados.add(estado)) {
-                                            _estados.remove(estado);
-                                          }
-                                        }),
+                                    const SizedBox(height: 4),
+                                    TextField(
+                                      controller: _minimo,
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                        decimal: true,
                                       ),
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.allow(
+                                          RegExp(r'[0-9.,]'),
+                                        ),
+                                      ],
+                                      style: TextStyle(color: theme.textPrimary),
+                                      decoration: InputDecoration(
+                                        labelText: 'Monto mínimo (USD)',
+                                        hintText: '150.00',
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: theme.inputFill,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Dónde aplica el envío gratis',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: theme.textSecondary,
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: AlignmentDirectional.centerStart,
+                                      child: TextButton.icon(
+                                        onPressed: _saving ? null : () => setState(
+                                          () => _coverageExpanded = !_coverageExpanded,
+                                        ),
+                                        icon: Icon(_coverageExpanded
+                                            ? Icons.expand_less
+                                            : Icons.expand_more),
+                                        label: Text(_todos
+                                            ? 'Todos los estados'
+                                            : _estados.isEmpty
+                                                ? 'Elegir estados'
+                                                : '${_estados.length} estados seleccionados'),
+                                      ),
+                                    ),
+                                    if (_coverageExpanded)
+                                      Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        _StatePill(
+                                          label: 'Todos los estados',
+                                          selected: _todos,
+                                          onTap: () => setState(() {
+                                            _todos = !_todos;
+                                            if (_todos) _estados.clear();
+                                          }),
+                                        ),
+                                        for (final estado in _estadosVenezuela)
+                                          _StatePill(
+                                            label: estado,
+                                            selected:
+                                                !_todos && _estados.contains(estado),
+                                            onTap: () => setState(() {
+                                              _todos = false;
+                                              if (!_estados.add(estado)) {
+                                                _estados.remove(estado);
+                                              }
+                                            }),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 220),
+                                      curve: Curves.easeOutCubic,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _todos
+                                            ? theme.successBg
+                                            : theme.warningBg,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: (_todos
+                                                  ? theme.successFg
+                                                  : theme.warningFg)
+                                              .withOpacity(0.35),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _todos
+                                            ? 'Cubre todos los estados. Ninguno queda con costo adicional por estar fuera de la cobertura.'
+                                            : 'Estados sin marcar: sin envío gratis. El comprador ve un costo adicional de flete.',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          height: 1.35,
+                                          fontWeight: FontWeight.w700,
+                                          color: _todos
+                                              ? theme.successFg
+                                              : theme.warningFg,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 220),
-                                  curve: Curves.easeOutCubic,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _todos
-                                        ? theme.successBg
-                                        : theme.warningBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: (_todos
-                                              ? theme.successFg
-                                              : theme.warningFg)
-                                          .withOpacity(0.35),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _todos
-                                        ? 'Cubre todos los estados. Ninguno queda con costo adicional por estar fuera de la cobertura.'
-                                        : 'Estados sin marcar: sin envío gratis. El comprador ve un costo adicional de flete.',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      height: 1.35,
-                                      fontWeight: FontWeight.w700,
-                                      color: _todos
-                                          ? theme.successFg
-                                          : theme.warningFg,
-                                    ),
-                                  ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: theme.brand,
+                          foregroundColor: onBrand,
+                          minimumSize: const Size.fromHeight(42),
+                        ),
+                        child: _saving
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: onBrand,
                                 ),
-                              ],
-                            ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  FilledButton(
-                    onPressed: _saving ? null : _saveDesktop,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.brand,
-                      foregroundColor: onBrand,
-                      minimumSize: const Size.fromHeight(42),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: onBrand,
-                            ),
-                          )
-                        : const Text('Guardar política'),
+                              )
+                            : const Text('Guardar política'),
+                      ),
+                    ],
                   ),
-                ],
-              ),
       ),
     );
   }

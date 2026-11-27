@@ -4,6 +4,8 @@ import 'importer_pickup_location_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
+import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_pickup_flow_copy.dart';
 
 Future<bool?> showImporterPickupLocationForm(
@@ -184,7 +186,7 @@ class _ImporterPickupLocationsPanelState
                 TextButton.icon(
                   onPressed: _loading ? null : () => _openForm(),
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Nueva'),
+                  label: const Text('Nuevo punto'),
                 ),
               ],
             ),
@@ -393,21 +395,22 @@ class _ImporterPickupLocationDialogState
     String? hint,
     IconData? icon,
   }) {
+    final theme = B2BThemeExtension.of(context);
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon:
-          icon == null ? null : Icon(icon, color: AppColors.textSecondary),
+          icon == null ? null : Icon(icon, color: theme.textSecondary),
       filled: true,
-      fillColor: AppColors.fieldFill,
+      fillColor: theme.inputFill,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: AppColors.borderSubtle),
+        borderSide: BorderSide(color: theme.borderSubtle),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+        borderSide: BorderSide(color: theme.brand, width: 1.5),
       ),
     );
   }
@@ -447,7 +450,9 @@ class _ImporterPickupLocationDialogState
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 560;
+    final theme = B2BThemeExtension.of(context);
+    final wide =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     final lugar = wide
         ? Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,11 +470,16 @@ class _ImporterPickupLocationDialogState
             ],
           );
     return AlertDialog(
+      backgroundColor: theme.dialogSurface,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: wide ? 24 : 12,
+        vertical: wide ? 24 : 12,
+      ),
       scrollable: true,
       title: Text(
-          widget.existing == null ? 'Nueva ubicación' : 'Editar ubicación'),
+          widget.existing == null ? 'Nuevo punto de retiro' : 'Editar punto de retiro'),
       content: SizedBox(
-        width: 460,
+        width: 600,
         child: Form(
           key: _formKey,
           child: Column(
@@ -481,7 +491,7 @@ class _ImporterPickupLocationDialogState
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
-                  color: AppColors.textSecondary,
+                  color: theme.textSecondary,
                 ),
               ),
               const SizedBox(height: 14),
@@ -554,10 +564,10 @@ class _ImporterPickupLocationDialogState
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                 ),
                 subtitle: Text(
-                  'Queda marcada como la otra ubicación por defecto.',
+                  'Se preselecciona para gestionar el retiro.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: theme.textSecondary,
                   ),
                 ),
               ),
@@ -573,12 +583,12 @@ class _ImporterPickupLocationDialogState
         FilledButton(
           onPressed: _saving ? null : _save,
           child: _saving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onPrimary,
                   ),
                 )
               : const Text('Guardar'),

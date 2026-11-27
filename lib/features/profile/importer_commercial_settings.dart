@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
-import 'package:motolink_pro_app/features/logistics/importer_envio_politica_panel.dart';
 import 'package:motolink_pro_app/features/payments/importer_accepted_pago_metodos_section.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'profile_model.dart';
@@ -227,18 +226,14 @@ class _ImporterCommercialSettingsState
                                 _saving ? 'Guardando…' : 'Guardar mínimo')),
                       ]),
                 ])),
-        if (desktop) ...[
-          const SizedBox(height: 20),
-          _ImporterMinUnitsSection(
-            profile: widget.profile,
-            onChanged: widget.onChanged,
-          ),
-        ],
+        const SizedBox(height: 20),
+        _ImporterMinUnitsSection(
+          profile: widget.profile,
+          onChanged: widget.onChanged,
+        ),
         const SizedBox(height: 16),
         ImporterAcceptedPagoMetodosSection(
             profile: widget.profile, onSaved: widget.onChanged),
-        const SizedBox(height: 20),
-        const ImporterEnvioPoliticaPanel(),
       ]);
   }
 }
@@ -397,7 +392,7 @@ class _ImporterMinUsdSectionState extends State<_ImporterMinUsdSection> {
   }
 }
 
-/// Mínimo de unidades por pedido. Solo se pinta en el panel de escritorio.
+/// Mínimo de unidades por pedido.
 class _ImporterMinUnitsSection extends StatefulWidget {
   const _ImporterMinUnitsSection({required this.profile, this.onChanged});
 

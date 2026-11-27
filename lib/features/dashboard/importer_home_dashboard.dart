@@ -16,6 +16,7 @@ import 'package:motolink_pro_app/features/inventory/importer_priority_actions.da
 import 'package:motolink_pro_app/features/inventory/importer_sales_snapshot.dart';
 import 'package:motolink_pro_app/features/cart/min_order_currency.dart';
 import 'package:motolink_pro_app/features/logistics/envio_politica.dart';
+import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
 import 'package:motolink_pro_app/features/profile/importer_commercial_settings.dart';
 import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
@@ -334,7 +335,7 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   onPressed: onSearch,
                   icon: const Icon(Icons.search),
                 ),
-              if (wide && !widget.mobileLayout)
+              if (wide || widget.mobileLayout)
                 TextButton.icon(
                   onPressed: () => ImporterWebInduction.show(
                     context: context,
@@ -382,11 +383,16 @@ class _ImporterHomeDashboardState extends State<ImporterHomeDashboard> {
                   EnvioPolitica.noDefinido) ...[
                 const SizedBox(height: 12),
                 _ImporterShippingNotice(
-                  onDefine: () => ImporterCommercialSettings.openDesktop(
-                    context,
-                    profile: widget.profile,
-                    onChanged: widget.onProfileRefresh,
-                  ),
+                  onDefine: () async {
+                    await Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ImporterCarriersScreen(
+                          openShippingPolicy: true,
+                        ),
+                      ),
+                    );
+                    if (mounted) widget.onProfileRefresh?.call();
+                  },
                 ),
               ],
             ],

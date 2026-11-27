@@ -8,6 +8,7 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/core/widgets/motolink_pro_logo.dart';
 import 'package:motolink_pro_app/features/commissions/importer_commission_settlements_section.dart';
 import 'package:motolink_pro_app/features/kyc/authorization_status_section.dart';
+import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 
 import 'account_settings_screen.dart';
@@ -284,7 +285,27 @@ class ProfileOverview extends StatelessWidget {
                 ),
               ),
             ],
-            if (profile.isImportador) _commercialEntry(context),
+            if (profile.isImportador) ...[
+              _commercialEntry(context),
+              ImporterTourAnchor(
+                target: ImporterTourTarget.shippingSettings,
+                child: _entry(
+                  context,
+                  LucideGlyph.truck,
+                  'Envíos y retiro',
+                  'Transportistas, puntos de retiro y política de envío',
+                  () async {
+                    await Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ImporterCarriersScreen(),
+                      ),
+                    );
+                    if (context.mounted) onChanged?.call();
+                  },
+                  lucide: true,
+                ),
+              ),
+            ],
             if (profile.isAliado) ...[
               _entry(
                 context,

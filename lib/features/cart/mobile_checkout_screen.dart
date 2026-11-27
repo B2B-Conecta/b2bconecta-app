@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'package:motolink_pro_app/core/widgets/desktop_workflow.dart';
 import 'package:motolink_pro_app/core/widgets/b2b_header_title.dart';
@@ -297,6 +298,19 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
     }
   }
 
+  Future<T> _queryDeliveryOptions<T>(
+    String rpcName,
+    Future<T> Function() load,
+  ) async {
+    try {
+      return await load();
+    } catch (error) {
+      final code = error is PostgrestException ? error.code : error.runtimeType;
+      debugPrint('Checkout: $rpcName falló ($code).');
+      rethrow;
+    }
+  }
+
   Future<void> _loadDelivery() async {
     final key = _destinationKey;
     if (_loadedDestination == key && _failed.isEmpty) return;
@@ -319,13 +333,20 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
     await Future.wait(_groups.keys.map((id) async {
       try {
         final results = await Future.wait<dynamic>([
-          widget.loadCarriers(id,
-              state:
-                  _profileAddress ? widget.profile.estado : _state.text.trim(),
-              city: _profileAddress ? widget.profile.ciudad : _city.text.trim(),
-              latitude: _profileAddress ? widget.profile.latitude : null,
-              longitude: _profileAddress ? widget.profile.longitude : null),
-          widget.loadPickups?.call(id) ?? Future.value(<CheckoutPickupOption>[])
+          _queryDeliveryOptions(
+            'list_importer_carriers_for_checkout',
+            () => widget.loadCarriers(id,
+                state:
+                    _profileAddress ? widget.profile.estado : _state.text.trim(),
+                city: _profileAddress ? widget.profile.ciudad : _city.text.trim(),
+                latitude: _profileAddress ? widget.profile.latitude : null,
+                longitude: _profileAddress ? widget.profile.longitude : null),
+          ),
+          _queryDeliveryOptions(
+            'list_customer_pickup_for_checkout',
+            () async => await widget.loadPickups?.call(id) ??
+                <CheckoutPickupOption>[],
+          ),
         ]);
         final options = results[0] as List<ImporterCarrierModel>;
         final pickupOptions = results[1] as List<CheckoutPickupOption>;
@@ -815,7 +836,7 @@ class _MobileCheckoutScreenState extends State<MobileCheckoutScreen> {
               const SizedBox(height: 6),
               if (_failed.contains(id)) ...[
                 const Text(
-                    'No pudimos consultar el transporte de este proveedor.'),
+                    'No pudimos cargar las opciones de entrega o retiro de este proveedor.'),
                 TextButton(
                     onPressed: _loadDelivery,
                     child: const Text('Reintentar transporte'))

@@ -1,3 +1,1 @@
-update auth.users
-set email_confirmed_at = now()
-where email = 'prueba@mail.com';
+select to_regprocedure('public.list_customer_pickup_for_checkout(uuid)');

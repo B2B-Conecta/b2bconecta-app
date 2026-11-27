@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/features/logistics/importer_carriers_screen.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
@@ -31,10 +32,11 @@ enum ImporterTourTarget {
   profileAlerts,
   profileData,
   commercialSettings,
+  shippingSettings,
   navProfile,
 }
 
-/// Inducción de primer ingreso del mayorista. Solo se ofrece en escritorio.
+/// Bienvenida del mayorista y guías de escritorio por sección.
 abstract final class ImporterWebInduction {
   static String _key(String profileId) =>
       'importer_web_induction_v5_${profileId.trim()}';
@@ -61,8 +63,8 @@ abstract final class ImporterWebInduction {
   static int? get profileSubTab {
     if (!_tour.active || _tour._script != _TourScript.welcome) return null;
     return switch (_tour.index) {
-      6 || 7 => 0,
-      8 => 1,
+      6 || 7 || 8 => 0,
+      9 => 1,
       _ => null,
     };
   }
@@ -245,7 +247,7 @@ class _ImporterTourAnchorState extends State<ImporterTourAnchor> {
   }
 }
 
-/// Capa del shell de escritorio. No pinta nada mientras el recorrido está quieto.
+/// Capa de inducción del mayorista.
 class ImporterWebTourLayer extends StatelessWidget {
   const ImporterWebTourLayer({
     super.key,
@@ -265,7 +267,10 @@ class ImporterWebTourLayer extends StatelessWidget {
       builder: (context, child) {
         final desktop =
             MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
-        if (!ImporterWebInduction.isActive || !desktop) return child!;
+        if (!ImporterWebInduction.isActive ||
+            (!desktop && _ImporterTourController.instance._script != _TourScript.welcome)) {
+          return child!;
+        }
         return NotificationListener<ScrollNotification>(
           onNotification: (notification) {
             if (notification is ScrollUpdateNotification ||
@@ -403,6 +408,17 @@ class _ImporterTourController extends ChangeNotifier {
       body:
           'En Perfil, Configuración comercial es donde defines el monto y las '
           'unidades mínimas de cada pedido.',
+    ),
+    _TourStep(
+      title: 'Envíos y retiro',
+      advanceOnTarget: false,
+      targets: [
+        ImporterTourTarget.shippingSettings,
+        ImporterTourTarget.navProfile,
+      ],
+      body:
+          'Define cómo recibirá el pedido la tienda. Aquí configuras el flete, '
+          'los transportistas y los puntos de retiro que puedes ofrecer.',
     ),
     _TourStep(
       title: 'Alertas y notificaciones',
@@ -697,9 +713,10 @@ class _ImporterTourController extends ChangeNotifier {
         MainShellTabController.navigateToReputationTab();
       case 6:
       case 7:
+      case 8:
         MainShellTabController.navigateToAliadoProfileSubTab(0);
         if (index == 7) unawaited(refreshCommercialState());
-      case 8:
+      case 9:
         MainShellTabController.navigateToAliadoProfileSubTab(1);
       default:
         MainShellTabController.navigateToPedidosTab();
@@ -1147,6 +1164,20 @@ class _ImporterTourOverlayState extends State<_ImporterTourOverlay>
                             color: theme.textSecondary,
                           ),
                         ),
+                      if (tour.step.targets.contains(ImporterTourTarget.shippingSettings))
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const ImporterCarriersScreen(
+                                  openShippingPolicy: true,
+                                ),
+                              ),
+                            ),
+                            child: const Text('Abrir política de envío'),
+                          ),
+                        ),
                       const SizedBox(height: 6),
                       Text(
                         _cue(focused),
@@ -1249,8 +1280,8 @@ class _ImporterTourOverlayState extends State<_ImporterTourOverlay>
   }
 
   Rect _cardPosition(Size size, Rect? hole) {
-    const width = 320.0;
-    const height = 360.0;
+    final width = math.min(320.0, math.max(1.0, size.width - 24));
+    final height = math.min(360.0, math.max(1.0, size.height - 24));
     final maxLeft = math.max(12.0, size.width - width - 12);
     final maxTop = math.max(12.0, size.height - height - 12);
 

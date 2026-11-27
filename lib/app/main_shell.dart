@@ -1537,7 +1537,7 @@ class _MainShellState extends State<MainShell> {
           );
         }
 
-        final shell = Scaffold(
+        final scaffold = Scaffold(
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1592,6 +1592,9 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
         );
+        final shell = widget.homeRole == AppHomeRole.importador
+            ? ImporterWebTourLayer(child: scaffold, viewToken: _tabIndex)
+            : scaffold;
         return kIsWeb
             ? CallbackShortcuts(
                 bindings: {
@@ -1792,7 +1795,7 @@ class _ProfileTabState extends State<_ProfileTab>
   }
 
   bool get _tourOwnsProfileTabs =>
-      widget.embedInDesktopShell && widget.homeRole == AppHomeRole.importador;
+      widget.homeRole == AppHomeRole.importador;
 
   void _applyProfileSubTab(int index) {
     if (!mounted) return;

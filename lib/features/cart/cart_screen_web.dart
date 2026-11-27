@@ -80,21 +80,22 @@ Widget _buildDesktopCartScreen(_CartScreenState state) {
                     child: Column(children: [
                       header,
                       const SizedBox(height: 18),
-                      Expanded(child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: ListView(
-                            padding: EdgeInsets.only(bottom: bottom),
-                            children: [...products, ...following],
-                          )),
-                          const SizedBox(width: 24),
-                          SizedBox(width: 340, child: SingleChildScrollView(
-                            primary: false,
-                            padding: EdgeInsets.only(bottom: bottom),
-                            child: summary,
-                          )),
-                        ],
-                      )),
+                      Expanded(
+                        child: ListView(
+                          padding: EdgeInsets.only(bottom: bottom),
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: Column(children: products)),
+                                const SizedBox(width: 24),
+                                SizedBox(width: 340, child: summary),
+                              ],
+                            ),
+                            ...following,
+                          ],
+                        ),
+                      ),
                     ]),
                   );
                 }

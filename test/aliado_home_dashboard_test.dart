@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,6 +69,22 @@ void main() {
       termsVersion: TermsConfig.currentVersion,
       ratingAsPayerAvgRolling100: 4.5,
       ratingAsPayerCountRolling100: 8);
+
+  testWidgets('desktop fallback waits for the billboard request', (tester) async {
+    final data = Completer<AliadoHomeData>();
+    await tester.pumpWidget(MaterialApp(
+      home: AliadoHomeDashboard(
+        profile: profile,
+        embedInDesktopShell: true,
+        loader: () => data.future,
+      ),
+    ));
+    expect(find.text('Explora el catálogo'), findsNothing);
+
+    data.complete(const AliadoHomeData());
+    await tester.pumpAndSettle();
+    expect(find.text('Explora el catálogo'), findsOneWidget);
+  });
 
   for (final (width, scale) in [(320.0, 1.0), (390.0, 1.6)]) {
     testWidgets('mobile home and raised nav work at $width with scale $scale',

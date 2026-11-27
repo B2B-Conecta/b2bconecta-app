@@ -46,18 +46,19 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
     return boards;
   }
 
-  Widget _webHeroBanner(AliadoHomeData? data) {
+  Widget? _webHeroBanner(AliadoHomeData? data) {
+    if (data == null || data.errors.contains('las promociones')) return null;
     final boards = _activeWebBillboards(data);
     if (boards.isEmpty) return _WebHomeHero(onCatalog: _catalog);
     return _WebBillboardHero(
       campaigns: boards,
       onOpen: _openHomeCampaign,
-      onCatalog: _catalog,
     );
   }
 
   List<Widget> _webSlivers(AsyncSnapshot<AliadoHomeData> snapshot) {
     final data = snapshot.data;
+    final hero = _webHeroBanner(data);
     final theme = B2BThemeExtension.of(context);
     final warning = EntrepreneurFirstPurchaseWarningBanner.maybe(widget.profile);
     final entrepreneur = warning == null
@@ -70,8 +71,10 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _webHeroBanner(data),
-              const SizedBox(height: 12),
+              if (hero != null) ...[
+                hero,
+                const SizedBox(height: 12),
+              ],
               const RetailerTourButton(),
             ],
           ),
@@ -1462,12 +1465,10 @@ class _WebBillboardHero extends StatefulWidget {
   const _WebBillboardHero({
     required this.campaigns,
     required this.onOpen,
-    required this.onCatalog,
   });
 
   final List<PromoCampaignModel> campaigns;
   final ValueChanged<PromoCampaignModel> onOpen;
-  final VoidCallback onCatalog;
 
   @override
   State<_WebBillboardHero> createState() => _WebBillboardHeroState();
@@ -1512,10 +1513,10 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
   }
 
   void _step(int direction) {
-    if (!mounted || widget.campaigns.length < 2) return;
-    if (_hover || MediaQuery.disableAnimationsOf(context)) return;
-    final next = (_index + direction) % widget.campaigns.length;
-    _go(next < 0 ? widget.campaigns.length - 1 : next);
+    if (!mounted || _hover || MediaQuery.disableAnimationsOf(context)) return;
+    final count = _liveCampaigns.length;
+    if (count < 2) return;
+    _go((_index.clamp(0, count - 1) + direction) % count);
   }
 
   void _go(int index) {
@@ -1532,13 +1533,15 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
     }
   }
 
+  List<PromoCampaignModel> get _liveCampaigns => [
+        for (final campaign in widget.campaigns)
+          if (!_failed.contains(campaign.imageUrlForWidth(1200))) campaign,
+      ];
+
   @override
   Widget build(BuildContext context) {
-    final live = [
-      for (final campaign in widget.campaigns)
-        if (!_failed.contains(campaign.imageUrlForWidth(1200))) campaign,
-    ];
-    if (live.isEmpty) return _WebHomeHero(onCatalog: widget.onCatalog);
+    final live = _liveCampaigns;
+    if (live.isEmpty) return const SizedBox.shrink();
     final theme = B2BThemeExtension.of(context);
     final several = live.length > 1;
     final active = live[_index.clamp(0, live.length - 1)];

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/core/widgets/product_photo_lightbox.dart';
 import 'package:motolink_pro_app/features/catalog/product_photo_gallery.dart';
 
 // Tiny deterministic fixture: tests do not download supplier images.
@@ -125,12 +126,29 @@ void main() {
 
   testWidgets('viewer starts on the selected photo and returns its final photo',
       (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await _pumpGallery(tester, urls: const ['one', 'two', 'three']);
     await tester.tap(find.byTooltip('Ver foto 2'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Ampliar foto'));
     await tester.pumpAndSettle();
     expect(find.text('2 / 3'), findsOneWidget);
+    final photo = find.byType(InteractiveViewer);
+    final close = find.byTooltip('Cerrar fotos');
+    final thumbnails = find.byTooltip('Ver foto 2');
+    final zoom = find.byTooltip('Acercar foto');
+    expect(
+        tester.getBottomLeft(close).dy, lessThan(tester.getTopLeft(photo).dy));
+    expect(tester.getBottomLeft(photo).dy,
+        lessThan(tester.getTopLeft(thumbnails).dy));
+    expect(tester.getBottomLeft(thumbnails).dy,
+        lessThan(tester.getTopLeft(zoom).dy));
+    expect(tester.getSize(thumbnails).width, greaterThan(44));
+    expect(tester.getTopRight(photo).dx,
+        lessThan(tester.getTopLeft(find.byTooltip('Foto siguiente')).dx));
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
     expect(find.text('3 / 3'), findsOneWidget);
@@ -169,6 +187,50 @@ void main() {
                 find.widgetWithIcon(IconButton, Icons.add_rounded))
             .onPressed,
         isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile viewer separates its header and swipes at fit only',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpGallery(tester, urls: const ['one', 'two', 'three']);
+    await tester.tap(find.byTooltip('Ampliar foto'));
+    await tester.pumpAndSettle();
+
+    Finder inViewer(Finder finder) => find.descendant(
+        of: find.byType(ProductPhotoLightbox), matching: finder);
+    final photo = find.byType(InteractiveViewer);
+    final close = inViewer(find.byTooltip('Cerrar fotos'));
+    final thumbnail = inViewer(find.byTooltip('Ver foto 1'));
+    expect(
+        tester.getBottomLeft(close).dy, lessThan(tester.getTopLeft(photo).dy));
+    expect(tester.getTopLeft(thumbnail).dy,
+        greaterThan(tester.getBottomLeft(photo).dy));
+    expect(tester.getSize(thumbnail).width, greaterThan(44));
+    expect(find.text('Pellizca para ampliar'), findsOneWidget);
+
+    await tester.drag(photo, const Offset(-130, 0));
+    await tester.pumpAndSettle();
+    expect(inViewer(find.text('2 / 3')), findsOneWidget);
+    await tester.tap(find.byTooltip('Acercar foto'));
+    await tester.pumpAndSettle();
+    expect(find.text('200%'), findsOneWidget);
+    await tester.drag(photo, const Offset(-130, 0));
+    await tester.pumpAndSettle();
+    expect(inViewer(find.text('2 / 3')), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Ajustar a pantalla'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pellizca para ampliar'), findsOneWidget);
+    await tester.tap(inViewer(find.byTooltip('Ver foto 3')));
+    await tester.pumpAndSettle();
+    expect(inViewer(find.text('3 / 3')), findsOneWidget);
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(find.text('3 / 3'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

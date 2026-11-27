@@ -14,6 +14,8 @@ class CatalogCartPrice extends StatelessWidget {
       this.compact = true,
       this.prominent = true,
       this.showPromotionChips = false,
+      this.usdColor,
+      this.bsColor,
       this.bcvRate});
   final PartModel part;
   final CartService? cart;
@@ -21,6 +23,8 @@ class CatalogCartPrice extends StatelessWidget {
   final bool compact;
   final bool prominent;
   final bool showPromotionChips;
+  final Color? usdColor;
+  final Color? bsColor;
   final double? bcvRate;
 
   @override
@@ -42,6 +46,8 @@ class CatalogCartPrice extends StatelessWidget {
               compact: compact,
               prominent: prominent,
               showPromotionChips: showPromotionChips,
+              usdColor: usdColor,
+              bsColor: bsColor,
               bcvRate: bcvRate);
         });
   }

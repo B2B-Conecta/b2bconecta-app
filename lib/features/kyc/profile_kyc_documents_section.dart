@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'package:motolink_pro_app/app/config/terms_config.dart';
 import 'account_access_status.dart';
@@ -169,15 +170,10 @@ class ProfileKycDocumentsSectionState
     setState(() => _showDocValidationErrors = true);
     if (showSnackBar && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+        const SnackBar(
+          content: AppNoticeMessage.error(
             'Complete los documentos obligatorios del registro inicial.',
-            style: TextStyle(
-              color: B2BThemeExtension.of(context).surfaceCard,
-            ),
           ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }

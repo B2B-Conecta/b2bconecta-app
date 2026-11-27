@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
@@ -184,8 +185,7 @@ class _ProfileSettingsTabState extends State<ProfileSettingsTab>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo guardar: $e'),
-          backgroundColor: Colors.red.shade800,
+          content: AppNoticeMessage.error('No se pudo guardar: $e'),
           behavior: SnackBarBehavior.floating,
         ),
       );

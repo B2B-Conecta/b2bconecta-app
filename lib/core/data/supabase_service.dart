@@ -786,6 +786,10 @@ class SupabaseService {
     Map<String, String> promoByImportador = const {},
     Map<String, Map<String, String?>> carriersByImportador = const {},
     Map<String, bool> applyCreditByImportador = const {},
+    Map<String, String> currencyByImportador = const {},
+    String? requestId,
+    String? savedAddressId,
+    Map<String, Map<String, String>> deliveryByImportador = const {},
   }) =>
       OrdersService.checkoutMultiImportadorCart(
           lines: lines,
@@ -795,7 +799,11 @@ class SupabaseService {
           destinoEntregaMapsUrl: destinoEntregaMapsUrl,
           promoByImportador: promoByImportador,
           carriersByImportador: carriersByImportador,
-          applyCreditByImportador: applyCreditByImportador);
+          applyCreditByImportador: applyCreditByImportador,
+          currencyByImportador: currencyByImportador,
+          requestId: requestId,
+          savedAddressId: savedAddressId,
+          deliveryByImportador: deliveryByImportador);
 
   static Future<double?> fetchGlobalTasaBcv() =>
       CommissionsService.fetchGlobalTasaBcv();

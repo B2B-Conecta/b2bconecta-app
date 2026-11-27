@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:motolink_pro_app/features/profile/profile_model.dart';
 
 import 'aliado_catalog_categories.dart';
 import 'aliado_catalog_reputation_filter_presets.dart';
+import 'catalog_category_icon.dart';
 import 'catalog_filters.dart';
 import 'catalog_taxonomy.dart';
 import 'catalog_sort_mode.dart';
@@ -122,7 +124,7 @@ class _AliadoCatalogWebSidebarState extends State<AliadoCatalogWebSidebar> {
                         ),
                     ],
                   )
-                : _CategoryTree(
+                : AliadoCatalogCategoryTree(
                     families: widget.categoryTree,
                     selected: widget.selectedCategory,
                     onSelect: widget.onCategory,
@@ -304,26 +306,28 @@ class AliadoCatalogWebToolbar extends StatelessWidget {
                   ),
                   child: const Text('Restablecer'),
                 ),
-              OutlinedButton.icon(
-                onPressed: onToggleFilters,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor:
-                      filtersOpen ? B2BBrandHero.start : theme.textPrimary,
-                  backgroundColor:
-                      filtersOpen ? theme.brandContainer : theme.surfaceCard,
-                  side: BorderSide(
-                    color: filtersOpen ? B2BBrandHero.start : theme.borderSubtle,
+              RetailerTourTarget(
+                child: OutlinedButton.icon(
+                  onPressed: onToggleFilters,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        filtersOpen ? B2BBrandHero.start : theme.textPrimary,
+                    backgroundColor:
+                        filtersOpen ? theme.brandContainer : theme.surfaceCard,
+                    side: BorderSide(
+                      color: filtersOpen ? B2BBrandHero.start : theme.borderSubtle,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  visualDensity: VisualDensity.compact,
-                  minimumSize: const Size(0, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  icon: const LucideIcon(LucideGlyph.slidersHorizontal, size: 16),
+                  label: const Text('Filtros'),
                 ),
-                icon: const LucideIcon(LucideGlyph.slidersHorizontal, size: 16),
-                label: const Text('Filtros'),
               ),
               _SortMenu(mode: sortMode, onSelected: onSort),
               ...chips,
@@ -502,8 +506,11 @@ class AliadoCatalogWebAddButton extends StatelessWidget {
   }
 }
 
-class _CategoryTree extends StatefulWidget {
-  const _CategoryTree({
+class AliadoCatalogCategoryTree extends StatefulWidget {
+  const AliadoCatalogCategoryTree({
+    super.key,
+    this.showCounts = false,
+    this.touchLayout = false,
     required this.families,
     required this.selected,
     required this.onSelect,
@@ -511,13 +518,16 @@ class _CategoryTree extends StatefulWidget {
 
   final List<AliadoCatalogCategoryGroup> families;
   final String selected;
+  final bool showCounts;
+  final bool touchLayout;
   final ValueChanged<String> onSelect;
 
   @override
-  State<_CategoryTree> createState() => _CategoryTreeState();
+  State<AliadoCatalogCategoryTree> createState() =>
+      AliadoCatalogCategoryTreeState();
 }
 
-class _CategoryTreeState extends State<_CategoryTree> {
+class AliadoCatalogCategoryTreeState extends State<AliadoCatalogCategoryTree> {
   final _open = <String>{};
 
   @override
@@ -527,7 +537,7 @@ class _CategoryTreeState extends State<_CategoryTree> {
   }
 
   @override
-  void didUpdateWidget(covariant _CategoryTree oldWidget) {
+  void didUpdateWidget(covariant AliadoCatalogCategoryTree oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selected != widget.selected) _revealSelection();
   }
@@ -550,16 +560,20 @@ class _CategoryTreeState extends State<_CategoryTree> {
       children: [
         _TreeRow(
           label: kAliadoCatalogAllCategoriesLabel,
+          touchLayout: widget.touchLayout,
           selected: widget.selected == kAliadoCatalogAllCategoriesLabel,
           onTap: () => widget.onSelect(kAliadoCatalogAllCategoriesLabel),
         ),
         for (final family in widget.families) ...[
           _TreeRow(
             label: catalogCategoryDisplayLabel(family.label),
+            categoryArt: CatalogCategoryArt.forLabel(family.label),
             selected: widget.selected == family.label,
             opened: _open.contains(family.label),
             hasChildren: family.children.isNotEmpty,
             unavailable: !family.hasInventory,
+            count: widget.showCounts ? family.productIds.length : null,
+            touchLayout: widget.touchLayout,
             onTap: () => widget.onSelect(family.label),
             onToggle: family.children.isEmpty
                 ? null
@@ -573,8 +587,11 @@ class _CategoryTreeState extends State<_CategoryTree> {
                 padding: const EdgeInsets.only(left: 16),
                 child: _TreeRow(
                   label: categoryLeaf(child.label),
+                  categoryArt: CatalogCategoryArt.forLabel(child.label),
                   selected: widget.selected == child.label,
                   unavailable: !child.hasInventory,
+                  count: widget.showCounts ? child.productIds.length : null,
+                  touchLayout: widget.touchLayout,
                   onTap: () => widget.onSelect(child.label),
                 ),
               ),
@@ -584,7 +601,8 @@ class _CategoryTreeState extends State<_CategoryTree> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               'Sin disponibilidad: hoy no hay productos publicados.',
-              style: TextStyle(fontSize: 11, height: 1.3, color: theme.textMuted),
+              style:
+                  TextStyle(fontSize: 11, height: 1.3, color: theme.textMuted),
             ),
           ),
       ],
@@ -598,6 +616,9 @@ class _TreeRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.unavailable = false,
+    this.count,
+    this.categoryArt,
+    this.touchLayout = false,
     this.hasChildren = false,
     this.opened = false,
     this.onToggle,
@@ -606,6 +627,9 @@ class _TreeRow extends StatelessWidget {
   final String label;
   final bool selected;
   final bool unavailable;
+  final int? count;
+  final CatalogCategoryArt? categoryArt;
+  final bool touchLayout;
   final bool hasChildren;
   final bool opened;
   final VoidCallback onTap;
@@ -621,61 +645,99 @@ class _TreeRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
-          child: Row(
-            children: [
-              if (hasChildren)
-                InkWell(
-                  onTap: onToggle,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: LucideIcon(
-                      opened ? LucideGlyph.chevronDown : LucideGlyph.chevronRight,
-                      size: 14,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: touchLayout ? 48 : 0),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+            child: Row(
+              children: [
+                if (hasChildren && touchLayout)
+                  IconButton(
+                    onPressed: onToggle,
+                    tooltip: opened ? 'Contraer $label' : 'Expandir $label',
+                    icon: LucideIcon(
+                      opened
+                          ? LucideGlyph.chevronDown
+                          : LucideGlyph.chevronRight,
+                      size: 18,
                       color: theme.textSecondary,
                     ),
+                  )
+                else if (hasChildren)
+                  InkWell(
+                    onTap: onToggle,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: LucideIcon(
+                        opened
+                            ? LucideGlyph.chevronDown
+                            : LucideGlyph.chevronRight,
+                        size: 14,
+                        color: theme.textSecondary,
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 18),
+                const SizedBox(width: 4),
+                if (touchLayout) ...[
+                  ExcludeSemantics(
+                    child: label == kAliadoCatalogAllCategoriesLabel
+                        ? LucideIcon(LucideGlyph.layoutGrid,
+                            size: 18, color: theme.brand)
+                        : CatalogCategoryIcon(art: categoryArt, size: 18),
                   ),
-                )
-              else
-                const SizedBox(width: 18),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    color: unavailable && !selected ? theme.textSecondary : fg,
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      color:
+                          unavailable && !selected ? theme.textSecondary : fg,
+                    ),
                   ),
                 ),
-              ),
-              if (unavailable)
-                Padding(
-                  padding: const EdgeInsets.only(left: 6),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: theme.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: theme.borderSubtle),
+                if (count != null && !unavailable)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(
+                      '$count',
+                      semanticsLabel: count == 1 ? '1 disponible' : '$count disponibles',
+                      style:
+                          TextStyle(fontSize: 12, color: theme.textSecondary),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text(
-                        'Sin disponibilidad',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: theme.textSecondary,
+                  ),
+                if (unavailable)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: theme.borderSubtle),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        child: Text(
+                          count == null ? 'Sin disponibilidad' : '0 disponibles',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: theme.textSecondary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

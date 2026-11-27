@@ -14,6 +14,8 @@ class ImporterPickupLocationModel {
     this.isActive = true,
     this.isDefault = false,
     this.sortOrder = 0,
+    this.customerPickupEnabled = false,
+    this.customerPickupInstructions = '',
   });
 
   final String id;
@@ -30,6 +32,8 @@ class ImporterPickupLocationModel {
   final bool isActive;
   final bool isDefault;
   final int sortOrder;
+  final bool customerPickupEnabled;
+  final String customerPickupInstructions;
 
   String get ubicacionMultilinea {
     final parts = <String>[];
@@ -62,6 +66,9 @@ class ImporterPickupLocationModel {
       contactName: json['contact_name']?.toString().trim(),
       contactPhone: json['contact_phone']?.toString().trim(),
       isActive: json['is_active'] != false,
+      customerPickupEnabled: json['customer_pickup_enabled'] == true,
+      customerPickupInstructions:
+          json['customer_pickup_instructions'] as String? ?? '',
       isDefault: json['is_default'] == true,
       sortOrder: json['sort_order'] is int
           ? json['sort_order'] as int

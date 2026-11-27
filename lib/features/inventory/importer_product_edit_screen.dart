@@ -18,6 +18,8 @@ import 'product_delete_outcome_sheet.dart';
 import 'product_image_gallery_editor.dart';
 import 'importer_product_price_preview.dart';
 import 'inventory_qr_label.dart';
+import 'inventory_combined_minimums_screen.dart';
+import 'inventory_service.dart';
 
 /// Crear o editar un producto del inventario (importador).
 class ImporterProductEditScreen extends StatefulWidget {
@@ -95,11 +97,9 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
       text: p != null ? '${p.stock}' : '',
     );
     _minOrderQtyController = TextEditingController(
-      text: p == null
-          ? ''
-          : p.hasSupplierMinOrderQty
-              ? '${p.minOrderQtyEffective}'
-              : '',
+      text: p != null && ProductMinOrderQty.isSupplierDefined(p.minOrderQty)
+          ? '${p.minOrderQty}'
+          : '',
     );
     final path = canonicalCatalogCategory(p?.category) ??
         classifyCatalogProduct(p?.category, p?.nombre ?? '');
@@ -275,7 +275,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           customFields: _customFields,
         );
       } else {
-        await SupabaseService.insertProduct(
+        final productId = await SupabaseService.insertProduct(
           sku: _skuController.text.trim(),
           name: _nameController.text.trim(),
           description: _descController.text.trim(),
@@ -290,6 +290,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           hasWarranty: _hasWarranty,
           customFields: _customFields,
         );
+        await _suggestCombinedMinimum(productId, _selectedCategory);
       }
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -301,6 +302,37 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _suggestCombinedMinimum(
+      String productId, String? category) async {
+    if (category == null) return;
+    final hasMatch =
+        await InventoryService.hasCombinedMinimumInCategory(category);
+    if (!mounted || !hasMatch) return;
+    final manage = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Incluir en un mínimo combinable'),
+        content:
+            const Text('Ya tienes un grupo con referencias de esta categoría.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ver grupos'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || manage != true) return;
+    await Navigator.of(context).push<void>(MaterialPageRoute(
+      builder: (_) =>
+          InventoryCombinedMinimumsScreen(suggestedProductId: productId),
+    ));
   }
 
   Future<void> _deleteProduct() async {
@@ -564,8 +596,10 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
           salePriceUsd: _pagoSoloDivisas
               ? null
               : parsePreviewMoney(_salePriceController.text),
-          quantity: ProductMinOrderQty.resolve(
-              int.tryParse(_minOrderQtyController.text.trim())),
+          quantity: widget.initial?.combinedMinimum != null
+              ? ProductMinOrderQty.platformFloor
+              : ProductMinOrderQty.resolve(
+                  int.tryParse(_minOrderQtyController.text.trim())),
           pagoSoloDivisas: _pagoSoloDivisas,
         ),
         const SizedBox(height: 12),
@@ -579,11 +613,12 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         TextFormField(
           controller: _minOrderQtyController,
           decoration: _dec(
-            'Pedido mínimo / MOQ',
+            'Mínimo individual por referencia',
             hint: 'Vacío = 1',
           ).copyWith(
-            helperText:
-                'Vacío = desde ${ProductMinOrderQty.platformDefault} unidad.',
+            helperText: widget.initial?.combinedMinimum == null
+                ? 'Vacío = desde ${ProductMinOrderQty.platformDefault} unidad.'
+                : 'Se aplica si quitas la referencia del grupo.',
           ),
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -597,6 +632,14 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
             return null;
           },
         ),
+        if (widget.initial?.combinedMinimum case final combined?)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Grupo ${combined.name} · ${combined.catalogLabel}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         if (technical) ...[
           const SizedBox(height: 8),
           _technicalBlock(inline: false),
@@ -900,7 +943,7 @@ class _ImporterProductEditScreenState extends State<ImporterProductEditScreen> {
         actions: [
           if (_isEdit && !wide)
             IconButton(
-              tooltip: 'Descargar etiqueta QR de inventario',
+              tooltip: 'Imprimir etiqueta QR',
               onPressed: _saving || _exportingLabel ? null : _downloadQrLabel,
               icon: const Icon(Icons.qr_code_2),
             ),

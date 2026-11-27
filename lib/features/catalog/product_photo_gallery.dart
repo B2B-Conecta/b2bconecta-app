@@ -72,6 +72,7 @@ class ProductPhotoGalleryState extends State<ProductPhotoGallery> {
       images: _urls.map(_provider).toList(),
       productName: widget.productName,
       initialIndex: index,
+      catalogGalleryLayout: true,
     );
     if (mounted) _go(selected);
   }

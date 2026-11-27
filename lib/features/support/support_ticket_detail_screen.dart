@@ -10,6 +10,7 @@ import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 import 'package:motolink_pro_app/features/admin/admin_users_hub_section.dart';
 import 'support_ticket_status.dart';
 import 'support_ticket_thread_section.dart';
+import 'mobile_support_widgets.dart';
 
 enum _SupportAction { refresh, details, dossier, close }
 
@@ -193,6 +194,9 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_desktop && !widget.isAdminView && !widget.embedded) {
+      return _mobileCustomerDetail();
+    }
     final theme = B2BThemeExtension.of(context);
     final uid = SupabaseService.currentUserId;
     final isOwner = uid != null && _ticket.createdBy == uid;
@@ -208,9 +212,8 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
             : theme.brandContainer);
     final desktop = _desktop;
     final webAdmin = desktop && widget.isAdminView;
-    final roleLabel = _ticket.authorRole == 'importador'
-        ? 'Mayorista'
-        : 'Minorista';
+    final roleLabel =
+        _ticket.authorRole == 'importador' ? 'Mayorista' : 'Minorista';
 
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
@@ -291,7 +294,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        _isClosed ? 'Resuelto' : _ticket.statusLabel,
+                        _isClosed ? 'Cerrado' : _ticket.statusLabel,
                         style: TextStyle(
                           color: statusFg,
                           fontSize: 12,
@@ -317,9 +320,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                           fontSize: 12,
                         ),
                       ),
-                    if (_ticket.relatedTransactionRequestId
-                            ?.isNotEmpty ==
-                        true)
+                    if (_ticket.relatedTransactionRequestId?.isNotEmpty == true)
                       TextButton(
                         onPressed: _showDetails,
                         style: TextButton.styleFrom(
@@ -361,7 +362,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
                 child: Text(
-                  _closing ? 'Cerrando…' : 'Resolver',
+                  _closing ? 'Cerrando…' : 'Cerrar',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 12.5,
@@ -465,6 +466,137 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _mobileCustomerDetail() {
+    final theme = B2BThemeExtension.of(context);
+    final owner = SupabaseService.currentUserId == _ticket.createdBy;
+    final status = _isClosed ? SupportTicketStatus.cerrado : _ticket.status;
+    return Scaffold(
+      backgroundColor: theme.background,
+      appBar: mobileSupportAppBar(context, 'Soporte B2B Conecta',
+          avatar: true,
+          actions: [
+            PopupMenuButton<_SupportAction>(
+                tooltip: 'Opciones del reclamo',
+                enabled: !_closing,
+                onSelected: _onAction,
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                itemBuilder: (_) => [
+                      PopupMenuItem(
+                          value: _SupportAction.refresh,
+                          enabled: !_refreshing,
+                          child: const Text('Actualizar conversación')),
+                      if (owner && !_isClosed)
+                        const PopupMenuItem(
+                            value: _SupportAction.close,
+                            child: Text('Cerrar reclamo')),
+                    ]),
+          ]),
+      body: SafeArea(
+          top: false,
+          child: LayoutBuilder(
+              builder: (context, bounds) => Column(children: [
+                    ConstrainedBox(
+                      constraints:
+                          BoxConstraints(maxHeight: bounds.maxHeight * .42),
+                      child: SingleChildScrollView(
+                          child: Container(
+                        margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                        decoration: BoxDecoration(
+                            color: theme.brandContainer,
+                            borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(supportReference(_ticket.id),
+                                  style: TextStyle(
+                                      color: theme.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12)),
+                              const SizedBox(height: 5),
+                              Text(_ticket.subject,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    SupportStatusChip(status: status),
+                                    Text(_ticket.categoryLabel)
+                                  ]),
+                              Theme(
+                                  data: Theme.of(context).copyWith(
+                                      dividerColor: Colors.transparent),
+                                  child: ExpansionTile(
+                                    tilePadding: EdgeInsets.zero,
+                                    childrenPadding:
+                                        const EdgeInsets.only(bottom: 12),
+                                    title: Text('Ver datos del reclamo',
+                                        style: TextStyle(
+                                            color: theme.brand,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600)),
+                                    children: [
+                                      Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                    'Creado el ${_stamp(_ticket.createdAt)}'),
+                                                if (_ticket.closedAt != null)
+                                                  Text(
+                                                      'Cerrado el ${_stamp(_ticket.closedAt)}'),
+                                                if (_ticket
+                                                        .relatedTransactionRequestId
+                                                        ?.isNotEmpty ==
+                                                    true) ...[
+                                                  const SizedBox(height: 8),
+                                                  const Text('Pedido vinculado',
+                                                      style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600)),
+                                                  SelectableText(
+                                                      '#${_ticket.relatedTransactionRequestId!.substring(0, _ticket.relatedTransactionRequestId!.length.clamp(0, 8)).toUpperCase()}'),
+                                                ],
+                                                const SizedBox(height: 8),
+                                                const Text(
+                                                    'Identificador completo',
+                                                    style: TextStyle(
+                                                        fontSize: 12)),
+                                                SelectableText(_ticket.id,
+                                                    style: TextStyle(
+                                                        color:
+                                                            theme.textSecondary,
+                                                        fontSize: 12)),
+                                              ])),
+                                    ],
+                                  )),
+                            ]),
+                      )),
+                    ),
+                    if (_closing || _refreshing)
+                      const LinearProgressIndicator(minHeight: 2),
+                    Expanded(
+                        child: SupportTicketThreadSection(
+                      key: ValueKey('stm-${_ticket.id}'),
+                      ticketId: _ticket.id,
+                      canReplyAsOwner: owner,
+                      canReplyAsAdmin: false,
+                      isTicketClosed: _isClosed,
+                      refreshVersion: _refreshVersion,
+                      onThreadChanged: () => _reloadTicket(),
+                    )),
+                  ]))),
     );
   }
 }

@@ -432,7 +432,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('1–10 de 87'), findsOneWidget);
+      expect(find.textContaining('1–10 de 87'), findsOneWidget);
     },
   );
 

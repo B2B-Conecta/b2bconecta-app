@@ -3,7 +3,6 @@ import 'package:motolink_pro_app/app/theme/app_theme.dart';
 
 import 'transaction_request_model.dart';
 import 'transaction_request_status.dart';
-import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_aliado_solicitud_section.dart';
 import 'package:motolink_pro_app/features/commissions/order_commission_summary.dart';
 import 'package:motolink_pro_app/features/profile/profile_section_helpers.dart';
@@ -39,10 +38,9 @@ String orderCardProductosSubtitle(
 }) {
   if (lines.isEmpty) return 'Sin partidas';
   final uds = lines.fold<int>(0, (a, r) => a + r.cantidad);
-  final totalRef = lines.fold<double>(0, (a, r) => a + r.precioTotal);
   final n = lines.length;
   final partidas = n == 1 ? '1 partida' : '$n partidas';
-  return '$partidas · $uds uds · ${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}';
+  return '$partidas · $uds uds · ${orderAmountSummary(lines)}';
 }
 
 /// Subtítulo de comisión B2B Conecta (importador).

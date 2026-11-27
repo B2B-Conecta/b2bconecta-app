@@ -106,8 +106,7 @@ class OrderListEntry {
     return '${value.day.toString().padLeft(2, '0')} ${months[value.month - 1]}';
   }
 
-  String get amount =>
-      '${formatRefAmount(lines.fold<double>(0, (sum, l) => sum + l.precioTotal))} ${orderAmountCurrency(lines)}';
+  String get amount => orderAmountSummary(lines);
   String? get bolivares => orderAmountCurrency(lines) == 'REF' &&
           lines.every((l) => l.precioTotalBsUi != null)
       ? formatBsLabel(
@@ -132,7 +131,10 @@ class OrderListEntry {
     return orderStatusLabel(lines.first.status);
   }
 
-  Color statusColor(BuildContext context) {
+  Color statusColor(BuildContext context) => OrderListColors.of(context)
+      .statusForeground(_preferredStatusColor(context));
+
+  Color _preferredStatusColor(BuildContext context) {
     if (needsAttention) return Theme.of(context).colorScheme.error;
     if (lines.every((l) => l.status == TransactionRequestStatus.rechazado)) {
       return OrderListColors.of(context).secondary;

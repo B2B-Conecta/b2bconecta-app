@@ -7,6 +7,11 @@ import 'package:motolink_pro_app/app/main_shell_tab.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/data/supabase_access.dart';
 import 'package:motolink_pro_app/core/widgets/chat_conversation_widgets.dart';
+import '../../core/layout/app_breakpoints.dart';
+import '../orders/shared/mobile_chat_widgets.dart';
+import '../orders/shared/order_message_attachment.dart';
+import '../orders/shared/order_message_pick.dart';
+import 'consultation_media.dart';
 
 /// El botón de la vitrina solo lo ve la tienda, y no sobre su propio usuario.
 bool showStoreSupplierChatButton({
@@ -27,6 +32,8 @@ class StoreSupplierThread {
     required this.importadorId,
     this.aliadoName,
     this.importadorName,
+    this.aliadoLogo,
+    this.importadorLogo,
   });
 
   final String id;
@@ -34,6 +41,10 @@ class StoreSupplierThread {
   final String importadorId;
   final String? aliadoName;
   final String? importadorName;
+  final String? aliadoLogo, importadorLogo;
+
+  String? logoFor(String? userId) =>
+      userId == aliadoId ? importadorLogo : aliadoLogo;
 
   String titleFor(String? userId) {
     final mine = userId?.trim();
@@ -77,6 +88,8 @@ class StoreSupplierMessage {
     this.productId,
     this.productName,
     this.productSku,
+    this.attachments = const [],
+    this.consultationModel,
   });
 
   final String id;
@@ -88,6 +101,8 @@ class StoreSupplierMessage {
   final String? productId;
   final String? productName;
   final String? productSku;
+  final List<OrderMessageAttachment> attachments;
+  final String? consultationModel;
 
   String get productLabel {
     final title = productName?.trim() ?? '';
@@ -110,6 +125,8 @@ class StoreSupplierMessage {
       productId: json['product_id']?.toString(),
       productName: json['product_name']?.toString(),
       productSku: json['product_sku']?.toString(),
+      attachments: parseOrderMessageAttachments(json['attachments']),
+      consultationModel: json['consultation_model']?.toString(),
     );
   }
 }
@@ -141,8 +158,8 @@ class StoreSupplierChatService {
         .from('store_supplier_threads')
         .select(
           'id, aliado_id, importador_id, '
-          'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name), '
-          'importador:profiles!store_supplier_threads_importador_id_fkey(business_name)',
+          'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name,logo_storage_path), '
+          'importador:profiles!store_supplier_threads_importador_id_fkey(business_name,logo_storage_path)',
         )
         .eq('id', id)
         .maybeSingle();
@@ -153,12 +170,14 @@ class StoreSupplierChatService {
       importadorId: row['importador_id']?.toString() ?? '',
       aliadoName: _embeddedName(row['aliado']),
       importadorName: _embeddedName(row['importador']),
+      aliadoLogo: _embeddedLogo(row['aliado']),
+      importadorLogo: _embeddedLogo(row['importador']),
     );
   }
 
   static const _messageSelect =
       'id, thread_id, author_id, author_role, body, created_at, '
-      'product_id, product_name, product_sku';
+      'product_id, product_name, product_sku, attachments, consultation_model';
   static const _messageSelectLegacy =
       'id, thread_id, author_id, author_role, body, created_at';
 
@@ -231,6 +250,62 @@ class StoreSupplierChatService {
     return error.code == '42703' || error.message.contains('product_id');
   }
 
+  /// Stable message IDs make a retry safe even when the first response was lost.
+  static Future<void> sendConsultation(
+      {required String threadId,
+      required String messageId,
+      required String body,
+      String? model,
+      PreparedOrderAttachment? photo,
+      String authorRole = 'aliado',
+      StoreSupplierProductContext? aboutProduct}) async {
+    final uid = SupabaseAccess.currentUserId;
+    if (uid == null) throw StateError('Inicia sesión para enviar la consulta.');
+    final text = body.trim();
+    if (text.isEmpty || text.length > 4000) {
+      throw ArgumentError('Escribe tu consulta (máximo 4000 caracteres).');
+    }
+    if ((model?.trim().length ?? 0) > 160) {
+      throw ArgumentError('El código o modelo supera 160 caracteres.');
+    }
+    final existing = await SupabaseAccess.client
+        .from('store_supplier_messages')
+        .select('id')
+        .eq('id', messageId)
+        .eq('thread_id', threadId)
+        .eq('author_id', uid)
+        .maybeSingle();
+    if (existing != null) return;
+    final attachments = <OrderMessageAttachment>[];
+    if (photo != null) {
+      attachments.add(await uploadConsultationPhoto(
+          threadId: threadId, messageId: messageId, photo: photo));
+    }
+    try {
+      await SupabaseAccess.client.from('store_supplier_messages').insert({
+        'id': messageId,
+        'thread_id': threadId,
+        'author_id': uid,
+        'author_role': authorRole,
+        'body': text,
+        'consultation_model':
+            model?.trim().isEmpty == true ? null : model?.trim(),
+        'attachments': attachments.map((a) => a.toJson()).toList(),
+        if (aboutProduct != null) 'product_id': aboutProduct.id,
+      });
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+      final saved = await SupabaseAccess.client
+          .from('store_supplier_messages')
+          .select('id')
+          .eq('id', messageId)
+          .eq('thread_id', threadId)
+          .eq('author_id', uid)
+          .maybeSingle();
+      if (saved == null) rethrow;
+    }
+  }
+
   static Future<void> markRead(String threadId) async {
     final uid = SupabaseAccess.currentUserId;
     final id = threadId.trim();
@@ -275,8 +350,8 @@ class StoreSupplierChatService {
             .from('store_supplier_threads')
             .select(
               'id, aliado_id, importador_id, created_at, '
-              'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name), '
-              'importador:profiles!store_supplier_threads_importador_id_fkey(business_name), '
+              'aliado:profiles!store_supplier_threads_aliado_id_fkey(business_name,logo_storage_path), '
+              'importador:profiles!store_supplier_threads_importador_id_fkey(business_name,logo_storage_path), '
               '$relation($messageColumns)',
             )
             .order('id')
@@ -297,6 +372,8 @@ class StoreSupplierChatService {
               importadorId: row['importador_id'] as String,
               aliadoName: _embeddedName(row['aliado']),
               importadorName: _embeddedName(row['importador']),
+              aliadoLogo: _embeddedLogo(row['aliado']),
+              importadorLogo: _embeddedLogo(row['importador']),
             ),
             lastBody: latest?.body,
             lastProduct: latest?.productLabel,
@@ -324,6 +401,12 @@ class StoreSupplierChatService {
     if (raw is List && raw.isNotEmpty && raw.first is Map) {
       return _embeddedName(raw.first);
     }
+    return null;
+  }
+
+  static String? _embeddedLogo(dynamic raw) {
+    if (raw is Map) return raw['logo_storage_path']?.toString();
+    if (raw is List && raw.isNotEmpty) return _embeddedLogo(raw.first);
     return null;
   }
 }
@@ -381,6 +464,9 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   List<StoreSupplierMessage> _items = const [];
   bool _loading = true;
   bool _sending = false;
+  PreparedOrderAttachment? _photo;
+  String? _pendingMessageId;
+  bool _pickingPhoto = false;
   String? _error;
   StoreSupplierProductContext? _aboutProduct;
   RealtimeChannel? _channel;
@@ -397,6 +483,7 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   @override
   void initState() {
     super.initState();
+    _ctrl.addListener(_draftChanged);
     final about = widget.aboutProduct;
     if (about != null && about.id.trim().isNotEmpty) {
       _aboutProduct = about;
@@ -415,6 +502,8 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
     );
     _load();
   }
+
+  void _draftChanged() => _pendingMessageId = null;
 
   @override
   void dispose() {
@@ -466,18 +555,33 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
 
   Future<void> _send() async {
     final role = _myRole;
-    final text = _ctrl.text.trim();
+    final text = _ctrl.text.trim().isEmpty && _photo != null
+        ? 'Foto de referencia'
+        : _ctrl.text.trim();
     if (role == null || text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await StoreSupplierChatService.send(
-        threadId: widget.threadId,
-        authorRole: role,
-        body: text,
-        aboutProduct: _aboutProduct,
-      );
+      if (_photo != null) {
+        _pendingMessageId ??= newConsultationMessageId();
+        await StoreSupplierChatService.sendConsultation(
+            threadId: widget.threadId,
+            messageId: _pendingMessageId!,
+            authorRole: role,
+            body: text,
+            photo: _photo,
+            aboutProduct: _aboutProduct);
+      } else {
+        await StoreSupplierChatService.send(
+          threadId: widget.threadId,
+          authorRole: role,
+          body: text,
+          aboutProduct: _aboutProduct,
+        );
+      }
       if (!mounted) return;
       _ctrl.clear();
+      _photo = null;
+      _pendingMessageId = null;
       await _load();
       if (mounted) widget.onActivity?.call();
     } catch (_) {
@@ -490,49 +594,127 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
     }
   }
 
+  Future<void> _pickPhoto(bool camera) async {
+    if (_sending || _pickingPhoto) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final photo = await prepareOrderChatImage(fromCamera: camera);
+      if (mounted && photo != null) {
+        setState(() {
+          _photo = photo;
+          _pendingMessageId = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'No se pudo adjuntar la foto. Usa JPG, PNG o WEBP de hasta 8 MB.')));
+      }
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = SupabaseAccess.currentUserId;
+    final mobile = MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu;
     final title = _thread?.titleFor(uid) ?? 'Mensajes';
     final product = _aboutProduct;
     final latestProduct = _items.lastOrNull?.productLabel ?? '';
-    final subtitle = latestProduct.isEmpty
-        ? 'Consulta directa'
-        : 'Último producto: $latestProduct';
+    final reference = _items.where((m) => m.authorRole == 'aliado').lastOrNull;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: !widget.embedded,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          PopupMenuButton<void>(
-            tooltip: 'Opciones del chat',
-            itemBuilder: (context) => [
-              PopupMenuItem<void>(
-                onTap: _load,
-                enabled: !_loading,
-                child: const Text('Actualizar mensajes'),
-              ),
-            ],
-          ),
-        ],
-      ),
+      appBar: mobile
+          ? MobileChatAppBar(
+              title: title,
+              subtitle: 'Consulta de repuesto',
+              showAvatar: _thread != null,
+              logoPath: _thread?.logoFor(uid),
+              automaticallyImplyLeading: !widget.embedded,
+              actions: [
+                  PopupMenuButton<void>(
+                      tooltip: 'Opciones del chat',
+                      itemBuilder: (_) => [
+                            PopupMenuItem<void>(
+                                onTap: _load,
+                                enabled: !_loading,
+                                child: const Text('Actualizar mensajes'))
+                          ])
+                ])
+          : consultationAppBar(
+              automaticallyImplyLeading: !widget.embedded,
+              title: title,
+              subtitle: 'Consulta de repuesto',
+              actions: [
+                  PopupMenuButton<void>(
+                      tooltip: 'Opciones del chat',
+                      itemBuilder: (_) => [
+                            PopupMenuItem<void>(
+                                onTap: _load,
+                                enabled: !_loading,
+                                child: const Text('Actualizar mensajes'))
+                          ])
+                ]),
       body: SafeArea(
         top: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Divider(height: 1),
+            Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text('Disponible en Chats → Consultas',
+                    style:
+                        TextStyle(fontSize: 12, color: AppColors.brandLink))),
+            if (latestProduct.isNotEmpty)
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Último producto: $latestProduct',
+                      maxLines: 2, overflow: TextOverflow.ellipsis)),
+            if (reference != null)
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: Material(
+                      color: AppColors.surfaceTinted,
+                      borderRadius: BorderRadius.circular(12),
+                      child: ListTile(
+                          dense: true,
+                          title: Text(reference.body,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle:
+                              reference.consultationModel?.isNotEmpty == true
+                                  ? Text(reference.consultationModel!)
+                                  : null,
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => showDialog<void>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                      title: const Text('Consulta de repuesto'),
+                                      content: SingleChildScrollView(
+                                          child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                            Text(reference.body),
+                                            if (reference.consultationModel
+                                                    ?.isNotEmpty ==
+                                                true)
+                                              Text(
+                                                  reference.consultationModel!),
+                                            for (final attachment
+                                                in reference.attachments)
+                                              ConsultationPhoto(
+                                                  attachment: attachment)
+                                          ])),
+                                      actions: [
+                                        TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('Cerrar'))
+                                      ]))))),
             if (_loading && _items.isNotEmpty)
               const LinearProgressIndicator(minHeight: 2),
             if (_error != null && _items.isNotEmpty)
@@ -544,6 +726,7 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
             Expanded(
               child: _items.isNotEmpty
                   ? ChatTimeline(
+                      mobileStyle: mobile,
                       itemCount: _items.length,
                       dateAt: (i) => _items[i].createdAt,
                       messageAt: (i) => _messageBubble(_items[i], uid),
@@ -562,11 +745,42 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
                               description: 'Escribe tu consulta aquí abajo.',
                             ),
             ),
+            if (_photo != null)
+              Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(children: [
+                    Image.memory(_photo!.bytes,
+                        width: 64, height: 64, fit: BoxFit.cover),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Text('Foto de referencia')),
+                    IconButton(
+                        tooltip: 'Quitar foto',
+                        onPressed: _sending
+                            ? null
+                            : () => setState(() {
+                                  _photo = null;
+                                  _pendingMessageId = null;
+                                }),
+                        icon: const Icon(Icons.close))
+                  ])),
             if (_myRole != null)
               ChatComposer(
+                mobileStyle: mobile,
                 controller: _ctrl,
                 sending: _sending,
                 onSend: _send,
+                hasAttachment: _photo != null,
+                leading: PopupMenuButton<bool>(
+                    tooltip: 'Adjuntar foto',
+                    enabled: !_sending && !_pickingPhoto,
+                    icon: const Icon(Icons.attach_file),
+                    onSelected: _pickPhoto,
+                    itemBuilder: (_) => [
+                          const PopupMenuItem(
+                              value: false, child: Text('Agregar foto')),
+                          const PopupMenuItem(
+                              value: true, child: Text('Tomar foto'))
+                        ]),
                 contextNote: product == null || product.label.isEmpty
                     ? null
                     : Row(
@@ -596,6 +810,7 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
   Widget _messageBubble(StoreSupplierMessage message, String? uid) {
     final product = message.productLabel;
     return ChatMessageBubble(
+      mobileStyle: MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu,
       key: ValueKey(message.id),
       mine: uid != null && message.authorId == uid,
       at: message.createdAt,
@@ -614,6 +829,13 @@ class _StoreSupplierChatScreenState extends State<StoreSupplierChatScreen> {
               ),
             ),
           Text(message.body, style: const TextStyle(height: 1.35)),
+          if (message.consultationModel?.isNotEmpty == true)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Código o modelo: ${message.consultationModel}',
+                    style: const TextStyle(fontWeight: FontWeight.w600))),
+          for (final attachment in message.attachments)
+            ConsultationPhoto(attachment: attachment),
         ],
       ),
     );

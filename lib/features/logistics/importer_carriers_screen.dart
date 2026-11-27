@@ -4,6 +4,7 @@ import 'importer_carrier_driver_model.dart';
 import 'importer_carrier_model.dart';
 import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
+import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
 import 'importer_carrier_form.dart';
 import 'importer_envio_politica_panel.dart';
@@ -11,7 +12,9 @@ import 'importer_pickup_locations_panel.dart';
 
 /// Importador: gestión de empresas de transporte y conductores.
 class ImporterCarriersScreen extends StatefulWidget {
-  const ImporterCarriersScreen({super.key});
+  const ImporterCarriersScreen({super.key, this.openShippingPolicy = false});
+
+  final bool openShippingPolicy;
 
   @override
   State<ImporterCarriersScreen> createState() => _ImporterCarriersScreenState();
@@ -131,80 +134,122 @@ class _ImporterCarriersScreenState extends State<ImporterCarriersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= AppBreakpoints.formMaxWidth;
+    final theme = B2BThemeExtension.of(context);
+    final isWide =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.formMaxWidth;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'Transportistas',
-          style: TextStyle(fontWeight: FontWeight.w700),
+    final horizontalPadding = isWide ? 24.0 : 16.0;
+    final padding =
+        EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 24);
+
+    return DefaultTabController(
+      length: 3,
+      initialIndex: widget.openShippingPolicy ? 2 : 0,
+      child: Scaffold(
+        backgroundColor: theme.background,
+        appBar: AppBar(
+          title: const Text('Envíos y retiro'),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: TabBar(
+                  isScrollable: !isWide,
+                  tabs: const [
+                    Tab(text: 'Transportistas'),
+                    Tab(text: 'Puntos de retiro'),
+                    Tab(text: 'Política de envío'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: TabBarView(
+              children: [
+                ListView(
+                  padding: padding,
+                  children: [
+                    if (!_loading && _error == null && _carriers.isNotEmpty)
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: FilledButton.icon(
+                          onPressed: () => _openCarrierForm(),
+                          icon: const Icon(Icons.local_shipping_outlined),
+                          label: const Text('Nuevo transportista'),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    if (_loading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_error != null)
+                      Column(
+                        children: [
+                          const Text('No pudimos cargar los transportistas.'),
+                          TextButton(
+                            onPressed: _load,
+                            child: const Text('Reintentar'),
+                          ),
+                        ],
+                      )
+                    else if (_carriers.isEmpty)
+                      _EmptyCarriersState(onCreate: () => _openCarrierForm())
+                    else
+                      for (final carrier in _carriers)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _CarrierCard(
+                            carrier: carrier,
+                            onEdit: () => _openCarrierForm(carrier),
+                            onDrivers: () => _openDrivers(carrier),
+                            onDeactivate: carrier.isActive
+                                ? () => _deactivateCarrier(carrier)
+                                : null,
+                            onActivate: carrier.isActive
+                                ? null
+                                : () => _activateCarrier(carrier),
+                          ),
+                        ),
+                  ],
+                ),
+                ListView(
+                  padding: padding,
+                  children: const [ImporterPickupLocationsPanel()],
+                ),
+                _ShippingPolicyTab(padding: padding),
+              ],
+            ),
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openCarrierForm(),
-        backgroundColor: AppColors.brand,
-        icon: const Icon(Icons.local_shipping_outlined),
-        label: const Text('Nuevo transportista'),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : _carriers.isEmpty
-                  ? ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        isWide ? 24 : 16,
-                        12,
-                        isWide ? 24 : 16,
-                        88,
-                      ),
-                      children: [
-                        const ImporterEnvioPoliticaPanel(),
-                        const SizedBox(height: 16),
-                        const ImporterPickupLocationsPanel(),
-                        const SizedBox(height: 20),
-                        _EmptyCarriersState(onCreate: () => _openCarrierForm()),
-                      ],
-                    )
-                  : Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: isWide ? 960 : double.infinity,
-                        ),
-                        child: ListView.separated(
-                          padding: EdgeInsets.fromLTRB(
-                            isWide ? 24 : 16,
-                            12,
-                            isWide ? 24 : 16,
-                            88,
-                          ),
-                          itemCount: _carriers.length + 2,
-                          separatorBuilder: (_, index) =>
-                              SizedBox(height: index == 0 ? 16 : 12),
-                          itemBuilder: (context, index) {
-                            if (index == 0) {
-                              return const ImporterEnvioPoliticaPanel();
-                            }
-                            if (index == 1) {
-                              return const ImporterPickupLocationsPanel();
-                            }
-                            final c = _carriers[index - 2];
-                            return _CarrierCard(
-                              carrier: c,
-                              onEdit: () => _openCarrierForm(c),
-                              onDrivers: () => _openDrivers(c),
-                              onDeactivate: c.isActive
-                                  ? () => _deactivateCarrier(c)
-                                  : null,
-                              onActivate: c.isActive
-                                  ? null
-                                  : () => _activateCarrier(c),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+    );
+  }
+}
+
+class _ShippingPolicyTab extends StatefulWidget {
+  const _ShippingPolicyTab({required this.padding});
+
+  final EdgeInsets padding;
+
+  @override
+  State<_ShippingPolicyTab> createState() => _ShippingPolicyTabState();
+}
+
+class _ShippingPolicyTabState extends State<_ShippingPolicyTab>
+    with AutomaticKeepAliveClientMixin<_ShippingPolicyTab> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return ListView(
+      padding: widget.padding,
+      children: const [ImporterEnvioPoliticaPanel()],
     );
   }
 }

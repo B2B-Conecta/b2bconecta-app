@@ -14,6 +14,7 @@ class ChatComposer extends StatelessWidget {
     this.leading,
     this.contextNote,
     this.hasAttachment = false,
+    this.mobileStyle = false,
   });
 
   final TextEditingController controller;
@@ -23,14 +24,19 @@ class ChatComposer extends StatelessWidget {
   final Widget? leading;
   final Widget? contextNote;
   final bool hasAttachment;
+  final bool mobileStyle;
 
   @override
   Widget build(BuildContext context) {
     final theme = B2BThemeExtension.of(context);
-    return DecoratedBox(
+    return Container(
+      margin: mobileStyle ? const EdgeInsets.fromLTRB(8, 4, 8, 8) : null,
       decoration: BoxDecoration(
         color: theme.surfaceCard,
-        border: Border(top: BorderSide(color: theme.borderSubtle)),
+        border: mobileStyle
+            ? Border.all(color: theme.borderSubtle)
+            : Border(top: BorderSide(color: theme.borderSubtle)),
+        borderRadius: mobileStyle ? BorderRadius.circular(26) : null,
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -55,12 +61,15 @@ class ChatComposer extends StatelessWidget {
                     maxLines: 3,
                     textInputAction: TextInputAction.newline,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: mobileStyle ? 14 : 13.5,
                       color: theme.textPrimary,
                     ),
                     decoration: InputDecoration(
                       hintText: hint,
-                      hintStyle: TextStyle(color: theme.textMuted),
+                      hintStyle: TextStyle(
+                          color: mobileStyle
+                              ? theme.textSecondary
+                              : theme.textMuted),
                       filled: true,
                       fillColor: theme.surfaceSubtle,
                       contentPadding: const EdgeInsets.symmetric(
@@ -68,15 +77,18 @@ class ChatComposer extends StatelessWidget {
                         vertical: 12,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(mobileStyle ? 24 : 12),
                         borderSide: BorderSide(color: theme.borderSubtle),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(mobileStyle ? 24 : 12),
                         borderSide: BorderSide(color: theme.borderSubtle),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(mobileStyle ? 24 : 12),
                         borderSide: BorderSide(color: theme.brand, width: 1.4),
                       ),
                     ),
@@ -88,7 +100,8 @@ class ChatComposer extends StatelessWidget {
                   builder: (context, _) => Tooltip(
                     message: 'Enviar mensaje',
                     child: Material(
-                      color: theme.brand,
+                      color:
+                          mobileStyle ? const Color(0xFF004BDD) : theme.brand,
                       shape: const CircleBorder(),
                       child: InkWell(
                         customBorder: const CircleBorder(),
@@ -98,8 +111,8 @@ class ChatComposer extends StatelessWidget {
                             ? null
                             : onSend,
                         child: SizedBox(
-                          width: 40,
-                          height: 40,
+                          width: mobileStyle ? 48 : 40,
+                          height: mobileStyle ? 48 : 40,
                           child: Center(
                             child: sending
                                 ? SizedBox(
@@ -113,7 +126,9 @@ class ChatComposer extends StatelessWidget {
                                 : Icon(
                                     Icons.send_rounded,
                                     size: 18,
-                                    color: theme.surfaceCard,
+                                    color: mobileStyle
+                                        ? Colors.white
+                                        : theme.surfaceCard,
                                   ),
                           ),
                         ),
@@ -193,11 +208,13 @@ class ChatTimeline extends StatelessWidget {
     required this.itemCount,
     required this.dateAt,
     required this.messageAt,
+    this.mobileStyle = false,
   });
 
   final int itemCount;
   final DateTime? Function(int index) dateAt;
   final Widget Function(int index) messageAt;
+  final bool mobileStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -218,14 +235,26 @@ class ChatTimeline extends StatelessWidget {
               if (date != null && !DateUtils.isSameDay(date, previous))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-                  child: Text(
-                    formatEsShortDate(date),
-                    style: TextStyle(
-                      color: theme.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: Container(
+                      padding: mobileStyle
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 5)
+                          : null,
+                      decoration: mobileStyle
+                          ? BoxDecoration(
+                              color: theme.brandContainer,
+                              borderRadius: BorderRadius.circular(20))
+                          : null,
+                      child: Text(
+                        mobileStyle && DateUtils.isSameDay(date, DateTime.now())
+                            ? 'Hoy'
+                            : formatEsShortDate(date),
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )),
                 ),
               messageAt(i),
             ],
@@ -244,18 +273,22 @@ class ChatMessageBubble extends StatelessWidget {
     required this.child,
     this.author,
     this.isAction = false,
+    this.highlightAction = false,
     this.showDate = false,
     this.use12HourClock = false,
+    this.mobileStyle = false,
   });
 
   final bool mine;
   final DateTime? at;
   final String? author;
   final bool isAction;
+  final bool highlightAction;
   final bool showDate;
 
   /// Hora de 12 horas (`10:32 AM`). El panel estrecho sigue en 24 h.
   final bool use12HourClock;
+  final bool mobileStyle;
   final Widget child;
 
   @override
@@ -276,12 +309,18 @@ class ChatMessageBubble extends StatelessWidget {
           .clamp(0.0, 500.0)
           .toDouble();
       final Color bubbleBg;
-      if (isAction) {
+      final ownMobile = mobileStyle && mine && (!isAction || highlightAction);
+      if (ownMobile) {
+        bubbleBg = const Color(0xFF004BDD);
+      } else if (isAction) {
         bubbleBg = theme.surfaceCard;
       } else if (mine) {
-        bubbleBg = theme.brandContainer;
+        bubbleBg = mobileStyle ? const Color(0xFF004BDD) : theme.brandContainer;
       } else {
-        bubbleBg = theme.surfaceSubtle;
+        bubbleBg =
+            mobileStyle && Theme.of(context).brightness == Brightness.light
+                ? const Color(0xFFE9EDF5)
+                : theme.surfaceSubtle;
       }
       return Align(
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -290,14 +329,20 @@ class ChatMessageBubble extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: bubbleBg,
-              border: isAction
-                  ? Border.all(color: theme.borderSubtle)
-                  : Border.all(
-                      color: mine
-                          ? theme.brand.withOpacity(0.18)
-                          : theme.borderSubtle,
-                    ),
-              borderRadius: BorderRadius.circular(isAction ? 14 : 12),
+              border: mobileStyle && (!isAction || highlightAction)
+                  ? null
+                  : isAction
+                      ? Border.all(color: theme.borderSubtle)
+                      : Border.all(
+                          color: mine
+                              ? theme.brand.withOpacity(0.18)
+                              : theme.borderSubtle,
+                        ),
+              borderRadius: BorderRadius.circular(isAction
+                  ? 14
+                  : mobileStyle
+                      ? 18
+                      : 12),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -311,7 +356,9 @@ class ChatMessageBubble extends StatelessWidget {
                       child: Text(
                         author!,
                         style: TextStyle(
-                          color: theme.textSecondary,
+                          color: ownMobile
+                              ? const Color(0xFFE5EFFF)
+                              : theme.textSecondary,
                           fontWeight: FontWeight.w700,
                           fontSize: 11,
                         ),
@@ -319,11 +366,11 @@ class ChatMessageBubble extends StatelessWidget {
                     ),
                   DefaultTextStyle.merge(
                     style: TextStyle(
-                      color: theme.textPrimary,
-                      fontSize: 13.5,
+                      color: ownMobile ? Colors.white : theme.textPrimary,
+                      fontSize: mobileStyle ? 15 : 13.5,
                       height: 1.35,
                     ),
-                    child: child,
+                    child: SelectionArea(child: child),
                   ),
                   if (time != null)
                     Padding(
@@ -333,7 +380,11 @@ class ChatMessageBubble extends StatelessWidget {
                             ? '${formatEsShortDate(local!)} · $time'
                             : time,
                         style: TextStyle(
-                          color: theme.textMuted,
+                          color: ownMobile
+                              ? const Color(0xFFE5EFFF)
+                              : mobileStyle
+                                  ? theme.textSecondary
+                                  : theme.textMuted,
                           fontSize: 11,
                         ),
                       ),

@@ -122,7 +122,7 @@ class _ActivityMetricsGridState extends State<ActivityMetricsGrid> {
         focus: ActivityMetricFocus.withOrders,
         label: 'Pedidos (${widget.periodLabel})',
         value: '${widget.orders}',
-        glyph: LucideGlyph.shoppingCart,
+        glyph: LucideGlyph.handbag,
         accent: accents.orders,
       ),
       _MetricSpec(

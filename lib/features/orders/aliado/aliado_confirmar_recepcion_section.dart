@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
-import 'package:motolink_pro_app/features/orders/shared/transaction_request_status.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_actions_flow_copy.dart';
 
@@ -85,7 +84,8 @@ class AliadoConfirmarRecepcionSection extends StatelessWidget {
                     const SizedBox(height: 8),
                   ],
                   FilledButton.icon(
-                    onPressed: b.busy || !b.puedeConfirmar ? null : b.onConfirmar,
+                    onPressed:
+                        b.busy || !b.puedeConfirmar ? null : b.onConfirmar,
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.teal.shade700,
                       foregroundColor: Colors.white,
@@ -151,16 +151,16 @@ class AliadoConfirmarRecepcionBloque {
 List<AliadoConfirmarRecepcionBloque> aliadoRecepcionBloquesDesdePedido({
   required List<TransactionRequestModel> lines,
   required bool Function(TransactionRequestModel line) lineaPuedeConfirmar,
-  required bool Function(List<TransactionRequestModel> chunk) chunkPuedeConfirmar,
-  required String? Function(List<TransactionRequestModel> chunk) busyKeyForChunk,
+  required bool Function(List<TransactionRequestModel> chunk)
+      chunkPuedeConfirmar,
+  required String? Function(List<TransactionRequestModel> chunk)
+      busyKeyForChunk,
   required String? entregaBusyId,
   required void Function(TransactionRequestModel line) onConfirmarLinea,
   required void Function(List<TransactionRequestModel> chunk) onConfirmarChunk,
 }) {
   final enTransito = lines.where(
-    (r) =>
-        r.status == TransactionRequestStatus.enTransito ||
-        r.status == TransactionRequestStatus.enviado,
+    (r) => r.puedeConfirmarRecepcionAliado,
   );
   if (enTransito.isEmpty) return const [];
 
@@ -186,7 +186,8 @@ List<AliadoConfirmarRecepcionBloque> aliadoRecepcionBloquesDesdePedido({
 
     out.add(
       AliadoConfirmarRecepcionBloque(
-        importadorNombre: multiImp ? (ref.ownerBusinessName ?? 'Importador') : null,
+        importadorNombre:
+            multiImp ? (ref.ownerBusinessName ?? 'Importador') : null,
         busy: busy,
         puedeConfirmar: chunk.length == 1
             ? lineaPuedeConfirmar(ref)
@@ -194,7 +195,8 @@ List<AliadoConfirmarRecepcionBloque> aliadoRecepcionBloquesDesdePedido({
         onConfirmar: chunk.length == 1
             ? () => onConfirmarLinea(ref)
             : () => onConfirmarChunk(chunk),
-        pagoPendienteEnTransito: chunk.any((r) => r.pagoMotolinkPendienteEnTransito),
+        pagoPendienteEnTransito:
+            chunk.any((r) => r.pagoMotolinkPendienteEnTransito),
       ),
     );
   }

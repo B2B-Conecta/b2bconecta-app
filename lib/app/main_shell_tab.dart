@@ -139,7 +139,14 @@ class MainShellTabController {
   /// Registrado por [MainShell] en [initState]; [unregister] en [dispose].
   static void register(void Function(int index) goTo) => _goTo = goTo;
 
+  static ValueChanged<int>? _selectAliadoTab;
+  static void registerAliadoTabSelection(ValueChanged<int> onSelect) => _selectAliadoTab = onSelect;
+
+  /// Usa las mismas recargas de pedidos, favoritos y perfil que la barra del shell.
+  static void navigateToAliadoTab(int index) => (_selectAliadoTab ?? _goTo)?.call(index);
+
   static void unregister() {
+    _selectAliadoTab = null;
     _goTo = null;
     _refreshImporterInventory = null;
     _refreshImporterHome = null;

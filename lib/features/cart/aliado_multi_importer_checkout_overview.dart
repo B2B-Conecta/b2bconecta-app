@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
@@ -22,8 +23,6 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
     if (nImp < 2) return const SizedBox.shrink();
 
     final pagados = importadoresConPagoConfirmado(porImportador);
-    final totalRef =
-        allLines.fold<double>(0, (s, r) => s + r.precioTotal);
 
     return Container(
       width: double.infinity,
@@ -46,7 +45,7 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.shopping_cart_outlined, color: AppColors.brandBlue),
+              const LucideIcon(LucideGlyph.handbag, color: AppColors.brandBlue),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -63,7 +62,7 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Cada proveedor emite su factura y usted realiza un pago separado. '
-            'Total del pedido: ${formatRefAmount(totalRef)} ${orderAmountCurrency(allLines)}.',
+            'Total del pedido: ${orderAmountSummary(allLines)}.',
             style: TextStyle(
               fontSize: 11.5,
               height: 1.35,
@@ -77,7 +76,8 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
               value: nImp > 0 ? pagados / nImp : 0,
               minHeight: 8,
               backgroundColor: Colors.grey.shade200,
-              color: pagados == nImp ? Colors.green.shade600 : AppColors.brandBlue,
+              color:
+                  pagados == nImp ? Colors.green.shade600 : AppColors.brandBlue,
             ),
           ),
           const SizedBox(height: 6),
@@ -86,9 +86,8 @@ class AliadoMultiImporterCheckoutOverview extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: pagados == nImp
-                  ? Colors.green.shade800
-                  : AppColors.brandBlue,
+              color:
+                  pagados == nImp ? Colors.green.shade800 : AppColors.brandBlue,
             ),
           ),
           const SizedBox(height: 12),

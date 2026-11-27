@@ -435,6 +435,7 @@ class PagedItems<T> extends StatefulWidget {
     this.pageBarBottomPadding = 10,
     this.entityLabel,
     this.compactPageBar = false,
+    this.scrollPageBar = false,
   });
 
   final List<T> items;
@@ -466,11 +467,15 @@ class PagedItems<T> extends StatefulWidget {
   final String? entityLabel;
   final bool compactPageBar;
 
+  /// Scrolls the bottom pager with the rows, useful under a floating nav bar.
+  final bool scrollPageBar;
+
   @override
   State<PagedItems<T>> createState() => _PagedItemsState<T>();
 }
 
 class _PagedItemsState<T> extends State<PagedItems<T>> {
+  final _scroll = ScrollController();
   int _pageIndex = 0;
   late int _pageSize;
   bool _pagingBusy = false;
@@ -487,6 +492,12 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
   void didUpdateWidget(PagedItems<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.resetKey != oldWidget.resetKey) _pageIndex = 0;
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<void> _setPage(int index) async {
@@ -517,6 +528,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       if (mounted && _pagingBusy) setState(() => _pagingBusy = false);
     }
     if (!mounted) return;
+    final previousPage = _pageIndex;
     setState(() {
       _pageIndex = clampListPageIndex(
         pageIndex: next,
@@ -527,6 +539,9 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
         pageSize: _pageSize,
       );
     });
+    if (_pageIndex != previousPage && _scroll.hasClients) {
+      _scroll.jumpTo(0);
+    }
   }
 
   @override
@@ -588,10 +603,12 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
         ],
       );
     }
+    final scrollPageBar = widget.scrollPageBar && widget.pagerAtBottom;
     Widget list = ListView.builder(
+      controller: scrollPageBar ? _scroll : null,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: widget.padding,
-      itemCount: page.length,
+      itemCount: page.length + (scrollPageBar ? 1 : 0),
       findChildIndexCallback: widget.itemKey == null
           ? null
           : (key) {
@@ -600,7 +617,9 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
                   page.indexWhere((e) => widget.itemKey!(e) == key.value);
               return index < 0 ? null : index;
             },
-      itemBuilder: (context, i) => buildItem(i),
+      itemBuilder: (context, i) => i == page.length
+          ? widget.pageBarBuilder?.call(bar) ?? bar
+          : buildItem(i),
     );
     if (widget.onRefresh != null) {
       list = RefreshIndicator(onRefresh: widget.onRefresh!, child: list);
@@ -610,7 +629,7 @@ class _PagedItemsState<T> extends State<PagedItems<T>> {
       children: [
         if (!widget.pagerAtBottom) barInset,
         Expanded(child: list),
-        if (widget.pagerAtBottom) barInset,
+        if (widget.pagerAtBottom && !scrollPageBar) barInset,
       ],
     );
   }

@@ -25,11 +25,21 @@ class OrderDeliveryStepper extends StatelessWidget {
               : 'El seguimiento aún no está disponible.',
           style: TextStyle(color: colors.secondary, height: 1.4));
     }
-    final current = phases.reduce((a, b) => a < b ? a : b);
+    final current = lines.every((l) =>
+            l.customerPickup &&
+            l.status == TransactionRequestStatus.pedidoListo)
+        ? 2
+        : phases.reduce((a, b) => a < b ? a : b);
     final done =
         lines.every((l) => l.status == TransactionRequestStatus.entregado);
     final mixed = lines.any((l) => l.status != lines.first.status);
-    const names = ['Confirmación', 'Preparación', 'En camino', 'Entrega'];
+    final pickup = lines.every((l) => l.customerPickup);
+    final names = [
+      'Confirmación',
+      'Preparación',
+      pickup ? 'Listo para retirar' : 'En camino',
+      pickup ? 'Retirado' : 'Entrega'
+    ];
     const icons = [
       Icons.receipt_long_outlined,
       Icons.inventory_2_outlined,
@@ -46,9 +56,7 @@ class OrderDeliveryStepper extends StatelessWidget {
                 color: i <= current ? colors.accent : colors.border)),
         child: Icon(i < current || done ? Icons.check_rounded : icons[i],
             size: 18,
-            color: i <= current
-                ? colors.onAccent
-                : colors.secondary));
+            color: i <= current ? colors.onAccent : colors.secondary));
     return LayoutBuilder(builder: (context, constraints) {
       final compact = constraints.maxWidth < 540 ||
           MediaQuery.textScalerOf(context).scale(12) > 17;

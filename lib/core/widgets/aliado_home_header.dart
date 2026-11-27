@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ios_chrome.dart';
+import 'aliado_header_metrics.dart';
 
 /// A single rounded surface owns both toolbar and collapsing search.
 class AliadoHomeHeader extends StatelessWidget {
@@ -19,14 +20,12 @@ class AliadoHomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final extra =
-        (MediaQuery.textScalerOf(context).scale(16) - 16).clamp(0.0, 32.0);
     return SliverPersistentHeader(
       pinned: true,
       delegate: _HeaderDelegate(
-        topInset: MediaQuery.viewPaddingOf(context).top + 6,
-        toolbarHeight: 68 + extra * 2,
-        searchHeight: 70 + extra,
+        topInset: AliadoHeaderMetrics.topInset(context),
+        toolbarHeight: AliadoHeaderMetrics.toolbarHeight(context),
+        searchHeight: AliadoHeaderMetrics.searchHeight(context),
         search: search,
         toolbar: (progress) {
           final compact = progress > .3;
@@ -39,7 +38,7 @@ class AliadoHomeHeader extends StatelessWidget {
             ...actions,
           ]);
           return Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
+            padding: AliadoHeaderMetrics.toolbarPadding,
             child: Row(children: [
               Expanded(child: identity(compact)),
               buttons,

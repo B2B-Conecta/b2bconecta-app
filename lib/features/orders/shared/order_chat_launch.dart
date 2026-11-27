@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/data/supabase_service.dart';
 
 import 'package:motolink_pro_app/app/theme/b2b_theme_extension.dart';
 import 'package:motolink_pro_app/core/layout/app_breakpoints.dart';
@@ -13,6 +14,8 @@ import 'package:motolink_pro_app/features/orders/shared/order_list_entry.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_motolink_thread_section.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
 import 'package:motolink_pro_app/features/profile/app_home_role.dart';
+import 'mobile_chat_widgets.dart';
+import 'mobile_order_action_widgets.dart';
 
 export 'package:motolink_pro_app/features/orders/shared/order_chat_access.dart';
 export 'package:motolink_pro_app/features/orders/shared/order_chat_widget.dart'
@@ -91,9 +94,8 @@ Future<void> showOrderChatSheet({
   String title = 'Chat del pedido',
   VoidCallback? onThreadChanged,
 }) {
-  final resolvedTitle = orderLines.isNotEmpty
-      ? orderChatTitleForLines(orderLines)
-      : title;
+  final resolvedTitle =
+      orderLines.isNotEmpty ? orderChatTitleForLines(orderLines) : title;
 
   if (_preferFloatingChat(context)) {
     return OrderFloatingChat.show(
@@ -112,100 +114,49 @@ Future<void> showOrderChatSheet({
     );
   }
 
-  final theme = B2BThemeExtension.of(context);
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: theme.dialogSurface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (sheetContext) {
-      final sheetTheme = B2BThemeExtension.of(sheetContext);
-      final height = MediaQuery.sizeOf(sheetContext).height * 0.9;
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-        ),
-        child: SizedBox(
-          height: height,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: sheetTheme.borderSubtle,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
-                child: Row(
-                  children: [
-                    LucideIcon(
-                      LucideGlyph.messageSquare,
-                      color: sheetTheme.brand,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        resolvedTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: sheetTheme.textPrimary,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Cerrar',
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      icon: LucideIcon(
-                        LucideGlyph.close,
-                        size: 16,
-                        color: sheetTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                child: SafeArea(
-                  top: false,
-                  child: OrderMotolinkThreadSection(
-                    key: ValueKey<String>(
-                      'sheet-${mergedThreadRequestIds?.join('-') ?? transactionRequestId}',
-                    ),
-                    transactionRequestId: transactionRequestId,
-                    mergedThreadRequestIds: mergedThreadRequestIds,
-                    orderLines: orderLines,
-                    allowReplyAsAliado: allowReplyAsAliado,
-                    allowReplyAsAdmin: allowReplyAsAdmin,
-                    allowReplyAsImportador: allowReplyAsImportador,
-                    deliveryGrace: deliveryGrace,
-                    onThreadChanged: onThreadChanged,
-                    suppressBuiltinTitle: true,
-                    suppressInlineHelp: false,
-                    expandMessages: true,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  ).whenComplete(() {
+  final viewerRole = allowReplyAsAliado
+      ? AppHomeRole.aliado
+      : allowReplyAsImportador
+          ? AppHomeRole.importador
+          : allowReplyAsAdmin
+              ? AppHomeRole.administrador
+              : (SupabaseService.currentUserId ==
+                      orderLines.firstOrNull?.aliadoId
+                  ? AppHomeRole.aliado
+                  : AppHomeRole.importador);
+  final thread =
+      orderChatThreadsFromOrders(orderLines, role: viewerRole).firstOrNull;
+  return Navigator.of(context)
+      .push<void>(MaterialPageRoute(
+          builder: (routeContext) => OrderMotolinkThreadSection(
+                mobileAppBarBuilder: (actions) => MobileChatAppBar(
+                    title: thread?.counterpartName ?? title,
+                    subtitle: orderLines
+                            .any((line) => line.postventaDevolucionAt != null)
+                        ? 'Posventa · ${mobileOrderReference(orderLines)}'
+                        : 'Chat del pedido',
+                    showAvatar: thread != null,
+                    logoPath: viewerRole == AppHomeRole.aliado
+                        ? orderLines.firstOrNull?.ownerLogoStoragePath
+                        : orderLines.firstOrNull?.aliadoLogoStoragePath,
+                    actions: actions),
+                transactionRequestId: transactionRequestId,
+                mergedThreadRequestIds: mergedThreadRequestIds,
+                orderLines: orderLines,
+                allowReplyAsAliado: allowReplyAsAliado,
+                allowReplyAsAdmin: allowReplyAsAdmin,
+                allowReplyAsImportador: allowReplyAsImportador,
+                deliveryGrace: deliveryGrace,
+                onThreadChanged: onThreadChanged,
+                suppressBuiltinTitle: true,
+                expandMessages: true,
+                conversationContext: thread == null
+                    ? null
+                    : MobileOrderChatCard(
+                        thread: thread,
+                        onOpenOrder: () => Navigator.pop(routeContext)),
+              )))
+      .whenComplete(() {
     NotificationProvider.active?.reload();
   });
 }
@@ -250,8 +201,7 @@ void openOrderChatForNotification({
     title: orderChatTitleForLines(
       lines,
       counterpart: counterpart,
-      viewerRole:
-          asAliado ? AppHomeRole.aliado : AppHomeRole.importador,
+      viewerRole: asAliado ? AppHomeRole.aliado : AppHomeRole.importador,
     ),
     onThreadChanged: onThreadChanged,
   );

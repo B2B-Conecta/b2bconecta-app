@@ -1,3 +1,4 @@
+import '../onboarding/retailer_induction.dart';
 import 'package:flutter/material.dart';
 
 import 'package:motolink_pro_app/app/main_shell_tab.dart';
@@ -6,6 +7,7 @@ import 'package:motolink_pro_app/core/data/supabase_service.dart';
 import 'package:motolink_pro_app/core/utils/bcv_base_price.dart';
 import 'package:motolink_pro_app/core/widgets/aliado_branded_header.dart';
 import 'package:motolink_pro_app/core/widgets/aliado_home_header.dart';
+import 'package:motolink_pro_app/core/widgets/aliado_header_metrics.dart';
 import 'package:motolink_pro_app/core/widgets/bandeja_sheet.dart';
 import 'package:motolink_pro_app/core/widgets/bcv_rate_badge.dart';
 import 'package:motolink_pro_app/core/widgets/ios_chrome.dart';
@@ -47,7 +49,8 @@ class AliadoCatalogBrandedHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AliadoHomeHeader(
-      identity: (compact) => _CatalogIdentity(profile: profile, compact: compact),
+      identity: (compact) =>
+          _CatalogIdentity(profile: profile, compact: compact),
       search: CatalogCollapsingSearchField(
         controller: searchController,
         onSubmitted: onSearchSubmitted,
@@ -129,7 +132,7 @@ class CatalogCollapsingSearchField extends StatelessWidget {
       borderSide: BorderSide.none,
     );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+      padding: AliadoHeaderMetrics.searchPadding,
       child: TextField(
         controller: controller,
         autofocus: autofocus,
@@ -146,28 +149,30 @@ class CatalogCollapsingSearchField extends StatelessWidget {
           ),
           suffixIcon: Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: IconButton(
-              tooltip: 'Filtros del catálogo',
-              onPressed: onOpenFilters,
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(44),
-                padding: EdgeInsets.zero,
-                foregroundColor: AliadoBrandedHeader.filterBlue,
-              ),
-              icon: Badge(
-                isLabelVisible: filterBadge > 0,
-                label: Text('$filterBadge'),
-                backgroundColor: AppColors.brandAccent,
-                child: const SizedBox.square(
-                  dimension: 32,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AliadoBrandedHeader.filterBlue,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: LucideIcon(LucideGlyph.slidersHorizontal,
-                          size: 17, color: Colors.white),
+            child: RetailerTourTarget(
+              child: IconButton(
+                tooltip: 'Filtros del catálogo',
+                onPressed: onOpenFilters,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(44),
+                  padding: EdgeInsets.zero,
+                  foregroundColor: AliadoBrandedHeader.filterBlue,
+                ),
+                icon: Badge(
+                  isLabelVisible: filterBadge > 0,
+                  label: Text('$filterBadge'),
+                  backgroundColor: AppColors.brandAccent,
+                  child: const SizedBox.square(
+                    dimension: 32,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AliadoBrandedHeader.filterBlue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: LucideIcon(LucideGlyph.slidersHorizontal,
+                            size: 17, color: Colors.white),
+                      ),
                     ),
                   ),
                 ),

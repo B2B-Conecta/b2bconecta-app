@@ -2,9 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import '../../core/layout/app_breakpoints.dart';
 import '../../core/widgets/aliado_header_search.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
@@ -15,6 +13,7 @@ import '../../core/widgets/ios_chrome.dart';
 import '../../core/data/supabase_service.dart';
 import '../../core/widgets/bandeja_sheet.dart';
 import '../../core/widgets/bcv_rate_badge.dart';
+import '../onboarding/retailer_induction.dart';
 import '../cart/cart_screen.dart';
 import '../cart/cart_service.dart';
 import '../cart/cart_product_actions.dart';
@@ -30,12 +29,13 @@ import '../catalog/catalog_filters.dart';
 import '../catalog/catalog_taxonomy.dart';
 import '../catalog/catalog_route_lock.dart';
 import '../catalog/importer_store_profile_screen.dart';
+import '../catalog/supplier_directory_screen.dart';
 import '../catalog/part_model.dart';
 import '../catalog/product_detail_screen.dart';
 import '../catalog/promo_banner_layout.dart';
 import '../catalog/promo_campaign_model.dart';
 import '../catalog/recent_product_views.dart';
-import '../catalog/store_supplier_chat.dart';
+import '../catalog/new_consultation_screen.dart';
 import '../inventory/product_custom_fields.dart';
 import '../onboarding/entrepreneur_first_purchase_warning_banner.dart';
 import '../onboarding/entrepreneur_rail_status_card.dart';
@@ -88,7 +88,7 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
 
   Future<AliadoHomeData> _load() async {
     final data = await (widget.loader ?? AliadoHomeService.load)();
-    if (!widget.embedInDesktopShell || widget.loader != null) return data;
+    if (widget.loader != null) return data;
     try {
       final stock = await CatalogService.fetchWebCatalogStockIndex();
       return data.withWebStock(stock);
@@ -153,27 +153,25 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
             includeBlankCategory && group.productIds.isEmpty,
       ));
 
-  bool get _categorySheetIsDesktop =>
-      MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
-
-  Widget _categorySheetTitle(String text, {required bool inStock, String? badge}) {
-    if (!_categorySheetIsDesktop || inStock) return Text(text);
+  Widget _categorySheetTitle(
+    String text,
+    AliadoCatalogCategoryGroup group, {
+    required bool showCount,
+  }) {
+    final count = group.productIds.length;
     return Row(
       children: [
-        Flexible(
-          child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
-        ),
-        const SizedBox(width: 8),
-        _WebStockBadge(label: badge ?? 'Sin stock'),
+        Expanded(child: Text(text)),
+        if (showCount || !group.hasInventory) ...[
+          const SizedBox(width: 8),
+          _WebStockBadge(
+            label: showCount
+                ? (count == 1 ? '1 disponible' : '$count disponibles')
+                : 'Sin stock',
+          ),
+        ],
       ],
     );
-  }
-
-  String? _categorySheetNote({required bool inStock, required bool child}) {
-    if (!_categorySheetIsDesktop || inStock) return null;
-    return child
-        ? '0 disponibles. No hay inventario en esta subcategoría por ahora.'
-        : 'No hay inventario disponible por ahora.';
   }
 
   void _categories(
@@ -222,20 +220,9 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                           ),
                           title: _categorySheetTitle(
                             catalogCategoryDisplayLabel(group.label),
-                            inStock: group.hasInventory,
+                            group,
+                            showCount: data.stockIndex.isNotEmpty,
                           ),
-                          subtitle: _categorySheetNote(
-                                    inStock: group.hasInventory,
-                                    child: false,
-                                  ) ==
-                                  null
-                              ? null
-                              : Text(
-                                  _categorySheetNote(
-                                    inStock: group.hasInventory,
-                                    child: false,
-                                  )!,
-                                ),
                           trailing: const _HomeAngle(),
                           onTap: () {
                             Navigator.pop(sheetContext);
@@ -254,7 +241,8 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                           ),
                           title: _categorySheetTitle(
                             catalogCategoryDisplayLabel(group.label),
-                            inStock: group.hasInventory,
+                            group,
+                            showCount: data.stockIndex.isNotEmpty,
                           ),
                           children: [
                             for (final option in [group, ...group.children])
@@ -270,23 +258,9 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
                                   identical(option, group)
                                       ? 'Ver todo en ${catalogCategoryDisplayLabel(group.label)}'
                                       : categoryLeaf(option.label),
-                                  inStock: option.hasInventory,
-                                  badge: identical(option, group)
-                                      ? 'Sin stock'
-                                      : '0 disponibles',
+                                  option,
+                                  showCount: data.stockIndex.isNotEmpty,
                                 ),
-                                subtitle: _categorySheetNote(
-                                          inStock: option.hasInventory,
-                                          child: !identical(option, group),
-                                        ) ==
-                                        null
-                                    ? null
-                                    : Text(
-                                        _categorySheetNote(
-                                          inStock: option.hasInventory,
-                                          child: !identical(option, group),
-                                        )!,
-                                      ),
                                 onTap: () {
                                   Navigator.pop(sheetContext);
                                   _openCategory(
@@ -308,8 +282,10 @@ class _AliadoHomeDashboardState extends State<AliadoHomeDashboard> {
   @override
   Widget build(BuildContext context) {
     AppColors.brightness = Theme.of(context).brightness;
-    if (!widget.embedInDesktopShell) return _mobile();
-    return _webHome();
+    return RetailerTourScreen(
+      stop: RetailerTourStop.home,
+      child: widget.embedInDesktopShell ? _webHome() : _mobile(),
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_recovery_storage.dart';
@@ -102,8 +103,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AuthService.mapAuthErrorMessage(e.message)),
-          backgroundColor: Colors.red.shade800,
+          content: AppNoticeMessage.error(
+            AuthService.mapAuthErrorMessage(e.message),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -111,8 +113,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo guardar la contraseña: $e'),
-          backgroundColor: Colors.red.shade800,
+          content: AppNoticeMessage.error(
+            'No se pudo guardar la contraseña: $e',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

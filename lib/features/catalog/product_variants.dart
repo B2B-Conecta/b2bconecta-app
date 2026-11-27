@@ -218,7 +218,7 @@ String _groupKey(PartModel part) {
   final parent = part.parentSku?.trim().toLowerCase() ?? '';
   if (parent.isEmpty) return 'row:${part.id}';
   final owner = part.ownerId?.trim() ?? '';
-  return 'grp:$owner:$parent';
+  return 'grp:$owner:$parent:${part.combinedMinimum?.id ?? ''}';
 }
 
 PartModel _collapseGroup(List<PartModel> members) {

@@ -328,8 +328,7 @@ class _DesktopNavigationShellState extends State<DesktopNavigationShell> {
                         else
                           DesktopShellTopBar(
                             unreadNotifications: widget.unreadNotifications,
-                            onNotificationTap: () =>
-                                widget.onNotificationTap(context),
+                            onNotificationTap: widget.onNotificationTap,
                             onMessagesTap: widget.onMessagesTap,
                             unreadMessages: widget.unreadMessages,
                             trailingActions: widget.trailingActions,
@@ -607,6 +606,7 @@ class _DesktopSideRail extends StatefulWidget {
 
 extension on _DesktopSideRailState {
   Widget _accountFooter(bool extended) {
+    final retailer = widget.profile.role?.trim().toLowerCase() == 'aliado';
     final menu = ShellUserMenu(
       chrome: widget.chrome,
       extended: extended,
@@ -615,8 +615,9 @@ extension on _DesktopSideRailState {
       selected: widget.accountFooterSelected,
       importerAccountMenu: widget.importerAccountMenu,
       openProfileOnTap:
-          widget.importerAccountMenu && !widget.accountOpensMenu,
+          (widget.importerAccountMenu || retailer) && !widget.accountOpensMenu,
       openSettingsOnTap: !widget.importerAccountMenu &&
+          !retailer &&
           !widget.accountOpensMenu &&
           widget.chrome != DesktopShellChrome.darkCorporate &&
           widget.onOpenProfile != null,

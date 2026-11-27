@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -45,14 +47,13 @@ Future<void> openNotificationCenter({
   const panelW = 380.0;
   const panelH = 520.0;
   final overlay =
-      Overlay.of(context).context.findRenderObject() as RenderBox?;
+      Overlay.of(context, rootOverlay: true).context.findRenderObject() as RenderBox?;
   final overlaySize = overlay?.size ?? MediaQuery.sizeOf(context);
 
   double left;
   double top;
-  final anchor = anchorContext ?? context;
-  final box = anchor.findRenderObject() as RenderBox?;
-  if (box != null && overlay != null) {
+  final box = anchorContext?.findRenderObject();
+  if (box is RenderBox && box.hasSize && overlay != null) {
     final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
     final anchorRect = Rect.fromLTWH(
       topLeft.dx,
@@ -71,15 +72,15 @@ Future<void> openNotificationCenter({
   if (left + panelW > overlaySize.width - 12) {
     left = overlaySize.width - panelW - 12;
   }
-  if (top + panelH > overlaySize.height - 12) {
-    top = (overlaySize.height - panelH - 12).clamp(12.0, overlaySize.height);
-  }
+  final maxTop = math.max(12.0, overlaySize.height - 200);
+  top = top.clamp(12.0, maxTop).toDouble();
+  final height = math.min(panelH, math.max(1.0, overlaySize.height - top - 12));
 
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Cerrar notificaciones',
-    barrierColor: theme.textPrimary.withOpacity(0.28),
+    barrierColor: theme.textPrimary.withOpacity(0.08),
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (ctx, anim, secondary) {
       return SafeArea(
@@ -89,7 +90,7 @@ Future<void> openNotificationCenter({
               left: left,
               top: top,
               width: panelW,
-              height: panelH,
+              height: height,
               child: FadeTransition(
                 opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
                 child: Material(
@@ -218,8 +219,6 @@ class _NotificationCenterPopoverState extends State<NotificationCenterPopover> {
         final unread = widget.provider.unreadCount;
 
         return Container(
-          width: 400,
-          height: 520,
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(16),
@@ -285,13 +284,18 @@ class _NotificationCenterPopoverState extends State<NotificationCenterPopover> {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text(
-                          'Marcar todo como leído',
+                          'Marcar como leídas',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
+                    IconButton(
+                      tooltip: 'Cerrar notificaciones',
+                      onPressed: widget.onClose,
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
                   ],
                 ),
               ),

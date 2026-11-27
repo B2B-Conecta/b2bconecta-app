@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 
 import 'rating_questionnaire_model.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_model.dart';
@@ -113,8 +114,7 @@ class _AdminOrderRatingSheetState extends State<_AdminOrderRatingSheet> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo registrar: $e'),
-          backgroundColor: Colors.red.shade800,
+          content: AppNoticeMessage.error('No se pudo registrar: $e'),
           behavior: SnackBarBehavior.floating,
         ),
       );

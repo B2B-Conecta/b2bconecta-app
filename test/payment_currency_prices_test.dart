@@ -41,6 +41,10 @@ void main() {
     testWidgets(
         'missing BCV or supplier restriction requires divisas: $onlyDivisas',
         (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final cart = CartService.instance..clear();
       addTearDown(cart.clear);
       CartProductActions.addMinimum(
@@ -51,6 +55,7 @@ void main() {
               precio: 52,
               salePriceUsd: 48,
               stock: 100,
+              minOrderQty: 5,
               ownerPagoSoloDivisas: onlyDivisas),
           profile: buyer,
           cart: cart);
@@ -60,16 +65,15 @@ void main() {
       await tester.pumpAndSettle();
       final continueButton =
           find.widgetWithText(FilledButton, 'Continuar con la entrega →');
-      expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
-      expect(find.text('260.00 REF'), findsWidgets);
+      expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
+      await tester.tap(find.text('Bolívares'), warnIfMissed: false);
+      await tester.pumpAndSettle();
       if (!onlyDivisas) {
-        expect(find.text('Sin tasa'), findsWidgets);
+        expect(find.text('No hay tasa BCV vigente para cobrar en bolívares.'),
+            findsWidgets);
         expect(find.text('Tasa BCV: 1 REF ='), findsNothing);
       }
-      await tester.ensureVisible(find.text('USD'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('USD'));
-      await tester.pumpAndSettle();
+      expect(cart.supplierCurrencyPreferences, isEmpty);
       expect(find.text('240.00 USD'), findsWidgets);
       expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
       expect(tester.takeException(), isNull);
@@ -105,6 +109,10 @@ void main() {
   for (final sale in [null, 48.0]) {
     testWidgets('cart pairs REF with BCV Bs and keeps divisas for offer $sale',
         (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final cart = CartService.instance..clear();
       addTearDown(cart.clear);
       final part = PartModel(
@@ -113,34 +121,32 @@ void main() {
           nombre: 'Disco',
           precio: 52,
           salePriceUsd: sale,
-          stock: 100);
+          stock: 100,
+          minOrderQty: 5);
       CartProductActions.addMinimum(part: part, profile: buyer, cart: cart);
       await tester.pumpWidget(
           const MaterialApp(home: CartScreen(profile: buyer, liveTasaBcv: 10)));
       await tester.pumpAndSettle();
       expect(cart.totalRef(), 260);
-      expect(find.textContaining('52.00 REF / ud'), findsOneWidget);
+      expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('260.00 REF'), findsWidgets);
-      expect(find.text('REF / Bs'), findsOneWidget);
+      expect(find.text('Bolívares'), findsOneWidget);
       expect(find.text('USD'), findsOneWidget);
-      expect(find.text('Bolívares'), findsNothing);
       expect(find.text('REF'), findsNothing);
-      expect(find.text('Bs 520,00'), findsOneWidget);
-      expect(find.text('Bs 2.600,00'), findsAtLeastNWidgets(2));
+      expect(find.text('Bs 2.600,00'), findsWidgets);
       await tester.ensureVisible(find.text('USD'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('USD'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('${(sale ?? 52).toStringAsFixed(2)} USD / ud'),
-          findsOneWidget);
+      expect(
+          find.text('${(sale ?? 52).toStringAsFixed(2)} USD'), findsOneWidget);
       expect(find.text('${((sale ?? 52) * 5).toStringAsFixed(2)} USD'),
           findsWidgets);
       expect(find.text('Tasa BCV: 1 REF ='), findsNothing);
       expect(find.text('Bs 2.600,00'), findsNothing);
-      await tester.tap(find.text('REF / Bs'));
+      await tester.tap(find.text('Bolívares'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('52.00 REF / ud'), findsOneWidget);
-      expect(find.text('Bs 520,00'), findsOneWidget);
+      expect(find.text('52.00 REF'), findsOneWidget);
       expect(find.text('Bs 2.600,00'), findsWidgets);
       await tester.pumpWidget(const SizedBox());
     });

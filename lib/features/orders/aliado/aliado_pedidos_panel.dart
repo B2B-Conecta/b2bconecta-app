@@ -18,12 +18,13 @@ import 'package:motolink_pro_app/features/orders/shared/order_flow_copy/order_vo
 import 'package:motolink_pro_app/features/orders/shared/importer_order_date.dart';
 import 'package:motolink_pro_app/features/orders/shared/transaction_request_filter_utils.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
-import 'aliado_cancelar_pedido_dialog.dart';
+import 'mobile_cancel_order_screen.dart';
 import 'aliado_expandable_order_card.dart';
 import 'aliado_order_detail_view.dart';
 import 'aliado_confirmar_recepcion_section.dart';
 import 'package:motolink_pro_app/features/reputation/aliado_experience_utils.dart';
 import 'package:motolink_pro_app/features/payments/aliado_order_pago_section.dart';
+import 'package:motolink_pro_app/features/payments/mobile_supplier_payment_screen.dart';
 import 'package:motolink_pro_app/features/orders/shared/order_payment_pricing.dart';
 import 'package:motolink_pro_app/features/reputation/order_rating_sheet.dart';
 import 'aliado_qty_adjustment_actions.dart';
@@ -342,14 +343,16 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       ));
     }
 
-    if (_creditOnly)
+    if (_creditOnly) {
       chips.add(_activeFilterChip(
           label: 'Saldo aplicado',
           onDeleted: () => setState(() => _creditOnly = false)));
-    if (_replacementOnly)
+    }
+    if (_replacementOnly) {
       chips.add(_activeFilterChip(
           label: 'Cambio de producto',
           onDeleted: () => setState(() => _replacementOnly = false)));
+    }
     if (chips.isEmpty) return null;
 
     return Padding(
@@ -400,13 +403,6 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     });
   }
 
-  List<TransactionRequestModel>? _grupoPorExpandKey(String expandKey) {
-    for (final g in groupAliadoOrdersByCheckout(_rows)) {
-      if (checkoutGroupExpandKey(g) == expandKey) return g;
-    }
-    return null;
-  }
-
   Future<void> _abrirValoracionTrasCancelacionAliado(
     BuildContext context,
     List<TransactionRequestModel> g, {
@@ -441,57 +437,32 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     List<TransactionRequestModel> rows,
   ) async {
     if (_cancelarBusyId != null) return;
-    final expandKey = checkoutGroupExpandKey(rows);
-    final m = await showAliadoCancelarPedidoPendienteDialog(context);
-    if (m == null) return;
-    if (!context.mounted) return;
-    setState(() => _cancelarBusyId = expandKey);
+    final cancellable = rows
+        .where((line) => line.aliadoPuedeCancelarHastaFacturaProveedor)
+        .toList();
+    if (cancellable.isEmpty) return;
+    setState(() => _cancelarBusyId = checkoutGroupExpandKey(rows));
     try {
-      for (final r in rows) {
-        if (!r.aliadoPuedeCancelarHastaFacturaProveedor) continue;
-        await SupabaseService.aliadoCancelaPedidoPendiente(
-          transactionRequestId: r.id,
-          motivo: m,
-        );
-      }
-      if (!context.mounted) return;
-      await _refreshExpandedCard();
-      if (!context.mounted) return;
-      final refreshed = _grupoPorExpandKey(expandKey) ?? rows;
-      await _abrirValoracionTrasCancelacionAliado(
-        context,
-        refreshed,
-        motivo: m,
-      );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            OrderActionsFlowCopy.pedidoCanceladoValorar,
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      var msg = e.toString();
-      if (msg.contains('emitió su factura')) {
-        msg = OrderActionsFlowCopy.aliadoNoCancelaFactura;
-      } else if (msg.contains('propuesta de cantidad')) {
-        msg = OrderActionsFlowCopy.aliadoNoCancelaCantidad;
-      } else if (msg.contains('ya está cerrado')) {
-        msg = 'El pedido ya está cerrado.';
-      } else if (msg.contains('Debe indicar un motivo') ||
-          msg.contains('3 caracteres')) {
-        msg = 'El motivo es obligatorio (mín. 3 caracteres).';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo cancelar: $msg')),
-      );
+      await Navigator.of(context).push<bool>(MaterialPageRoute(
+          builder: (_) => MobileCancelOrderScreen(
+                lines: cancellable,
+                cancelLine: (line, reason) =>
+                    SupabaseService.aliadoCancelaPedidoPendiente(
+                        transactionRequestId: line.id, motivo: reason),
+                loadLines:
+                    SupabaseService.fetchMyPedidosActivosYCerradosForAliado,
+                onRate: (ratingContext, cancelled, reason) =>
+                    _abrirValoracionTrasCancelacionAliado(
+                        ratingContext, cancelled,
+                        motivo: reason),
+                onExplore: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  MainShellTabController.navigateToAliadoCatalog();
+                },
+              )));
+      if (mounted) await _refreshExpandedCard();
     } finally {
-      if (mounted) {
-        setState(() => _cancelarBusyId = null);
-      }
+      if (mounted) setState(() => _cancelarBusyId = null);
     }
   }
 
@@ -510,9 +481,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
   ) {
     return chunk
         .where(
-          (r) =>
-              r.status == TransactionRequestStatus.enTransito ||
-              r.status == TransactionRequestStatus.enviado,
+          (r) => r.puedeConfirmarRecepcionAliado,
         )
         .toList();
   }
@@ -544,8 +513,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
         );
       } else {
         for (final r in chunk) {
-          if (r.status == TransactionRequestStatus.enTransito ||
-              r.status == TransactionRequestStatus.enviado) {
+          if (r.puedeConfirmarRecepcionAliado) {
             await SupabaseService.aliadoMarcarPedidoEntregado(r.id);
           }
         }
@@ -1078,6 +1046,29 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
     final hasAfterSales =
         delivered || chunk.any((l) => l.postventaDevolucionAt != null);
     return AliadoOrderDetailSections(
+      onOpenPayment: () async {
+        await Navigator.of(context).push<void>(MaterialPageRoute(
+            builder: (paymentContext) => MobileSupplierPaymentScreen(
+                  lines: chunk,
+                  onChanged: _refreshExpandedCard,
+                  loadLines: () => SupabaseService
+                      .fetchCheckoutGroupLinesForTransactionRequest(r.id),
+                  onMessage: () => showOrderChatSheet(
+                    context: paymentContext,
+                    transactionRequestId: r.id,
+                    mergedThreadRequestIds: chunk.length > 1
+                        ? chunk.map((l) => l.id).toList()
+                        : null,
+                    orderLines: chunk,
+                    allowReplyAsAliado: orderLinesAllowChatReply(chunk),
+                    allowReplyAsAdmin: false,
+                    deliveryGrace: orderLinesChatDeliveryGrace(chunk),
+                    title: 'Chat · ${r.ownerBusinessName ?? 'Proveedor'}',
+                    onThreadChanged: _refreshExpandedCard,
+                  ),
+                )));
+        if (mounted) _refreshExpandedCard();
+      },
       attention: chunk.any((l) => l.qtyAdjustmentPendienteAliado)
           ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               for (final line
@@ -1202,6 +1193,7 @@ class _AliadoPedidosPanelState extends State<AliadoPedidosPanel> {
       onCancelarSolicitudPendiente: _grupoPuedeCancelar(g)
           ? () => _cancelarGrupoPendiente(context, g)
           : null,
+      onCancelarProveedor: (chunk) => _cancelarGrupoPendiente(context, chunk),
       cancelarSolicitudPendienteBusy: _cancelarBusyId == expandKey,
       expandedFooter: isMulti ? null : _orderCardFooter(context, g),
       multiImporterPanelBuilder: isMulti

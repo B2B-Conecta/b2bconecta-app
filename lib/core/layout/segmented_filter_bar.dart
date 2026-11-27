@@ -10,11 +10,13 @@ class SegmentedFilterBar extends StatelessWidget {
     required this.labels,
     required this.selectedIndex,
     required this.onSelected,
+    this.distributeWhenNarrow = false,
   });
 
   final List<String> labels;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+  final bool distributeWhenNarrow;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +33,7 @@ class SegmentedFilterBar extends StatelessWidget {
           padding: const EdgeInsets.all(3),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final narrow = constraints.maxWidth < 420;
+              final narrow = !distributeWhenNarrow && constraints.maxWidth < 420;
               if (narrow) {
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,

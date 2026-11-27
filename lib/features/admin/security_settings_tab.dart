@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -162,13 +163,9 @@ class _SecuritySettingsTabState extends State<SecuritySettingsTab>
   }
 
   void _showSnack(String message, {bool isError = false}) {
-    final theme = B2BThemeExtension.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? const Color(0xFFDC2626) : theme.surfaceElevated,
-        behavior: SnackBarBehavior.floating,
+        content: isError ? AppNoticeMessage.error(message) : Text(message),
       ),
     );
   }

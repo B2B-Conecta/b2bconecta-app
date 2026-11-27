@@ -38,7 +38,7 @@ class CatalogCartBar extends StatelessWidget {
                     child: Row(
                       children: [
                         const LucideIcon(
-                          LucideGlyph.shoppingCart,
+                          LucideGlyph.handbag,
                           size: 22,
                           color: AppColors.black,
                         ),

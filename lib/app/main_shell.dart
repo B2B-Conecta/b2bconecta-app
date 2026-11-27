@@ -1,4 +1,4 @@
-import 'dart:async' show Timer, unawaited;
+import 'dart:async' show scheduleMicrotask, Timer, unawaited;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
@@ -54,6 +54,7 @@ import 'package:motolink_pro_app/features/dashboard/importer_command_palette.dar
 import 'package:motolink_pro_app/features/dashboard/importer_shell_badges.dart';
 import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart';
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_welcome_dialog.dart';
+import 'package:motolink_pro_app/features/onboarding/retailer_induction.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
@@ -160,6 +161,8 @@ class _MainShellState extends State<MainShell> {
     });
     if (widget.homeRole == AppHomeRole.aliado) {
       _tabIndex = AliadoShellTabs.inicio;
+      MainShellTabController.registerAliadoTabSelection(
+          (index) => _onB2bTabSelected(index, AppHomeRole.aliado));
       MainShellTabController.registerB2BNavigation(
         home: AliadoShellTabs.inicio,
         pedidos: AliadoShellTabs.pedidos,
@@ -207,6 +210,9 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    if (widget.homeRole == AppHomeRole.aliado) {
+      scheduleMicrotask(endRetailerTour);
+    }
     _presenceTimer?.cancel();
     PushNotificationService.instance.unregisterTapHandler();
     _notifications.removeListener(_onNotificationsChanged);
@@ -598,9 +604,9 @@ class _MainShellState extends State<MainShell> {
       bottomContentPadding: 8,
     ),
     ShellDestination(
-      icon: Icons.shopping_cart_outlined,
-      selectedIcon: Icons.shopping_cart,
-      lucideIcon: LucideGlyph.shoppingCart,
+      icon: Icons.shopping_bag_outlined,
+      selectedIcon: Icons.shopping_bag,
+      lucideIcon: LucideGlyph.handbag,
       label: 'Pedidos',
       title: 'Pedidos',
       subtitle: 'En curso · entregas',
@@ -662,9 +668,9 @@ class _MainShellState extends State<MainShell> {
       compactHeaderOnScroll: true,
     ),
     ShellDestination(
-      icon: Icons.shopping_cart_outlined,
-      selectedIcon: Icons.shopping_cart,
-      lucideIcon: LucideGlyph.shoppingCart,
+      icon: Icons.shopping_bag_outlined,
+      selectedIcon: Icons.shopping_bag,
+      lucideIcon: LucideGlyph.handbag,
       badgeKey: ImporterShellBadgeKey.pedidos,
       label: 'Pedidos',
       title: 'Pedidos',
@@ -1037,7 +1043,8 @@ class _MainShellState extends State<MainShell> {
           tooltip: 'Carrito',
           onPressed: _openAliadoCart,
           count: n,
-          icon: n > 0 ? Icons.shopping_cart : Icons.shopping_cart_outlined,
+          icon: Icons.shopping_bag_outlined,
+          iconWidget: const LucideIcon(LucideGlyph.handbag, size: 22),
         );
       },
     );
@@ -1244,18 +1251,19 @@ class _MainShellState extends State<MainShell> {
 
   void _openAliadoReputation() {
     Navigator.of(context).push<void>(MaterialPageRoute(
-        builder: (_) => Scaffold(
-              appBar: AppBar(title: const Text('Mi reputación')),
-              body: StatefulBuilder(
-                  builder: (context, update) => ReputationOverview(
-                      profile: _profile,
-                      isImporter: false,
-                      showHeading: false,
-                      onProfileRefresh: () async {
-                        await _refreshProfile();
-                        if (context.mounted) update(() {});
-                      })),
-            )));
+      builder: (_) => StatefulBuilder(
+        builder: (context, update) => ReputationOverview(
+          profile: _profile,
+          isImporter: false,
+          showHeading: false,
+          standaloneRetailer: true,
+          onProfileRefresh: () async {
+            await _refreshProfile();
+            if (context.mounted) update(() {});
+          },
+        ),
+      ),
+    ));
   }
 
   Widget _buildB2bDesktopShell({
@@ -1355,8 +1363,7 @@ class _MainShellState extends State<MainShell> {
         final theme = B2BThemeExtension.of(context);
         return ResponsiveScaffold(
           scaffoldKey: _b2bMobileScaffoldKey,
-          extendBody:
-              role == AppHomeRole.aliado && _tabIndex == AliadoShellTabs.inicio,
+          extendBody: role == AppHomeRole.aliado,
           drawer: AdminShellDrawer(
             profile: _profile,
             destinations: destinations,
@@ -1534,7 +1541,7 @@ class _MainShellState extends State<MainShell> {
           );
         }
 
-        final shell = Scaffold(
+        final scaffold = Scaffold(
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1589,6 +1596,9 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
         );
+        final shell = widget.homeRole == AppHomeRole.importador
+            ? ImporterWebTourLayer(child: scaffold, viewToken: _tabIndex)
+            : scaffold;
         return kIsWeb
             ? CallbackShortcuts(
                 bindings: {
@@ -1789,7 +1799,7 @@ class _ProfileTabState extends State<_ProfileTab>
   }
 
   bool get _tourOwnsProfileTabs =>
-      widget.embedInDesktopShell && widget.homeRole == AppHomeRole.importador;
+      widget.homeRole == AppHomeRole.importador;
 
   void _applyProfileSubTab(int index) {
     if (!mounted) return;
@@ -1946,7 +1956,7 @@ class _ProfileTabState extends State<_ProfileTab>
         widget.embedInDesktopShell ? 0 : 20,
         widget.embedInDesktopShell ? 0 : 8,
         widget.embedInDesktopShell ? 0 : 20,
-        24,
+        24 + _navigationInset,
       ),
       child: Align(
         alignment: Alignment.topCenter,
@@ -1959,6 +1969,11 @@ class _ProfileTabState extends State<_ProfileTab>
       ),
     );
   }
+
+  double get _navigationInset =>
+      widget.homeRole == AppHomeRole.aliado && !widget.embedInDesktopShell
+          ? MediaQuery.paddingOf(context).bottom
+          : 0;
 
   @override
   Widget build(BuildContext context) {
@@ -2064,6 +2079,7 @@ class _ProfileTabState extends State<_ProfileTab>
         child: AccountSettingsScreen(
           embedded: true,
           panel: panel,
+          extraBottomPadding: _navigationInset,
           roleLabel: ProfileRoleLabels.labelEs(widget.profile.role),
           guideAlerts: widget.embedInDesktopShell &&
               widget.homeRole == AppHomeRole.importador &&
@@ -2095,6 +2111,7 @@ class _ProfileTabState extends State<_ProfileTab>
 
     final profileBody = SafeArea(
       top: !useBranded && !widget.embedInDesktopShell,
+      bottom: !useBranded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2117,10 +2134,8 @@ class _ProfileTabState extends State<_ProfileTab>
                   height: 42,
                   child: TabBar(
                     controller: _profileTabs,
-                    isScrollable: mobile || _tabCount > 3,
-                    tabAlignment: (mobile || _tabCount > 3)
-                        ? TabAlignment.start
-                        : TabAlignment.fill,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.center,
                     labelColor: theme.surfaceCard,
                     unselectedLabelColor: theme.textPrimary,
                     indicatorSize: TabBarIndicatorSize.tab,

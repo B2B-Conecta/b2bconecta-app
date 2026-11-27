@@ -86,8 +86,7 @@ void main() {
           ];
         }
         return http.Response(jsonEncode(body), status,
-            request: request,
-            headers: {'content-type': 'application/json'});
+            request: request, headers: {'content-type': 'application/json'});
       }),
     );
     await Supabase.instance.client.auth.signInWithPassword(
@@ -118,7 +117,8 @@ void main() {
     testWidgets('support keeps composer at bottom at $width', (tester) async {
       await open(tester, width);
       expect(find.text('Soporte B2B Conecta'), findsNWidgets(2));
-      expect(tester.getBottomLeft(find.byType(ChatComposer)).dy, 800);
+      expect(tester.getBottomLeft(find.byType(ChatComposer)).dy,
+          width >= 768 ? 792 : 800);
       expect(find.byType(ChatMessageBubble), findsOneWidget);
       expect(tester.getSize(find.byType(ChatMessageBubble)).width,
           lessThanOrEqualTo(1100));

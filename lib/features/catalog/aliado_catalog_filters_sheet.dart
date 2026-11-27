@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:motolink_pro_app/core/widgets/lucide_icon.dart';
 
 import 'aliado_catalog_categories.dart';
-import 'catalog_taxonomy.dart';
+import 'aliado_catalog_web_panel.dart';
 import 'catalog_category_icon.dart';
+import 'catalog_taxonomy.dart';
 import 'importer_catalog_logo.dart';
 import 'aliado_catalog_filters_draft.dart';
 import 'aliado_catalog_reputation_filter_presets.dart';
@@ -23,6 +24,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     required this.scrollController,
     this.categories = const [],
     this.categoryGroups = const [],
+    this.showCategoryCounts = false,
     this.onOpenImporterStore,
   });
 
@@ -31,6 +33,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
   final ScrollController? scrollController;
   final List<String> categories;
   final List<AliadoCatalogCategoryGroup> categoryGroups;
+  final bool showCategoryCounts;
   final ValueChanged<String>? onOpenImporterStore;
 
   static Future<AliadoCatalogFiltersDraft?> show(
@@ -39,6 +42,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
     required List<ImporterOption> importers,
     List<String> categories = const [],
     List<AliadoCatalogCategoryGroup> categoryGroups = const [],
+    bool showCategoryCounts = false,
     ValueChanged<String>? onOpenImporterStore,
   }) {
     return showAdaptiveAdminSheet<AliadoCatalogFiltersDraft>(
@@ -55,6 +59,7 @@ class AliadoCatalogFiltersSheet extends StatefulWidget {
         scrollController: scrollController,
         categories: categories,
         categoryGroups: categoryGroups,
+        showCategoryCounts: showCategoryCounts,
         onOpenImporterStore: onOpenImporterStore,
       ),
     );
@@ -77,6 +82,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
   double? _minRatingAvg;
   int? _minRatingCount;
   late bool _onlyWithCommercialDiscount;
+  late bool _onlyEnvioIncluido;
   String _importerQuery = '';
   int _importerPage = 0;
   static const _importerPageSize = 5;
@@ -90,6 +96,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
     _minRatingAvg = widget.initial.minOwnerRatingAvg;
     _minRatingCount = widget.initial.minOwnerRatingCount;
     _onlyWithCommercialDiscount = widget.initial.onlyWithCommercialDiscount;
+    _onlyEnvioIncluido = widget.initial.onlyEnvioIncluido;
     _estadoController = TextEditingController(text: widget.initial.ownerEstado);
     _ciudadController = TextEditingController(text: widget.initial.ownerCiudad);
     _minPriceController = TextEditingController(text: widget.initial.minPrice);
@@ -125,6 +132,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
       minOwnerRatingAvg: _minRatingAvg,
       minOwnerRatingCount: _minRatingCount,
       onlyWithCommercialDiscount: _onlyWithCommercialDiscount,
+      onlyEnvioIncluido: _onlyEnvioIncluido,
     );
   }
 
@@ -136,6 +144,7 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
       _minRatingAvg = null;
       _minRatingCount = null;
       _onlyWithCommercialDiscount = false;
+      _onlyEnvioIncluido = false;
       _estadoController.clear();
       _ciudadController.clear();
       _minPriceController.clear();
@@ -433,63 +442,56 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                   icon: Icons.category_outlined,
                   hint: 'Rubros de los productos publicados en el catálogo.',
                 ),
-                if (widget.categories.isEmpty &&
-                    widget.categoryGroups.isEmpty &&
-                    _category == kAliadoCatalogAllCategoriesLabel)
-                  Text(
-                    'Todavía no hay categorías publicadas.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: AppColors.textSecondary,
-                    ),
+                if (widget.categoryGroups.isNotEmpty)
+                  AliadoCatalogCategoryTree(
+                    families: widget.categoryGroups,
+                    selected: _category,
+                    showCounts: widget.showCategoryCounts,
+                    touchLayout: !desktop,
+                    onSelect: (label) => setState(() => _category = label),
                   )
                 else
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: aliadoCatalogCategoryChoices(
-                      categories: [
-                        ...widget.categories,
-                        for (final group in widget.categoryGroups) group.label,
-                      ],
-                      selected: categoryFamily(_category),
-                    ).map((label) {
-                      return _choiceChip(
-                        label: catalogCategoryDisplayLabel(label),
-                        art: CatalogCategoryArt.forLabel(label),
-                        selected: categoryFamily(_category) == label,
-                        onTap: () => setState(() => _category = label),
-                      );
-                    }).toList(),
-                  ),
-                for (final group in widget.categoryGroups)
-                  if (group.label == categoryFamily(_category) &&
-                      group.children.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text('Tipo de pieza',
-                        style: Theme.of(context).textTheme.labelLarge),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
+                    children: [
+                      for (final label in aliadoCatalogCategoryChoices(
+                        categories: widget.categories,
+                        selected: _category,
+                      ))
                         _choiceChip(
-                          label:
-                              'Todos en ${catalogCategoryDisplayLabel(group.label)}',
-                          selected: _category == group.label,
-                          onTap: () => setState(() => _category = group.label),
+                          label: catalogCategoryDisplayLabel(label),
+                          art: CatalogCategoryArt.forLabel(label),
+                          selected: _category == label,
+                          onTap: () => setState(() => _category = label),
                         ),
-                        for (final child in group.children)
-                          _choiceChip(
-                            label: categoryLeaf(child.label),
-                            selected: _category == child.label,
-                            onTap: () =>
-                                setState(() => _category = child.label),
-                          ),
-                      ],
+                    ],
+                  ),
+                _sectionHeader(
+                  'Condiciones rápidas',
+                  icon: Icons.local_offer_outlined,
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _choiceChip(
+                      label: 'Solo promociones USD',
+                      selected: _onlyWithCommercialDiscount,
+                      onTap: () => setState(() {
+                        _onlyWithCommercialDiscount =
+                            !_onlyWithCommercialDiscount;
+                      }),
+                    ),
+                    _choiceChip(
+                      label: 'Envío incluido',
+                      selected: _onlyEnvioIncluido,
+                      onTap: () => setState(() {
+                        _onlyEnvioIncluido = !_onlyEnvioIncluido;
+                      }),
                     ),
                   ],
+                ),
                 _sectionHeader(
                   'Orden',
                   icon: Icons.swap_vert_rounded,
@@ -595,19 +597,6 @@ class _AliadoCatalogFiltersSheetState extends State<AliadoCatalogFiltersSheet> {
                       ),
                     ),
                   ],
-                ),
-                _sectionHeader(
-                  'Promoción',
-                  icon: Icons.local_offer_outlined,
-                  hint: 'Productos con precio de oferta.',
-                ),
-                _choiceChip(
-                  label: 'Solo productos con promoción USD',
-                  selected: _onlyWithCommercialDiscount,
-                  onTap: () => setState(
-                    () => _onlyWithCommercialDiscount =
-                        !_onlyWithCommercialDiscount,
-                  ),
                 ),
                 _sectionHeader(
                   'Precio (REF)',

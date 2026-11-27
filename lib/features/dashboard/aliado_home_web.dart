@@ -67,7 +67,14 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         sliver: SliverToBoxAdapter(
-          child: _webHeroBanner(data),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _webHeroBanner(data),
+              const SizedBox(height: 12),
+              const RetailerTourButton(),
+            ],
+          ),
         ),
       ),
       if (warning != null)
@@ -282,7 +289,11 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
             title: '¿No encuentras un repuesto?',
             subtitle: 'Consulta con un proveedor',
             action: 'Consultar',
-            onTap: () => _webSupplierDialog(data.suppliers, consult: true),
+            onTap: () => CatalogRouteLock.push(
+                context,
+                MaterialPageRoute<void>(
+                    builder: (_) =>
+                        NewConsultationScreen(suppliers: data.suppliers))),
           ),
           top: 10,
         ),
@@ -412,7 +423,7 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
             ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -448,13 +459,16 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
                   _price(part),
                   const SizedBox(height: 4),
                   ProductStockSummary(part: part),
-                  const SizedBox(height: 10),
-                  _WebAddButton(
-                    part: part,
-                    profile: widget.profile,
-                    onDetails: () => _openPart(part),
-                  ),
                 ],
+              ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: _WebAddButton(
+                part: part,
+                profile: widget.profile,
+                onDetails: () => _openPart(part),
               ),
             ),
           ],
@@ -479,7 +493,11 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
             _webHeading(
               'Tus proveedores',
               action: 'Ver tiendas',
-              onAction: () => _webSupplierDialog(data.suppliers, consult: false),
+              onAction: () => CatalogRouteLock.push(
+                  context,
+                  MaterialPageRoute<void>(
+                      builder: (_) =>
+                          SupplierDirectoryScreen(viewer: widget.profile))),
             ),
             Row(children: [
               for (final supplier in featured)
@@ -671,30 +689,6 @@ extension _AliadoHomeWeb on _AliadoHomeDashboardState {
     );
     if (!mounted || selected == null) return;
     _catalog(CatalogFilters(brandField: selected));
-  }
-
-  Future<void> _webSupplierDialog(List<ImporterOption> suppliers,
-      {required bool consult}) async {
-    final theme = B2BThemeExtension.of(context);
-    final selected = await showDialog<ImporterOption>(
-      context: context,
-      barrierColor: theme.textPrimary.withOpacity(0.35),
-      builder: (dialogContext) => _WebSupplierPickerDialog(
-        suppliers: suppliers,
-        consult: consult,
-      ),
-    );
-    if (!mounted || selected == null) return;
-    if (!consult) {
-      _openStore(selected);
-      return;
-    }
-    await CatalogRouteLock.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => _HomeSupplierConversation(supplier: selected),
-      ),
-    );
   }
 }
 
@@ -1485,6 +1479,7 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
   int _index = 0;
   bool _hover = false;
   final _failed = <String>{};
+  final _imageRatios = <String, double>{};
 
   @override
   void initState() {
@@ -1546,6 +1541,17 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
     if (live.isEmpty) return _WebHomeHero(onCatalog: widget.onCatalog);
     final theme = B2BThemeExtension.of(context);
     final several = live.length > 1;
+    final active = live[_index.clamp(0, live.length - 1)];
+    final usesMobileCreative = active.imagePublicUrl.trim().isEmpty;
+    final width = usesMobileCreative ? active.mobileImageWidth : active.imageWidth;
+    final height = usesMobileCreative ? active.mobileImageHeight : active.imageHeight;
+    final estimatedRatio = width != null && height != null && width > 0 && height > 0
+        ? width / height
+        : usesMobileCreative
+            ? PromoBannerSpec.mobileAspect
+            : PromoBannerSpec.desktopAspect;
+    final aspect = (_imageRatios[active.imageUrlForWidth(1200)] ?? estimatedRatio)
+        .clamp(PromoBannerSpec.webFrameAspect, 10.0);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: PromoBannerSpec.webFrameWidth),
@@ -1568,7 +1574,7 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
           borderRadius: BorderRadius.circular(16),
           clipBehavior: Clip.antiAlias,
           child: AspectRatio(
-            aspectRatio: PromoBannerSpec.webFrameAspect,
+            aspectRatio: aspect,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1588,6 +1594,12 @@ class _WebBillboardHeroState extends State<_WebBillboardHero> {
                           : null,
                       child: PromoCreativeImage(
                         url: url,
+                        fit: BoxFit.contain,
+                        onImageRatio: (ratio) {
+                          if (mounted && _imageRatios[url] != ratio) {
+                            setState(() => _imageRatios[url] = ratio);
+                          }
+                        },
                         onLoadFailed: (failed) {
                           if (_failed.add(failed) && mounted) setState(() {});
                         },
@@ -1742,24 +1754,26 @@ class _WebHomeHero extends StatelessWidget {
                   Positioned(
                     left: width * 0.046,
                     bottom: height * 0.11,
-                    child: FilledButton(
-                      onPressed: onCatalog,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: B2BBrandHero.foreground,
-                        foregroundColor: B2BBrandHero.accentInk,
-                        elevation: 0,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: width * 0.026,
-                          vertical: height * 0.04,
+                    child: RetailerTourTarget(
+                      child: FilledButton(
+                        onPressed: onCatalog,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: B2BBrandHero.foreground,
+                          foregroundColor: B2BBrandHero.accentInk,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: width * 0.026,
+                            vertical: height * 0.04,
+                          ),
+                          shape: const StadiumBorder(),
+                          textStyle: TextStyle(
+                            fontSize: (width * 0.018).clamp(13.0, 17.0),
+                            fontWeight: FontWeight.w700,
+                            height: 1,
+                          ),
                         ),
-                        shape: const StadiumBorder(),
-                        textStyle: TextStyle(
-                          fontSize: (width * 0.018).clamp(13.0, 17.0),
-                          fontWeight: FontWeight.w700,
-                          height: 1,
-                        ),
+                        child: const Text('Explora el catálogo'),
                       ),
-                      child: const Text('Explora el catálogo'),
                     ),
                   ),
                 ],
@@ -1867,429 +1881,11 @@ class _WebAddButton extends StatelessWidget {
                 size: 16,
                 color: added ? B2BBrandHero.start : B2BBrandHero.foreground,
               ),
-              label: Text(label),
+              label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _WebSupplierPickerDialog extends StatefulWidget {
-  const _WebSupplierPickerDialog({
-    required this.suppliers,
-    required this.consult,
-  });
-
-  final List<ImporterOption> suppliers;
-  final bool consult;
-
-  @override
-  State<_WebSupplierPickerDialog> createState() =>
-      _WebSupplierPickerDialogState();
-}
-
-class _WebSupplierPickerDialogState extends State<_WebSupplierPickerDialog> {
-  static const _pageSize = 5;
-  final _query = TextEditingController();
-  String? _estado;
-  int _page = 0;
-
-  @override
-  void dispose() {
-    _query.dispose();
-    super.dispose();
-  }
-
-  List<String> get _estados {
-    final values = <String>{
-      for (final supplier in widget.suppliers)
-        if (supplier.estado?.trim().isNotEmpty == true) supplier.estado!.trim(),
-    };
-    final list = values.toList()..sort();
-    return list;
-  }
-
-  List<ImporterOption> get _visible {
-    final query = _query.text.trim().toLowerCase();
-    return [
-      for (final supplier in widget.suppliers)
-        if (_estado == null || supplier.estado?.trim() == _estado)
-          if (query.isEmpty ||
-              supplier.businessName.toLowerCase().contains(query) ||
-              (supplier.ciudad?.toLowerCase().contains(query) ?? false) ||
-              (supplier.estado?.toLowerCase().contains(query) ?? false))
-            supplier,
-    ];
-  }
-
-  void _clear() {
-    _query.clear();
-    setState(() {
-      _estado = null;
-      _page = 0;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = B2BThemeExtension.of(context);
-    final visible = _visible;
-    final estados = _estados;
-    return Dialog(
-      backgroundColor: theme.dialogSurface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.borderSubtle),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 640),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    widget.consult ? 'Elige un proveedor' : 'Tiendas',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: theme.textPrimary,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Cerrar',
-                  onPressed: () => Navigator.pop(context),
-                  icon: LucideIcon(LucideGlyph.close, color: theme.textSecondary),
-                ),
-              ]),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: TextField(
-                  controller: _query,
-                  onChanged: (_) => setState(() => _page = 0),
-                  style: TextStyle(color: theme.textPrimary, fontSize: 13.5),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Buscar proveedor, ciudad o estado...',
-                    hintStyle: TextStyle(color: theme.textMuted, fontSize: 13.5),
-                    filled: true,
-                    fillColor: theme.inputFill,
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(left: 12, right: 4),
-                      child: LucideIcon(
-                        LucideGlyph.search,
-                        size: 18,
-                        color: theme.textSecondary,
-                      ),
-                    ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                      maxWidth: 40,
-                      maxHeight: 40,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.borderSubtle),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: theme.borderSubtle),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: B2BBrandHero.start),
-                    ),
-                  ),
-                ),
-              ),
-              if (estados.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 36,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _estadoChip(theme, 'Todos', null),
-                      for (final estado in estados) ...[
-                        const SizedBox(width: 8),
-                        _estadoChip(theme, estado, estado),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              if (visible.isEmpty)
-                _empty(theme)
-              else ...[
-                for (final supplier in _pageItems(visible)) ...[
-                  _WebSupplierPickCard(
-                    supplier: supplier,
-                    consult: widget.consult,
-                    onTap: () => Navigator.pop(context, supplier),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                _pager(theme, visible.length),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<ImporterOption> _pageItems(List<ImporterOption> visible) {
-    final pages = (visible.length / _pageSize).ceil();
-    final page = _page.clamp(0, pages - 1);
-    final start = page * _pageSize;
-    final end = start + _pageSize > visible.length
-        ? visible.length
-        : start + _pageSize;
-    return visible.sublist(start, end);
-  }
-
-  void _goToPage(int page, int pages) =>
-      setState(() => _page = page.clamp(0, pages - 1));
-
-  Widget _pager(B2BThemeExtension theme, int total) {
-    final pages = (total / _pageSize).ceil();
-    final page = _page.clamp(0, pages - 1);
-    final start = page * _pageSize + 1;
-    final end = (page + 1) * _pageSize > total ? total : (page + 1) * _pageSize;
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, right: 8),
-      child: Row(children: [
-        Expanded(
-          child: Text(
-            'Mostrando $start–$end de $total proveedores',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: theme.textSecondary,
-            ),
-          ),
-        ),
-        TextButton(
-          onPressed: page == 0 ? null : () => _goToPage(page - 1, pages),
-          style: TextButton.styleFrom(foregroundColor: B2BBrandHero.start),
-          child: const Text('Anterior'),
-        ),
-        SizedBox(
-          height: 32,
-          width: pages > 5 ? 148 : pages * 32,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (var i = 0; i < pages; i++) _pageButton(i, page, pages),
-            ],
-          ),
-        ),
-        TextButton(
-          onPressed: page >= pages - 1 ? null : () => _goToPage(page + 1, pages),
-          style: TextButton.styleFrom(foregroundColor: B2BBrandHero.start),
-          child: const Text('Siguiente'),
-        ),
-      ]),
-    );
-  }
-
-  Widget _pageButton(int index, int page, int pages) {
-    final selected = index == page;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Material(
-        color: selected ? B2BBrandHero.start : B2BBrandHero.foreground.withOpacity(0),
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          onTap: () => _goToPage(index, pages),
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: Center(
-              child: Text(
-                '${index + 1}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? B2BBrandHero.foreground : B2BBrandHero.start,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _estadoChip(B2BThemeExtension theme, String label, String? value) {
-    final selected = _estado == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      showCheckmark: false,
-      onSelected: (_) => setState(() {
-        _estado = value;
-        _page = 0;
-      }),
-      labelStyle: TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w700,
-        color: selected ? B2BBrandHero.foreground : theme.textPrimary,
-      ),
-      selectedColor: B2BBrandHero.start,
-      backgroundColor: theme.surfaceSubtle,
-      side: BorderSide(
-        color: selected ? B2BBrandHero.start : theme.borderSubtle,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  Widget _empty(B2BThemeExtension theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            LucideIcon(LucideGlyph.search, size: 28, color: theme.textMuted),
-            const SizedBox(height: 10),
-            Text(
-              'Ningún proveedor coincide',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: theme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Prueba otro nombre, ciudad o estado.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextButton(onPressed: _clear, child: const Text('Limpiar filtros')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WebSupplierPickCard extends StatefulWidget {
-  const _WebSupplierPickCard({
-    required this.supplier,
-    required this.consult,
-    required this.onTap,
-  });
-
-  final ImporterOption supplier;
-  final bool consult;
-  final VoidCallback onTap;
-
-  @override
-  State<_WebSupplierPickCard> createState() => _WebSupplierPickCardState();
-}
-
-class _WebSupplierPickCardState extends State<_WebSupplierPickCard> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = B2BThemeExtension.of(context);
-    final supplier = widget.supplier;
-    final action = widget.consult ? 'Consultar' : 'Ver tienda';
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          decoration: BoxDecoration(
-            color: _hover ? theme.brandContainer : theme.surfaceCard,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _hover ? B2BBrandHero.start.withOpacity(.45) : theme.borderSubtle,
-            ),
-          ),
-          child: InkWell(
-            onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Row(children: [
-                _HomeLogo(path: supplier.logoStoragePath, size: 40),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        supplier.businessName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: theme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        supplier.ubicacionLine,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                      if (supplier.isCatalogFeatured) ...[
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Destacado',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: B2BBrandHero.start,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  action,
-                  style: const TextStyle(
-                    color: B2BBrandHero.start,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                const _HomeAngle(size: 16, color: B2BBrandHero.start),
-              ]),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -412,7 +412,7 @@ class _InventoryQrScreenState extends State<InventoryQrScreen> {
     return PopScope(
       canPop: _busy == null,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Etiquetas QR')),
+        appBar: AppBar(title: const Text('Imprimir etiquetas QR')),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
@@ -428,7 +428,8 @@ class _InventoryQrScreenState extends State<InventoryQrScreen> {
                         'Una misma etiqueta sirve para gestionar tus productos '
                         'desde Inventario y para que tus clientes vean su ficha '
                         'al escanearla con la cámara del teléfono. La vista '
-                        'pública solo muestra productos publicados.',
+                        'pública solo muestra productos publicados. Es el mismo '
+                        'QR que puedes compartir desde la ficha del producto.',
                       ),
                       const SizedBox(height: 12),
                       const Text(

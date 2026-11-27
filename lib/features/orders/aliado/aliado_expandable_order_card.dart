@@ -31,6 +31,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
     required this.onToggle,
     required this.statusLabel,
     this.onCancelarSolicitudPendiente,
+    this.onCancelarProveedor,
     this.cancelarSolicitudPendienteBusy = false,
     this.expandedLeading,
     this.expandedFooter,
@@ -60,6 +61,7 @@ class AliadoExpandableOrderCard extends StatelessWidget {
 
   /// Solo aplica mientras [TransactionRequestModel.status] es pendiente.
   final VoidCallback? onCancelarSolicitudPendiente;
+  final ValueChanged<List<TransactionRequestModel>>? onCancelarProveedor;
   final bool cancelarSolicitudPendienteBusy;
   final Widget? expandedFooter;
 
@@ -116,26 +118,33 @@ class AliadoExpandableOrderCard extends StatelessWidget {
       );
     }
 
-    final summary = OrderSummaryHeader(
-      lines: lines,
-      viewerRole: AppHomeRole.aliado,
-      expanded: expanded,
-      onToggle: onToggle,
-      statusLabel: statusLabel,
-      showToggle: !workspaceDetail,
-      detailSummary: workspaceDetail,
-      actionsInHeader: workspaceDetail,
-      compactDetail: compactDetail,
-      onCancel: onCancelarSolicitudPendiente != null &&
-              lines.every((l) => l.aliadoPuedeCancelarHastaFacturaProveedor)
-          ? onCancelarSolicitudPendiente
-          : null,
-      cancelBusy: cancelarSolicitudPendienteBusy,
-      chatAction: OrderChatIconButton(
-        relatedOrderIds: lines.map((e) => e.id).toList(),
-        onOpen: () => openChat(lines),
-      ),
-    );
+    final cancelAll = onCancelarSolicitudPendiente != null &&
+            lines.every((line) => line.aliadoPuedeCancelarHastaFacturaProveedor)
+        ? onCancelarSolicitudPendiente
+        : null;
+    Widget buildSummary(List<TransactionRequestModel> chatLines,
+        {required VoidCallback? onCancel, String cancelLabel = 'Cancelar pedido'}) {
+      return OrderSummaryHeader(
+        lines: lines,
+        viewerRole: AppHomeRole.aliado,
+        expanded: expanded,
+        onToggle: onToggle,
+        statusLabel: statusLabel,
+        showToggle: !workspaceDetail,
+        detailSummary: workspaceDetail,
+        actionsInHeader: workspaceDetail,
+        compactDetail: compactDetail,
+        onCancel: onCancel,
+        cancelLabel: cancelLabel,
+        cancelBusy: cancelarSolicitudPendienteBusy,
+        chatAction: OrderChatIconButton(
+          relatedOrderIds: chatLines.map((line) => line.id).toList(),
+          onOpen: () => openChat(chatLines),
+        ),
+      );
+    }
+
+    final summary = buildSummary(lines, onCancel: cancelAll);
     if (workspaceDetail && detailSectionsBuilder != null) {
       return B2bOrderCardDensityScope(
         density: density,
@@ -143,6 +152,22 @@ class AliadoExpandableOrderCard extends StatelessWidget {
           key: ValueKey(checkoutGroupExpandKey(lines)),
           lines: lines,
           summary: summary,
+          summaryBuilder: (_, selected) {
+            final cancelSupplier = onCancelarProveedor;
+            return buildSummary(
+              selected,
+              onCancel: cancelSupplier == null
+                  ? cancelAll
+                  : selected.every(
+                          (line) => line.aliadoPuedeCancelarHastaFacturaProveedor)
+                      ? () => cancelSupplier(selected)
+                      : null,
+              cancelLabel:
+                  cancelSupplier != null && distinctImporterIds.length > 1
+                      ? 'Cancelar a ${selected.first.ownerBusinessName ?? 'este proveedor'}'
+                      : 'Cancelar pedido',
+            );
+          },
           compact: compactDetail,
           viewerProfile: viewerProfile,
           onMessageProvider: openChat,
@@ -544,15 +569,16 @@ class _DescuentoDivisasFichaChip extends StatelessWidget {
 String _checkoutGroupResumen(List<TransactionRequestModel> lines) {
   if (lines.isEmpty) return '';
   final uds = lines.fold<int>(0, (a, r) => a + r.cantidad);
-  final totalRef = lines.fold<double>(0, (a, r) => a + r.precioTotal);
   final imp = lines.length;
   final buf = StringBuffer(
     '$imp ${imp == 1 ? "importador" : "importadores"} · $uds uds · '
-    '${formatRefAmount(totalRef)} ${orderAmountCurrency(lines)}',
+    '${orderAmountSummary(lines)}',
   );
   final bsVals =
       lines.map((r) => r.precioTotalBsUi).whereType<double>().toList();
-  if (bsVals.length == lines.length && bsVals.isNotEmpty) {
+  if (!orderHasMixedCurrencies(lines) &&
+      bsVals.length == lines.length &&
+      bsVals.isNotEmpty) {
     final sumBs = bsVals.fold<double>(0, (a, b) => a + b);
     buf.write(' · ~${formatVesAmount(sumBs)} Bs');
   }

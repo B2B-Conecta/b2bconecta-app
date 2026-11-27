@@ -94,7 +94,12 @@ class _AliadoFavoritesScreenState extends State<AliadoFavoritesScreen> {
         }
         return PagedItems(
           items: parts,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            24 + (useBranded ? MediaQuery.paddingOf(context).bottom : 0),
+          ),
           separator: 10,
           itemBuilder: (part) => _FavoriteRow(part: part),
         );

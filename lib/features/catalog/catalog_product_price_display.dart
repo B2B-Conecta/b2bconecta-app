@@ -26,6 +26,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
     this.usdColor,
     this.refColor,
     this.bsColor,
+    this.keepDiscountInline = false,
   });
   final double listPriceUsd;
   final double? salePriceUsd;
@@ -41,6 +42,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
   final Color? usdColor;
   final Color? refColor;
   final Color? bsColor;
+  final bool keepDiscountInline;
 
   @override
   Widget build(BuildContext context) {
@@ -75,27 +77,39 @@ class CatalogProductPriceDisplay extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: color)));
 
-    // Catálogo mock: USD verde + chip −%, REF y Bs.
+    Widget usdOffer() {
+      final children = <Widget>[
+        amount(usd, 'USD', mainSize, usdColor ?? AppColors.successGreen),
+        if (discountLabel != null) ...[
+          if (keepDiscountInline) const SizedBox(width: 6),
+          _UsdDiscountChip(label: discountLabel),
+        ],
+      ];
+      if (keepDiscountInline) {
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(mainAxisSize: MainAxisSize.min, children: children),
+        );
+      }
+      return Wrap(
+          spacing: 6,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: children);
+    }
+
+    // Highlight USD only for an actual benefit or a divisas-only supplier.
     if (catalogGrid) {
       return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              spacing: 6,
-              runSpacing: 2,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                amount(usd, 'USD', mainSize,
-                    usdColor ?? AppColors.successGreen),
-                if (discountLabel != null)
-                  _UsdDiscountChip(label: discountLabel),
-              ],
-            ),
+            if (hasPromoUsd || ownerPagoSoloDivisas) usdOffer(),
             if (!ownerPagoSoloDivisas) ...[
-              const SizedBox(height: 3),
-              amount(
-                  list, 'REF', secondarySize, refColor ?? AppColors.textPrimary),
+              if (hasPromoUsd) const SizedBox(height: 3),
+              amount(list, 'REF', hasPromoUsd ? secondarySize : mainSize,
+                  refColor ?? AppColors.textPrimary),
               _BasePriceBsLine(
                   refUsd: list,
                   fontSize: 12,
@@ -111,16 +125,7 @@ class CatalogProductPriceDisplay extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (hasPromoUsd) ...[
-            Wrap(
-                spacing: 6,
-                runSpacing: 2,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  amount(
-                      usd, 'USD', mainSize, usdColor ?? AppColors.successGreen),
-                  if (discountLabel != null)
-                    _UsdDiscountChip(label: discountLabel),
-                ]),
+            usdOffer(),
             const SizedBox(height: 4),
             amount(list, listCurrency, secondarySize, AppColors.textSecondary),
           ] else

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../app/theme/b2b_theme_extension.dart';
+import '../../../core/layout/app_breakpoints.dart';
 
 import 'package:motolink_pro_app/app/theme/app_theme.dart';
 import 'package:motolink_pro_app/core/utils/ves_amount_format.dart';
@@ -18,6 +20,9 @@ class OrderPostventaChatCard extends StatelessWidget {
     required this.onResolve,
     this.imageUrl,
     this.creditAmount = 0,
+    this.orderReference,
+    this.outgoing = false,
+    this.resolveAttachmentUrl,
   });
 
   final ParsedReturnRequest data;
@@ -26,6 +31,9 @@ class OrderPostventaChatCard extends StatelessWidget {
   final bool canDecide;
   final bool busy;
   final double creditAmount;
+  final String? orderReference;
+  final bool outgoing;
+  final Future<String> Function(String path)? resolveAttachmentUrl;
   final Future<void> Function(String resolution, String? note) onResolve;
 
   @override
@@ -33,12 +41,96 @@ class OrderPostventaChatCard extends StatelessWidget {
     final pref = data.preferenceLabel.trim().isEmpty
         ? OrderReturnRules.preferenceLabel(data.preference)
         : _capitalize(data.preferenceLabel);
-    final title = pref.isEmpty
-        ? 'Observación del pedido'
-        : 'Solicitud de devolución';
+    final title =
+        pref.isEmpty ? 'Observación del pedido' : 'Solicitud de devolución';
     final units = data.units == 1 ? '1 unidad' : '${data.units} unidades';
     final product =
         data.productName.trim().isEmpty ? 'Producto' : data.productName.trim();
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) {
+      final theme = B2BThemeExtension.of(context);
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(
+            'Reporte del pedido${orderReference == null ? '' : ' $orderReference'}',
+            style: TextStyle(
+                color: outgoing ? Colors.white : theme.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w800)),
+        const SizedBox(height: 9),
+        Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: theme.surfaceCard,
+                borderRadius: BorderRadius.circular(12)),
+            child: DefaultTextStyle.merge(
+                style: TextStyle(color: theme.textPrimary),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            OrderProductThumb(size: 48, url: imageUrl),
+                            const SizedBox(width: 9),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(product,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                      '${data.units} ${data.units == 1 ? 'unidad afectada' : 'unidades afectadas'}',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: theme.textSecondary)),
+                                ])),
+                          ]),
+                      if (pref.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text('Preferencia: $pref',
+                            style: const TextStyle(fontSize: 12))
+                      ],
+                      if (data.reason.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text.rich(
+                            TextSpan(children: [
+                              const TextSpan(
+                                  text: 'Motivo: ',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w700)),
+                              TextSpan(text: data.reason.trim())
+                            ]),
+                            style: const TextStyle(fontSize: 14, height: 1.35)),
+                      ],
+                      OrderMessageMediaStrip(
+                          attachments: attachments,
+                          expanded: true,
+                          resolveUrl: resolveAttachmentUrl),
+                      if (canDecide) ...[
+                        const SizedBox(height: 10),
+                        Text('Acuerda la solución con la tienda.',
+                            style: TextStyle(
+                                fontSize: 12, color: theme.textSecondary)),
+                        const SizedBox(height: 8),
+                        _decision(context,
+                            resolution: 'credito',
+                            label: creditAmount > 0
+                                ? 'Aprobar crédito · ${formatRefAmount(creditAmount)} REF'
+                                : 'Aprobar crédito a favor'),
+                        const SizedBox(height: 8),
+                        _decision(context,
+                            resolution: 'cambio',
+                            label: 'Aprobar cambio de producto'),
+                        TextButton(
+                            onPressed: busy ? null : () => _reject(context),
+                            child: const Text('No aceptar')),
+                      ],
+                    ]))),
+      ]);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:motolink_pro_app/core/widgets/app_notice_message.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:motolink_pro_app/app/app_scaffold_messenger.dart';
@@ -158,23 +159,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    final theme = B2BThemeExtension.of(context);
     final messenger =
         scaffoldMessengerKey.currentState ?? ScaffoldMessenger.of(context);
     messenger.showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: isError ? theme.warningFg : theme.successFg,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: isError ? theme.warningBg : theme.successBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        behavior: SnackBarBehavior.floating,
+        content: isError
+            ? AppNoticeMessage.error(message)
+            : AppNoticeMessage.success(message),
       ),
     );
   }

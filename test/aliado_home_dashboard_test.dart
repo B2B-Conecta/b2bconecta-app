@@ -115,7 +115,7 @@ void main() {
       final identityElement = tester.element(identity);
       expect(find.text('Para tu negocio'), findsNothing);
       final bcv = find.byKey(const ValueKey('home-bcv'));
-      final cart = find.byTooltip('Carrito');
+      final cart = find.byTooltip('Bolsa');
       expect(bcv, findsOneWidget);
       expect(tester.getCenter(bcv).dx - tester.getCenter(cart).dx, 44);
       expect(find.byTooltip('Abrir búsqueda'), findsNothing);
@@ -161,10 +161,10 @@ void main() {
           closeTo(tester.getCenter(suppliersHeading).dy, 1));
       await tester.tap(storeLink);
       await tester.pumpAndSettle();
-      expect(find.text('Tiendas'), findsOneWidget);
-      await tester.tap(find.byTooltip('Cerrar'));
+        expect(find.text('Proveedores'), findsOneWidget);
+        await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Carrito'), findsOneWidget);
+      expect(find.byTooltip('Bolsa'), findsOneWidget);
       expect(tester.getCenter(bcv).dx - tester.getCenter(cart).dx, 44);
       expect(tester.element(identity), same(identityElement));
       await tester.tap(find.byTooltip('Bandeja'));
@@ -257,7 +257,7 @@ void main() {
         widget is SingleChildScrollView &&
         widget.scrollDirection == Axis.horizontal);
     expect(rails, findsNWidgets(2));
-    for (final (index, width) in [318.56, 191.86].indexed) {
+    for (final (index, width) in [318.56, 275.12].indexed) {
       final rail = rails.at(index);
       await Scrollable.ensureVisible(tester.element(rail), alignment: .4);
       final cards = find.descendant(
@@ -271,7 +271,8 @@ void main() {
       await tester.timedDrag(
           rail, Offset(-stride * .7, 0), const Duration(milliseconds: 450));
       await tester.pumpAndSettle();
-      expect(tester.getCenter(cards.at(1)).dx, closeTo(195, .5));
+      // The scroll spring settles within one logical pixel.
+      expect(tester.getCenter(cards.at(1)).dx, closeTo(195, 1));
       await tester.drag(rail, const Offset(-390, 0));
       await tester.pumpAndSettle();
       expect(tester.getRect(cards.last).right, closeTo(376, .5));
@@ -451,7 +452,9 @@ void main() {
       await tester.pump();
       expect(tab, AliadoShellTabs.catalogo);
       expect(
-          MainShellTabController.consumeAliadoCatalogRequest()!.filters.searchQuery,
+          MainShellTabController.consumeAliadoCatalogRequest()!
+              .filters
+              .searchQuery,
           isNull);
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
       await tester.pumpAndSettle();
@@ -546,6 +549,154 @@ void main() {
         isNotNull);
     expect(tester.takeException(), isNull);
   });
+
+  for (final scale in [1.0, 1.6]) {
+    testWidgets('desktop home aligns purchase buttons at text scale $scale',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const standard = PartModel(
+          id: 'plain-card',
+          ownerId: 'supplier',
+          nombre: 'Bujía',
+          precio: 12,
+          stock: 40);
+      const offer = PartModel(
+          id: 'offer-card',
+          ownerId: 'supplier',
+          ownerBusinessName: 'Distribuidora de repuestos',
+          nombre: 'Pastillas de freno delanteras para motocicletas',
+          parentSku: 'BRAKE',
+          precio: 12,
+          salePriceUsd: 9,
+          stock: 40);
+      await tester.pumpWidget(MaterialApp(
+          builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!),
+          home: AliadoHomeDashboard(
+              profile: profile,
+              embedInDesktopShell: true,
+              loader: () async =>
+                  const AliadoHomeData(newArrivals: [standard, offer]))));
+      await tester.pumpAndSettle();
+      final standardButton = tester.getRect(find.byTooltip('Agregar Bujía'));
+      final offerButton =
+          tester.getRect(find.byTooltip('Ver opciones ${offer.nombre}'));
+      expect(standardButton.top, closeTo(offerButton.top, 0.5));
+      expect(standardButton.height, closeTo(offerButton.height, 0.5));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final section in ['buyAgain', 'newArrivals', 'bestSellers']) {
+    for (final size in [(320.0, 1.0), (390.0, 1.0), (320.0, 1.6)]) {
+      testWidgets(
+          'home keeps discount inline and minimum beside price: $section $size',
+          (tester) async {
+        tester.view.physicalSize = Size(size.$1, 1100);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const item = PartModel(
+            id: 'minimum-layout',
+            nombre: 'Kit embrague completo 125 cc',
+            ownerBusinessName: 'Repuestos Delta Caracas C.A.',
+            precio: 45,
+            salePriceUsd: 41.5,
+            stock: 100,
+            minOrderQty: 5);
+        await tester.pumpWidget(MaterialApp(
+            builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(size.$2)),
+                child: child!),
+            home: AliadoHomeDashboard(
+                profile: profile,
+                loader: () async => AliadoHomeData(
+                      buyAgain: section == 'buyAgain' ? [item] : const [],
+                      newArrivals: section == 'newArrivals' ? [item] : const [],
+                      bestSellers: section == 'bestSellers' ? [item] : const [],
+                    ))));
+        await tester.pumpAndSettle();
+        final price = tester.getRect(find.text('41.50 USD'));
+        final discount = tester.getRect(find.text('-8%'));
+        final minimum = tester.getRect(find.text('Mín.\n5 uds'));
+        expect(discount.left, greaterThan(price.right));
+        expect(discount.center.dy, closeTo(price.center.dy, .5));
+        expect(minimum.left, greaterThan(discount.right));
+        final divider = tester.getRect(find.byType(VerticalDivider));
+        expect(divider.left, greaterThanOrEqualTo(discount.right));
+        expect(divider.right, lessThanOrEqualTo(minimum.left));
+        expect(find.text('45.00 REF'), findsOneWidget);
+        expect(find.text('Mín. 5 uds'), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final width in [320.0, 390.0, 540.0]) {
+    testWidgets(
+        'home cards align heights with prices beside larger photos at $width',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const plain = PartModel(
+          id: 'plain',
+          nombre: 'Bujía NGK 125',
+          precio: 3.2,
+          stock: 100,
+          minOrderQty: 20,
+          ownerBusinessName: 'Proveedor');
+      const promo = PartModel(
+          id: 'promo',
+          nombre: 'Filtro Ferodo',
+          precio: 15,
+          stock: 100,
+          salePriceUsd: 13.5,
+          minOrderQty: 10,
+          ownerBusinessName: 'Proveedor');
+      await tester.pumpWidget(MaterialApp(
+          home: AliadoHomeDashboard(
+              profile: profile,
+              loader: () async =>
+                  const AliadoHomeData(newArrivals: [plain, promo]))));
+      await tester.pumpAndSettle();
+      final tileWidth = width == 320
+          ? 272.0
+          : width == 390
+              ? 275.12
+              : 320.0;
+      Rect card(String name) => tester.getRect(find.ancestor(
+          of: find.text(name),
+          matching: find.byWidgetPredicate((widget) =>
+              widget is SizedBox &&
+              ((widget.width ?? 0) - tileWidth).abs() < .1)));
+      final plainCard = card(plain.nombre);
+      final promoCard = card(promo.nombre);
+      expect(plainCard.width, tileWidth);
+      expect(plainCard.height, closeTo(promoCard.height, .1));
+      expect(promoCard.height, lessThan(180));
+      expect(tester.getRect(find.text('3.20 REF')).left,
+          greaterThan(plainCard.left + 90));
+      expect(tester.getRect(find.text('3.20 REF')).left,
+          closeTo(tester.getRect(find.text(plain.nombre)).left, .1));
+      expect(tester.getRect(find.text('Mín.\n20 uds')).right,
+          closeTo(plainCard.right - 8, .1));
+      expect(tester.getRect(find.text('Mín.\n10 uds')).right,
+          closeTo(promoCard.right - 8, .1));
+      final price = tester.getRect(find.text('13.50 USD'));
+      final discount = tester.getRect(find.text('-10%'));
+      expect(discount.left, greaterThan(price.right));
+      expect(discount.center.dy, closeTo(price.center.dy, .5));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('partial failure keeps available sections and offers retry',
       (tester) async {

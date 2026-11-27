@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'order_chat_access.dart';
 import 'order_postventa_chat_card.dart';
+import 'mobile_postventa_context.dart';
+import 'mobile_order_action_widgets.dart';
 import 'order_return_rules.dart';
 import 'order_message_attachment.dart';
 import 'orders_service.dart';
@@ -41,6 +43,7 @@ class OrderMotolinkThreadSection extends StatefulWidget {
     this.suppressInlineHelp = false,
     this.expandMessages = false,
     this.conversationContext,
+    this.mobileAppBarBuilder,
     this.emptyHint,
     this.closedEmptyTitle,
     this.closedEmptyDescription,
@@ -77,6 +80,9 @@ class OrderMotolinkThreadSection extends StatefulWidget {
   final bool expandMessages;
   final Widget? conversationContext;
 
+  /// Full-screen mobile chat places its existing actions in the app bar.
+  final PreferredSizeWidget Function(List<Widget> actions)? mobileAppBarBuilder;
+
   /// Texto cuando todavía no hay mensajes y se puede responder.
   final String? emptyHint;
 
@@ -103,6 +109,7 @@ class _OrderMotolinkThreadSectionState
   final List<RealtimeChannel> _messageChannels = [];
   final Set<String> _resolvedRequestIds = {};
   String? _resolvingRequestId;
+  int _postventaRevision = 0;
 
   bool get _usaHiloFusionado =>
       widget.mergedThreadRequestIds != null &&
@@ -236,6 +243,7 @@ class _OrderMotolinkThreadSectionState
       if (!mounted) return;
       setState(() {
         _items = list;
+        _postventaRevision++;
         _loading = false;
       });
     } catch (e) {
@@ -415,11 +423,13 @@ class _OrderMotolinkThreadSectionState
         MediaQuery.sizeOf(context).width >= AppBreakpoints.mobileMenu;
     final author = desktop ? _desktopAuthorLabel(m) : _narrowAuthorLabel(m, mine);
     return ChatMessageBubble(
+      mobileStyle: MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu,
       key: ValueKey(m.id),
       mine: mine,
       at: m.createdAt,
       author: author,
       isAction: request != null,
+      highlightAction: request != null,
       showDate: !widget.expandMessages,
       child: request == null
           ? Column(
@@ -431,6 +441,11 @@ class _OrderMotolinkThreadSectionState
               ],
             )
           : OrderPostventaChatCard(
+              outgoing: mine,
+              orderReference: widget.orderLines.isEmpty
+                  ? null
+                  : mobileOrderReference(
+                      line == null ? widget.orderLines : [line]),
               data: request,
               attachments: m.attachments,
               imageUrl: line == null
@@ -535,6 +550,19 @@ class _OrderMotolinkThreadSectionState
     );
   }
 
+  Widget _chatMenu() => PopupMenuButton<_ChatAction>(
+      tooltip: 'Opciones del chat',
+      onSelected: _handleChatAction,
+      itemBuilder: (context) => [
+            PopupMenuItem(
+                value: _ChatAction.refresh,
+                enabled: !_loading,
+                child: const Text('Actualizar mensajes')),
+            if (!widget.suppressInlineHelp)
+              const PopupMenuItem(
+                  value: _ChatAction.help, child: Text('Ayuda del chat')),
+          ]);
+
   @override
   Widget build(BuildContext context) {
     final uid = SupabaseService.currentUserId;
@@ -556,12 +584,13 @@ class _OrderMotolinkThreadSectionState
             ? '¿Tienes una duda sobre este pedido?'
             : (widget.closedEmptyTitle ?? 'Este pedido aún no tiene mensajes'),
         description: canReply
-            ? (widget.emptyHint ??
-                'Escribe aquí para iniciar la conversación.')
+            ? (widget.emptyHint ?? 'Escribe aquí para iniciar la conversación.')
             : (widget.closedEmptyDescription ?? widget.emptyHint),
       );
     } else if (widget.expandMessages) {
       messages = ChatTimeline(
+        mobileStyle:
+            MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu,
         itemCount: _items.length,
         dateAt: (i) => _items[i].createdAt,
         messageAt: (i) => _messageTile(uid, i),
@@ -578,11 +607,29 @@ class _OrderMotolinkThreadSectionState
     final hidePanelMenu = widget.suppressBuiltinTitle &&
         widget.suppressInlineHelp &&
         widget.conversationContext == null;
-    return Column(
+    final mobileAppBar =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu
+            ? widget.mobileAppBarBuilder
+            : null;
+    final content = Column(
       mainAxisSize: widget.expandMessages ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!hidePanelMenu) ...[
+        if (mobileAppBar != null && widget.conversationContext != null)
+          widget.conversationContext!,
+        if ((mobileAppBar != null ||
+                (widget.expandMessages &&
+                    (widget.allowReplyAsAliado ||
+                        widget.orderLines
+                            .any((line) => line.aliadoId == uid)))) &&
+            (widget.orderLines
+                    .any((line) => line.postventaDevolucionAt != null) ||
+                _items.any((message) =>
+                    OrderReturnRules.parseReturnRequestMessage(message.body) !=
+                    null)))
+          MobilePostventaContext(
+              lines: widget.orderLines, revision: _postventaRevision),
+        if (mobileAppBar == null && !hidePanelMenu) ...[
           Padding(
             padding: const EdgeInsetsDirectional.only(start: 14, end: 6),
             child: Row(
@@ -594,22 +641,7 @@ class _OrderMotolinkThreadSectionState
                           : const Text('Chat del pedido',
                               style: TextStyle(fontWeight: FontWeight.w700))),
                 ),
-                PopupMenuButton<_ChatAction>(
-                  tooltip: 'Opciones del chat',
-                  onSelected: _handleChatAction,
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: _ChatAction.refresh,
-                      enabled: !_loading,
-                      child: const Text('Actualizar mensajes'),
-                    ),
-                    if (!widget.suppressInlineHelp)
-                      const PopupMenuItem(
-                        value: _ChatAction.help,
-                        child: Text('Ayuda del chat'),
-                      ),
-                  ],
-                ),
+                _chatMenu(),
               ],
             ),
           ),
@@ -626,6 +658,8 @@ class _OrderMotolinkThreadSectionState
         if (widget.expandMessages) Expanded(child: messages) else messages,
         if (canReply)
           ChatComposer(
+            mobileStyle:
+                MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu,
             controller: _ctrl,
             onSend: _send,
             sending: _sending || _pickingAttachment,
@@ -680,5 +714,10 @@ class _OrderMotolinkThreadSectionState
           ),
       ],
     );
+    if (mobileAppBar == null) return content;
+    return Scaffold(
+        backgroundColor: B2BThemeExtension.of(context).background,
+        appBar: mobileAppBar([_chatMenu()]),
+        body: SafeArea(top: false, child: content));
   }
 }

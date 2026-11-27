@@ -56,6 +56,7 @@ import 'package:motolink_pro_app/features/kyc/aliado_access_approved_banner.dart
 import 'package:motolink_pro_app/features/onboarding/entrepreneur_welcome_dialog.dart';
 import 'package:motolink_pro_app/features/onboarding/retailer_induction.dart';
 import 'package:motolink_pro_app/features/onboarding/importer_web_induction.dart';
+import 'package:motolink_pro_app/features/onboarding/induction_window.dart';
 import 'package:motolink_pro_app/features/orders/aliado/aliado_pedidos_panel.dart';
 import 'package:motolink_pro_app/features/orders/importador/importer_active_orders_panel.dart';
 import 'main_shell_tab.dart';
@@ -132,8 +133,7 @@ class _MainShellState extends State<MainShell> {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(_maybeShowEntrepreneurWelcome());
-      unawaited(_maybeShowImporterWebInduction());
+      unawaited(_showEntryGuides());
     });
     PushNotificationService.instance.registerTapHandler(_onPushNotificationTap);
     unawaited(PushNotificationService.instance.registerForCurrentUser());
@@ -310,14 +310,32 @@ class _MainShellState extends State<MainShell> {
     unawaited(_maybeShowEntrepreneurWelcome());
   }
 
-  Future<void> _maybeShowImporterWebInduction() async {
-    if (widget.homeRole != AppHomeRole.importador) return;
-    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) return;
-    ImporterWebInduction.rememberProfile(_profile.id);
-    await ImporterWebInduction.showIfNeeded(
-      context: context,
-      profileId: _profile.id,
-    );
+  Future<void> _showEntryGuides() async {
+    final role = widget.homeRole;
+    if (role != AppHomeRole.aliado && role != AppHomeRole.importador) return;
+
+    await _maybeShowEntrepreneurWelcome();
+    if (!mounted) return;
+
+    final profileId = _profile.id;
+    DateTime? endsAt;
+    try {
+      endsAt = await openMyInductionWindow();
+    } catch (error) {
+      debugPrint('No se pudo consultar el periodo de inducción: ${error.runtimeType}');
+    }
+    if (!mounted || _profile.id != profileId) return;
+    if (role == AppHomeRole.importador) {
+      ImporterWebInduction.rememberProfile(profileId);
+      await ImporterWebInduction.showIfNeeded(
+        context: context,
+        profileId: profileId,
+        endsAt: endsAt,
+      );
+    } else if (isInductionWindowOpen(endsAt) &&
+        !_profile.isEntrepreneurMarketplaceLocked) {
+      startRetailerTour();
+    }
   }
 
   Future<void> _maybeShowEntrepreneurWelcome() async {

@@ -1,3 +1,5 @@
+import 'induction_window.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -87,21 +89,22 @@ abstract final class ImporterWebInduction {
     );
   }
 
-  /// Primer ingreso en una ventana de escritorio. El panel estrecho no lo abre.
+  static DateTime? _automaticUntil;
+
   static Future<void> showIfNeeded({
     required BuildContext context,
     required String profileId,
+    required DateTime? endsAt,
   }) async {
-    if (!context.mounted) return;
-    if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) return;
-    if (await isDismissed(profileId)) return;
-    if (!context.mounted) return;
+    _automaticUntil = endsAt;
+    if (!context.mounted || !isInductionWindowOpen(endsAt) || isActive) return;
     await show(context: context, profileId: profileId);
   }
 
   static void rememberProfile(String profileId) {
     final id = profileId.trim();
     if (id.isEmpty) return;
+    if (_tour.profileId != id) _automaticUntil = null;
     _tour.profileId = id;
   }
 
@@ -134,7 +137,7 @@ abstract final class ImporterWebInduction {
     if (!context.mounted) return;
     if (MediaQuery.sizeOf(context).width < AppBreakpoints.mobileMenu) return;
     final id = _tour.profileId.trim();
-    if (id.isEmpty) return;
+    if (id.isEmpty || !isInductionWindowOpen(_automaticUntil)) return;
     if (_tour.active) {
       _tour.queueFirstOrder = true;
       return;
@@ -744,7 +747,8 @@ class _ImporterTourController extends ChangeNotifier {
     final session = _session;
     _session = null;
     if (session != null && !session.isCompleted) session.complete();
-    if (!queued || profileId.isEmpty) return;
+    if (!queued || profileId.isEmpty ||
+        !isInductionWindowOpen(ImporterWebInduction._automaticUntil)) return;
     if (await ImporterWebInduction._isFlagDismissed(
       ImporterWebInduction._firstOrderKey(profileId),
     )) {

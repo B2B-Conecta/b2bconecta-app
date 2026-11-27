@@ -12,6 +12,11 @@ final _active = ValueNotifier(false);
 
 void endRetailerTour() => _active.value = false;
 
+void startRetailerTour() {
+  _active.value = true;
+  MainShellTabController.navigateToHomeTab();
+}
+
 Future<void> showRetailerInduction(BuildContext context) async {
   final start = await showDialog<bool>(
     context: context,
@@ -32,9 +37,7 @@ Future<void> showRetailerInduction(BuildContext context) async {
       ],
     ),
   );
-  if (!context.mounted || start != true) return;
-  _active.value = true;
-  MainShellTabController.navigateToHomeTab();
+  if (context.mounted && start == true) startRetailerTour();
 }
 
 class RetailerTourButton extends StatelessWidget {
